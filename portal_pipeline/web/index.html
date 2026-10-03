@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="portal-token" content="PAIRING_TOKEN"><title>Resume portal workspace</title><link rel="stylesheet" href="/style.css"></head>
+<body><main><header><p class="eyebrow">SEPARATE DEVELOPMENT WORKSPACE</p><h1>Prepare once.<br>Review every field.</h1><p class="intro">Use your audited resume, choose the answers to fill, and finish the application yourself.</p><span class="badge">Review before filling</span></header>
+<div class="grid"><section class="card"><h2>1. Select an application</h2>
+<form id="import-form"><label>Audited application folder<input name="folder" required placeholder="D:\Code\Resume\Applications\..." aria-describedby="import-help"></label>
+<label>Employer portal posting URL, if different<input name="portal_url" type="url" placeholder="Optional: exact employer posting URL"></label>
+<p id="import-help" class="small">Prepare and audit the application through your current workflow first. Import reads the exact folder and its tracker row, then copies the resume into this workspace.</p><button type="submit">Import audited application</button></form>
+<details><summary>Develop with a sandbox application</summary><form id="create-form">
+<label>Company<input name="company" required maxlength="300" placeholder="Employer name"></label>
+<label>Role<input name="role" required maxlength="300" placeholder="Exact posting title"></label>
+<label>Posting URL<input name="url" type="url" placeholder="https://..."></label>
+<label>Starting resume<select name="template" id="templates"></select></label>
+<label>Job description<textarea name="jd" required rows="7" placeholder="Paste the full job description"></textarea></label>
+<div class="actions"><button type="submit">Prepare working copy</button><button id="sample" class="secondary" type="button">Try sample application</button></div></form></details></section>
+<section class="card"><h2>2. Review the resume</h2><p id="context">Prepare an application to begin.</p>
+<div id="review" hidden><div id="build-editor"><label>Working resume content<textarea id="content" rows="12" spellcheck="false"></textarea></label>
+<p class="small">Edit the working copy using verified experience. Contact, credentials, employer names, role titles, and dates remain tied to the master.</p>
+<label>Required resume terms, one per line<textarea id="terms" rows="2" placeholder="Only terms you can honestly claim"></textarea></label>
+<label>Eligibility checklist<textarea id="eligibility" rows="2" placeholder="Requirement::yes/no/partial::note::required/preferred"></textarea></label>
+<label class="check"><input id="requirements-reviewed" type="checkbox"> I reviewed the JD's resume terms and eligibility requirements.</label>
+<label class="check"><input id="content-reviewed" type="checkbox"> I checked the resume claims against verified experience.</label>
+<div class="actions"><button id="build" type="button">Build working resume</button></div></div>
+<div class="actions"><button id="download" class="secondary" type="button">Download for Word review</button></div>
+<pre id="checks" aria-live="polite"></pre>
+<details id="audit-details" hidden><summary>Existing application audit report</summary><pre id="audit-report"></pre></details>
+<label class="check"><input id="visual-reviewed" type="checkbox"> I reviewed the latest document in Word, including wrapping and widows.</label>
+<button id="approve" type="button">Enable this resume for attachment</button>
+</div></section></div>
+<section class="card connect"><div><h2>3. Select fields on the portal</h2><p>Open an application page after signing in yourself. Use the extension to scan it, choose fields, edit answers, and fill only your selection. Choose the employer or school for each history row before filling.</p>
+<p><a href="/fixture" target="_blank" rel="noopener">Open the synthetic Workday form</a> to try the review panel locally without installing the extension.</p>
+<p class="small">Selected dropdowns with a linked option list are supported. Other custom controls, hidden uploads, cross-origin frames, and live employer validation remain future work.</p></div>
+<div><label>Extension pairing token<input id="pairing" readonly></label><button id="copy" class="secondary" type="button">Copy pairing token</button><p class="small">The token changes when the local server restarts. Pair again after a restart.</p></div></section>
+<p id="status" class="notice" role="status">Loading workspace...</p><footer>Current resume workflow and application trackers remain separate. No login, signature, attestation, or final submission is automated.</footer></main><script src="/app.js"></script></body></html>

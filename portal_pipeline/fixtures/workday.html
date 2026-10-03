@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="portal-token" content="PAIRING_TOKEN"><title>Synthetic Workday application</title><link rel="stylesheet" href="/style.css"></head>
+<body><main style="max-width:760px;margin-left:30px"><header><p class="eyebrow">LOCAL FORM FIXTURE</p><h1>Treasury Risk Analyst</h1><p>Synthetic Employer. No application can be submitted to an employer from this page.</p><button id="scan" type="button">Review this page's fields</button></header>
+<section class="card"><p id="progress">Step 1 of 3</p><form id="application">
+<div data-step="1">
+<label>First name<input id="first" name="firstName" data-automation-id="legalName-firstName" required></label>
+<label>Last name<input id="last" name="lastName" data-automation-id="legalName-lastName" required></label>
+<label>Email<input id="email" name="email" type="email" required></label>
+<label>Phone<input id="phone" name="phone" value="Keep this existing value"></label>
+<label>Street address<input id="street" name="streetAddress"></label>
+<label>Are you authorized to work in the US?<select id="authorized" name="authorized"><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+<label>Do you require sponsorship now?<select id="now" name="sponsorNow"><option value="">Select</option><option value="1">Yes</option><option value="0">No</option></select></label>
+<label>Will you require sponsorship in the future?<select id="future" name="sponsorFuture"><option value="">Select</option><option value="1">Yes</option><option value="0">No</option></select></label>
+<label>Do you require sponsorship?<select id="ambiguous" name="sponsor"><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+<label>Password<input id="password" name="password" type="password"></label>
+<label>Gender<select id="gender" name="gender"><option value="">Select</option><option>Prefer not to say</option></select></label>
+<p id="custom-relocation-label">Are you willing to relocate?</p>
+<div id="custom-relocation" class="fixture-combobox" role="combobox" tabindex="0" aria-labelledby="custom-relocation-label" aria-controls="relocation-options" aria-expanded="false" aria-haspopup="listbox" aria-valuetext="">Choose an answer</div>
+<div id="relocation-options" class="fixture-listbox" role="listbox" aria-labelledby="custom-relocation-label" hidden><div role="option" aria-selected="false">Yes</div><div role="option" aria-selected="false">No</div></div>
+<button id="next-one" type="button" data-automation-id="bottom-navigation-next-button">Next</button>
+</div>
+<div data-step="2" hidden><h2>Employment history</h2><div id="jobs"></div><h2>Education</h2><div id="education-records"></div>
+<label>Resume<input id="resume" name="resume" type="file" accept=".docx"></label><p id="upload-state" role="status"></p>
+<label>Cover letter<input id="cover" name="coverLetter" type="file"></label>
+<label>Why are you interested in this company?<textarea id="why" name="why"></textarea></label>
+<label>Custom department dropdown<input id="custom" role="combobox" aria-label="Custom department dropdown"></label>
+<button id="next-two" type="button" data-automation-id="bottom-navigation-next-button">Next</button></div>
+<div data-step="3" hidden><h2>Final review</h2><p>Review every answer and attachment. The prototype does not click these controls.</p>
+<label class="check"><input id="attestation" type="checkbox" name="attestation"> I certify that all information is accurate.</label>
+<label>Signature<input id="signature" name="signature"></label>
+<button id="submit" type="submit">Submit application</button><p id="submit-count" role="status">Submit clicks: 0</p></div>
+</form></section></main><script src="/fixture-adapter.js"></script><script src="/fixture-engine.js"></script><script src="/fixture-panel.js"></script><script src="/fixture.js"></script></body></html>

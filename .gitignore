@@ -1,0 +1,14 @@
+**/__pycache__/
+**/.pytest_cache/
+**/node_modules/
+portal_pipeline/data/
+portal_pipeline/test-results/
+Portal_Trial/out/
+*.docx
+*.xlsx
+*.pdf
+.env
+.env.*
+browser-profile/
+playwright-report/
+test-results/

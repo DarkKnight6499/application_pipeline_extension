@@ -1,0 +1,3 @@
+# Runtime uses the existing workflow's python-docx and openpyxl dependencies.
+# Browser tests were verified with this Playwright version.
+playwright==1.63.0
