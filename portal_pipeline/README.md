@@ -43,11 +43,11 @@ The audit's eligibility gaps remain visible advisory findings. This prototype do
 7. For an unsupported control, choose **Export field structure**. The JSON report records labels and control attributes without entered answers, profile proposals, option text, query strings, or protected controls. Review labels and IDs before sharing because an employer may put personal information in those attributes.
 8. For each employment or education row, choose its employer and role or its school in **Profile record for ...**. Those fields stay disabled until you choose a record or explicitly choose manual answers. Page order is not used to assign candidate history.
 
-After updating the prototype, reload the unpacked extension in its extensions page and refresh the application tab. Version `0.3.1` adds **Inspect page only**, which does not require helper pairing or an imported application. Version `0.3.0` added explicit history row choices, split month/year fields, and prevention of overlapping fills and rescans.
+After updating the prototype, reload the unpacked extension in its extensions page and refresh the application tab. Version `0.4.0` adds Greenhouse application-form boundaries and labelled hidden resume inputs. Version `0.3.1` added **Inspect page only**, which does not require helper pairing or an imported application. Version `0.3.0` added explicit history row choices, split month/year fields, and prevention of overlapping fills and rescans.
 
-The extension requests page access on user action using `activeTab`. Its persistent host permission covers only the local helper. The current popup restricts scanning to Workday and the paired local fixture, keeping development focused on the first portal. Real Workday compatibility is still unverified. The filling panel checks the posting origin and asks you to confirm the exact application.
+The extension requests page access on user action using `activeTab`. Its persistent host permission covers only the local helper. The current popup restricts scanning to Workday, Greenhouse, and the paired local fixture. Real employer compatibility remains unverified. The filling panel checks the posting origin and asks you to confirm the exact application.
 
-For the first walkthrough, open the Workday application page and choose **Inspect page only** in the popup. The extension-owned panel lists control labels, types, sections, and manual reasons. It loads no candidate profile, offers no answer selection or fill action, and rejects scan and fill commands from that inspection panel. Export a report, navigate manually, and use **Rescan this page** for the next report. A posting or protected-only login/review page can legitimately show no inspectable fields. Pair and import an audited application later when ready to fill.
+For a walkthrough, open the Workday or Greenhouse application page and choose **Inspect page only** in the popup. The extension-owned panel lists control labels, types, sections, and manual reasons. It loads no candidate profile, offers no answer selection or fill action, and rejects scan and fill commands from that inspection panel. Export a report, navigate manually, and use **Rescan this page** for the next report. A posting or protected-only login/review page can legitimately show no inspectable fields. Pair and import an audited application later when ready to fill.
 
 Login, MFA, CAPTCHA, demographics, signatures, attestations, and final submission stay manual. Password values are not exposed by scanning. No tokens or profile values are placed in an employer-page review panel. The injected panel appears only on the synthetic local fixture.
 
@@ -77,13 +77,15 @@ Separate start and end month/year fields can use components of verified `YYYY-MM
 
 Recognized history rows use only history-specific field aliases. Their Email, City, or Salary expectation questions do not borrow personal contact information or prospective salary answers. Unknown history questions need manual answers.
 
-Hidden uploads, cross-origin frames, adding or removing history entries, other portal-specific date controls, and automatic navigation are not implemented. History row discovery is validated only against the explicit synthetic sections; real employer grouping still needs inspection and an adapter. A failed dropdown attempt may leave its listbox open for manual review.
+Greenhouse hosted forms matching the observed contract support a labelled hidden native resume input. Scanning stays inside one unique `form#application-form`, excludes internal ARIA-hidden inputs, and protects the full demographic container. Cover-letter inputs are identified separately; the resume is never used as a cover letter. The public Justworks form supplied the structural evidence. See [GREENHOUSE_CONTRACT.md](../docs/GREENHOUSE_CONTRACT.md). This does not establish remote upload completion or live form compatibility.
+
+Other hidden uploads, cross-origin frames, adding or removing history entries, other portal-specific date controls, and automatic navigation are not implemented. History row discovery is validated only against the explicit synthetic sections; real employer grouping still needs inspection and an adapter. A failed dropdown attempt may leave its listbox open for manual review.
 
 One fill runs at a time per page. The review panel disables editing, row changes, Close, and Rescan until the fill result is ready. Structure export remains available because it does not replace the active scan. Wait for results before manually navigating on the employer page.
 
 A fill reports a verified DOM value after a short settling period. It does not guarantee that the employer saved the value on its server. A file input result does not prove the upload completed remotely. If a portal changes an unselected field, the engine reports the change and stops further writes. It does not silently roll the form back.
 
-No real employer application has been validated yet. Live validation should start with one Workday application through its final review page, with the user present and submission remaining manual.
+No real employer application has been validated yet. Live validation must independently verify Workday and Greenhouse through final review, with the user present and submission remaining manual.
 
 See [INSPECTION.md](INSPECTION.md) for the real-portal inspection checklist and report interpretation.
 

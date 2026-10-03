@@ -33,6 +33,14 @@ The original report is preserved in [LEGACY_GREENHOUSE_TRIAL.md](trials/LEGACY_G
 
 Latest completed validation before Greenhouse development: 76 tests passed in 46.206 seconds, with JavaScript syntax checks passing. Backend tests confirmed source trackers and references were unchanged.
 
+## Greenhouse phase, version 0.4.0
+
+- An initially discovered Antora posting redirected to a board marked inactive. It was rejected as the adapter reference. The public Justworks application provided an intact form instead.
+- Generic scanning would include auxiliary required inputs, miss whole-section demographic protection, and label the resume upload as Attach. The dedicated adapter now scopes the form, excludes ARIA-hidden controls, protects the survey container, and resolves the hidden resume input through its exact labelled group.
+- Editable comboboxes remain unsupported because the public response does not establish their live popup and selection contract. Compound sponsorship stays pending. These are visible limits rather than successful fills.
+- Five new browser regressions and the extended loaded-extension inspection test pass. The full suite passed 81 tests in 50.944 seconds. JavaScript syntax checks passed.
+- Public HTML inspection and synthetic verification do not establish live persistence or upload completion. Detailed evidence and the next task are in [GREENHOUSE_CONTRACT.md](GREENHOUSE_CONTRACT.md).
+
 ## Acceptance still pending
 
 DOM readback does not prove remote saving. A file input's filename does not prove remote upload completion. Neither Workday nor Greenhouse has a real employer application validated through final review. Final submission stays manual.

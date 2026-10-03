@@ -22,7 +22,7 @@
     `));
     const panel = element("section", "", {class: "panel", "aria-label": "Portal filling review"});
     const top = element("div", "", {class: "row top"});
-    top.append(element("h2", options.inspectionOnly ? "Inspect Workday fields" : "Review selected fields"));
+    top.append(element("h2", options.inspectionOnly ? "Inspect application fields" : "Review selected fields"));
     const close = element("button", "Close", {class: "close", type: "button"});
     close.onclick = () => host.remove();
     top.append(close);
@@ -48,6 +48,7 @@
         status.textContent = `${report.host}: ${report.fields.length} visible, unprotected controls. Inspection only. No candidate profile loaded and no fields filled.`;
         panel.append(element("p", "Export one structure report per page. Login and navigation stay manual. Reports omit entered answers and option text; review labels before sharing.", {class: "source"}));
         if (!report.fields.length) panel.append(element("p", "No application fields found. This may be a posting, login page, or unsupported form. Inspect the next application page after manual navigation.", {class: "note"}));
+        if (report.portal_manual_reason) panel.append(element("p", report.portal_manual_reason, {class: "note"}));
         for (const field of report.fields) {
           const card = element("div", "", {class: "field"});
           card.append(element("h3", field.label || "Unlabelled control"));

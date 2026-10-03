@@ -647,7 +647,7 @@ class BrowserTests(unittest.TestCase):
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             # Opening popup.html in a test tab does not grant activeTab. Give only
             # routed synthetic hosts test permissions; production stays unchanged.
-            manifest["host_permissions"] += ["https://inspection-fixture.myworkdayjobs.com/*", "https://jobs.lever.co/*"]
+            manifest["host_permissions"] += ["https://inspection-fixture.myworkdayjobs.com/*", "https://job-boards.greenhouse.io/*", "https://jobs.lever.co/*"]
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
             context = self.playwright.chromium.launch_persistent_context(str(Path(browser_profile) / "profile"), channel="chromium", headless=True,
                 args=[f"--disable-extensions-except={extension}", f"--load-extension={extension}"])
@@ -704,7 +704,7 @@ class BrowserTests(unittest.TestCase):
                     if navigation:
                         page.locator(navigation).click()
                         review.locator("#rescan").click()
-                        host.get_by_role("heading", name="Inspect Workday fields", exact=True).wait_for()
+                        host.get_by_role("heading", name="Inspect application fields", exact=True).wait_for()
                         if navigation == "#next":
                             host.get_by_role("heading", name="Employer", exact=True).wait_for()
                         else:
@@ -712,6 +712,24 @@ class BrowserTests(unittest.TestCase):
                 self.assertEqual(page.locator("#signature").input_value(), "")
                 self.assertFalse(any("/api/" in url for url in requests))
                 self.assertEqual(review.evaluate("async () => await chrome.storage.local.get(null)"), {})
+                greenhouse_url = "https://job-boards.greenhouse.io/synthetic/jobs/123"
+                context.route(greenhouse_url, lambda route: route.fulfill(content_type="text/html", body=(HERE / "fixtures/greenhouse.html").read_text(encoding="utf-8")))
+                page.goto(greenhouse_url)
+                popup = context.new_page()
+                popup.goto(f"chrome-extension://{extension_id}/popup.html")
+                page.bring_to_front()
+                with popup.expect_event("close", timeout=10000):
+                    popup.locator("#inspect").click()
+                review.reload()
+                host.get_by_role("heading", name="Resume/CV", exact=True).wait_for()
+                with review.expect_download() as download_info:
+                    host.get_by_role("button", name="Export field structure", exact=True).click()
+                report = json.loads(Path(download_info.value.path()).read_text(encoding="utf-8"))
+                self.assertEqual(report["portal"], "greenhouse")
+                self.assertTrue(any(field["structure"]["dom_id"] == "resume" for field in report["fields"]))
+                self.assertFalse(any(field["structure"]["dom_id"] in {"newsletter", "required-shadow", "transgender", "survey-education"} for field in report["fields"]))
+                self.assertEqual(page.locator("#resume").evaluate("node => node.files.length"), 0)
+                self.assertFalse(any("/api/" in url for url in requests))
                 # Other portal families remain outside this first-portal run.
                 context.route("https://jobs.lever.co/fixture", lambda route: route.fulfill(body="Other portal"))
                 page.goto("https://jobs.lever.co/fixture")
@@ -723,6 +741,87 @@ class BrowserTests(unittest.TestCase):
                 self.assertFalse(page.evaluate("Boolean(globalThis.PortalEngine)"))
             finally:
                 context.close()
+
+    def greenhouse_fixture(self):
+        url = "https://job-boards.greenhouse.io/synthetic/jobs/123"
+        self.page.route(url, lambda route: route.fulfill(content_type="text/html", body=(HERE / "fixtures/greenhouse.html").read_text(encoding="utf-8")))
+        self.page.goto(url)
+        for name in ["adapters/aria-listbox.js", "adapters/greenhouse.js", "engine.js"]:
+            self.page.add_script_tag(path=str(HERE / "extension" / name))
+
+    def test_greenhouse_scopes_application_and_excludes_internal_and_survey_controls(self):
+        self.greenhouse_fixture()
+        fields = self.scan()
+        ids = {field["structure"]["dom_id"] for field in fields}
+        self.assertNotIn("newsletter", ids)
+        self.assertNotIn("required-shadow", ids)
+        for identifier in ["transgender", "survey-education"]:
+            field = next(field for field in fields if field["structure"]["dom_id"] == identifier)
+            self.assertTrue(field["blocked"])
+            self.assertEqual(field["proposal"], "")
+        report = self.page.evaluate("PortalEngine.inspect()")
+        self.assertEqual(report["portal"], "greenhouse")
+        self.assertNotIn("transgender", json.dumps(report))
+        self.assertEqual(self.page.locator("#required-shadow").input_value(), "KEEP SHADOW")
+
+    def test_greenhouse_selected_native_fields_and_hidden_reviewed_resume(self):
+        self.greenhouse_fixture()
+        fields = self.scan()
+        resume = next(field for field in fields if field["structure"]["dom_id"] == "resume")
+        self.assertEqual(resume["label"], "Resume/CV")
+        self.assertTrue(resume["required"])
+        attachment = self.pipeline.resume(self.session["id"], for_upload=True)
+        import base64
+        selected = [{"id": field["id"], "value": field["proposal"]} for field in fields if field["key"] in {"first_name", "email", "phone"}]
+        selected.append({"id": resume["id"], "value": "Yazad_Madan.docx"})
+        result = self.page.evaluate("async ({selections, attachment}) => PortalEngine.fill(selections, {attachment})", {
+            "selections": selected, "attachment": {"name": "Yazad_Madan.docx", "base64": base64.b64encode(attachment).decode(),
+                "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "sha256": hashlib.sha256(attachment).hexdigest()}})
+        self.assertEqual([entry["status"] for entry in result], ["filled", "filled", "preserved", "filled"])
+        self.assertEqual(self.page.locator("#last_name").input_value(), "")
+        self.assertEqual(self.page.locator("#phone").input_value(), "KEEP PHONE")
+        self.assertEqual(self.page.locator("#resume").evaluate("node => node.files[0].name"), "Yazad_Madan.docx")
+        self.assertEqual(self.page.locator("#cover_letter").evaluate("node => node.files.length"), 0)
+        self.assertEqual(self.page.evaluate("submitAttempts"), 0)
+        self.assertIn("completion indicator", result[-1]["message"])
+
+    def test_greenhouse_editable_dropdowns_and_compound_sponsorship_stay_manual(self):
+        self.greenhouse_fixture()
+        fields = self.scan()
+        country = next(field for field in fields if field["structure"]["dom_id"] == "country")
+        self.assertIsNone(country["adapter"])
+        self.assertTrue(country["manual_reason"])
+        compound = next(field for field in fields if field["structure"]["dom_id"] == "compound")
+        self.assertIsNone(compound["key"])
+        self.assertEqual(compound["proposal"], "")
+        result = self.page.evaluate("async selection => PortalEngine.fill([selection])", {"id": country["id"], "value": "United States"})
+        self.assertEqual(result[0]["status"], "failed")
+        self.assertEqual(self.page.locator("#country").input_value(), "")
+
+    def test_greenhouse_reparented_field_and_demographic_move_block_stale_fill(self):
+        self.greenhouse_fixture()
+        first = next(field for field in self.scan() if field["key"] == "first_name")
+        self.page.evaluate("document.body.append(document.getElementById('first_name'))")
+        result = self.page.evaluate("async selection => PortalEngine.fill([selection])", {"id": first["id"], "value": "Synthetic"})
+        self.assertEqual(result[0]["status"], "failed")
+        self.assertEqual(self.page.locator("#first_name").input_value(), "")
+        self.page.evaluate("document.getElementById('application-form').append(document.getElementById('first_name'))")
+        first = next(field for field in self.scan() if field["key"] == "first_name")
+        self.page.evaluate("document.getElementById('demographic-section').append(document.getElementById('first_name'))")
+        result = self.page.evaluate("async selection => PortalEngine.fill([selection])", {"id": first["id"], "value": "Synthetic"})
+        self.assertEqual(result[0]["status"], "failed")
+        self.assertEqual(self.page.locator("#first_name").input_value(), "")
+
+    def test_greenhouse_changed_upload_label_and_duplicate_form_require_manual_review(self):
+        self.greenhouse_fixture()
+        resume = next(field for field in self.scan() if field["structure"]["dom_id"] == "resume")
+        self.page.locator("#upload-label-resume").evaluate("node => node.textContent = 'Proof of identity'")
+        result = self.page.evaluate("async selection => PortalEngine.fill([selection])", {"id": resume["id"], "value": "Yazad_Madan.docx"})
+        self.assertEqual(result[0]["status"], "failed")
+        self.assertEqual(self.page.locator("#resume").evaluate("node => node.files.length"), 0)
+        self.page.evaluate("const duplicate=document.createElement('form');duplicate.id='application-form';document.body.append(duplicate)")
+        self.assertEqual(self.scan(), [])
+        self.assertIn("unique supported", self.page.evaluate("PortalEngine.inspect().portal_manual_reason"))
 
     def test_real_extension_pairs_and_injects_on_user_action(self):
         with tempfile.TemporaryDirectory() as browser_profile:

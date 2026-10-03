@@ -29,13 +29,14 @@ The code currently depends on that external source checkout. It is not a standal
 
 ## Development status
 
-Version `0.3.1` passes 76 automated tests on synthetic fixtures, including a loaded MV3 extension. No real employer application has been validated through final review. Workday is the initial target. Greenhouse is the next requested development phase.
+Version `0.4.0` adds a Greenhouse hosted-form adapter alongside Workday. It limits scanning to the application form, protects the full demographic section, skips internal inputs, and recognizes the resume's hidden native file input through its labelled group. Editable dropdowns remain manual. All 81 tests pass. No real employer application has been validated through final review.
 
 The extension's persistent host permission covers only the local helper. Real application page access is requested by user action. The routed-host inspection test uses a temporary extension copy with test-only host permissions because opening a popup as a test tab does not grant `activeTab`; it does not establish the real browser permission flow.
 
 - [Research and project plan](docs/PROJECT_PLAN.md)
 - [Development handoff](portal_pipeline/HANDOFF.md)
 - [Failures and limitations](docs/TRIAL_ERRORS.md)
+- [Greenhouse contract and evidence](docs/GREENHOUSE_CONTRACT.md)
 - [Original Greenhouse trial report](docs/trials/LEGACY_GREENHOUSE_TRIAL.md)
 
 The legacy report records a separate earlier prototype. Its test counts and safety stop are historical evidence, not current extension results.

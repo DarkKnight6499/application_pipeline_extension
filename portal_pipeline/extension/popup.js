@@ -16,9 +16,9 @@
       const {server: pairedServer} = await chrome.storage.local.get("server");
       const url = new URL(tab.url);
       const localFixture = pairedServer && url.origin === pairedServer && url.pathname === "/fixture";
-      const supported = /(^|\.)myworkdayjobs\.com$/.test(url.hostname);
-      if (!localFixture && !supported) throw new Error("First-portal development is limited to Workday or the paired local fixture.");
-      await chrome.scripting.executeScript({target: {tabId: tab.id}, files: ["adapters/aria-listbox.js", "engine.js", "page-bridge.js"]});
+      const supported = /(^|\.)(myworkdayjobs\.com|greenhouse\.io)$/.test(url.hostname);
+      if (!localFixture && !supported) throw new Error("Development is limited to Workday, Greenhouse, or the paired local fixture.");
+      await chrome.scripting.executeScript({target: {tabId: tab.id}, files: ["adapters/aria-listbox.js", "adapters/greenhouse.js", "engine.js", "page-bridge.js"]});
       await chrome.sidePanel.setOptions({tabId: tab.id, path: `review.html?tab=${tab.id}${inspectionOnly ? "&mode=inspect" : ""}`, enabled: true});
       await chrome.sidePanel.open({tabId: tab.id});
       window.close();

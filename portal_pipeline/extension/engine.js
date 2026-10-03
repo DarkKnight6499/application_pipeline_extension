@@ -65,6 +65,8 @@
   }
 
   function labelFor(element) {
+    const portalLabel = globalThis.PortalGreenhouse?.label(element);
+    if (portalLabel) return portalLabel;
     const explicit = [...(element.labels || [])].map(labelText).join(" ");
     const ids = (element.getAttribute("aria-labelledby") || "").split(/\s+/).filter(Boolean);
     const ariaText = ids.map(id => document.getElementById(id)?.textContent || "").join(" ").trim();
@@ -73,8 +75,14 @@
   }
 
   function visible(element) {
+    if (element.closest('[aria-hidden="true"],[hidden]')) return false;
     const style = getComputedStyle(element);
     return !element.hidden && style.display !== "none" && style.visibility !== "hidden" && element.getClientRects().length > 0;
+  }
+
+  function controlVisible(element) {
+    const upload = globalThis.PortalGreenhouse?.uploadGroup(element);
+    return upload ? visible(upload) && !element.closest('[aria-hidden="true"],[hidden]') : visible(element);
   }
 
   function classify(label, identity, section) {
@@ -160,7 +168,8 @@
       }
     });
     for (const element of document.querySelectorAll("input, select, textarea, [role='combobox']")) {
-      if (element.closest("#portal-panel-host") || !visible(element)) continue;
+      if (element.closest("#portal-panel-host") || !controlVisible(element)) continue;
+      if (globalThis.PortalGreenhouse?.active() && !PortalGreenhouse.formFor(element)) continue;
       const custom = element.getAttribute("role") === "combobox" && element.tagName !== "SELECT";
       const type = custom ? "combobox" : element.type || element.getAttribute("role") || element.tagName.toLowerCase();
       if (["hidden", "submit", "button", "reset", "image"].includes(type)) continue;
@@ -178,7 +187,7 @@
       const context = contextFor(element, contexts), record = records.get(context) || null;
       const section = record?.group || "contact";
       const protectionText = `${label} ${identity} ${element.closest("fieldset")?.querySelector("legend")?.textContent || ""}`;
-      const blocked = element.type === "password" || protectedTerms.test(protectionText) || demographicTerms.test(protectionText);
+      const blocked = element.type === "password" || protectedTerms.test(protectionText) || demographicTerms.test(protectionText) || !!globalThis.PortalGreenhouse?.protectedField(element);
       let key = blocked ? null : classify(label, identity, section);
       if (key?.includes(".")) {
         const [group, name] = key.split(".");
@@ -195,7 +204,7 @@
         : type === "radio" ? members.map(item => ({value: item.value, label: labelFor(item), disabled: item.disabled})) : [];
       const fact = key ? datePartFact(profile, key, element, options) : null;
       const field = {id, label, key, section: key?.split(".")[0] || section, type, current, options, record,
-                     required: element.required || element.getAttribute("aria-required") === "true",
+                     required: element.required || element.getAttribute("aria-required") === "true" || globalThis.PortalGreenhouse?.uploadGroup(element)?.getAttribute("aria-required") === "true",
                      blocked, disabled: !!(element.disabled || element.readOnly || element.getAttribute("aria-disabled") === "true" || element.getAttribute("aria-readonly") === "true"),
                      adapter: customInfo?.supported ? "aria-listbox" : null, manual_reason: customInfo?.reason || "",
                      structure: {tag: element.tagName.toLowerCase(), name: element.name || "", automation_id: element.getAttribute("data-automation-id") || "",
@@ -203,7 +212,7 @@
                      proposal: fact?.value ?? "", source: record?.error || (record?.index === null ? "Choose a profile record for this row first." : fact?.source || "Manual answer required"),
                      status: blocked ? "manual_only" : !fact && type !== "file" ? "pending" : "prepared"};
       fields.push(field);
-      if (register) controls.set(id, {element, members, field, context, contextIdentity: contextIdentity(context), fingerprint: fingerprint(element), identity: controlIdentity(element)});
+      if (register) controls.set(id, {element, members, field, context, portalForm: globalThis.PortalGreenhouse?.formFor(element), contextIdentity: contextIdentity(context), fingerprint: fingerprint(element), identity: controlIdentity(element)});
     }
     return fields;
   }
@@ -211,6 +220,8 @@
   function inspect() {
     const fields = scan({values: {}}, {register: false});
     return {schema_version: 1, host: location.hostname, inspected_at: new Date().toISOString(),
+      portal: globalThis.PortalGreenhouse?.active() ? "greenhouse" : "generic",
+      portal_manual_reason: globalThis.PortalGreenhouse?.active() && !PortalGreenhouse.form() ? "No unique supported Greenhouse application form found. Inspect the employer page manually." : "",
       protected_fields_omitted: fields.filter(field => field.blocked).length,
       fields: fields.filter(field => !field.blocked).map(field => ({label: field.label, type: field.type,
         required: field.required, disabled: field.disabled, section: field.section, adapter: field.adapter,
@@ -253,6 +264,10 @@
     const checkHistory = control => {
       if (control.context && (contextFor(control.element) !== control.context || contextIdentity(control.context) !== control.contextIdentity)) throw new Error("The history row identity changed. Rescan and choose its profile record again.");
     };
+    const checkPortal = control => {
+      if (globalThis.PortalGreenhouse?.active() && (!control.portalForm || PortalGreenhouse.formFor(control.element) !== control.portalForm)) throw new Error("The Greenhouse application form changed. Rescan before filling.");
+      if (globalThis.PortalGreenhouse?.protectedField(control.element)) throw new Error("This field is manual only.");
+    };
     for (const selection of selections) {
       const control = controls.get(selection.id);
       let outcome;
@@ -260,11 +275,12 @@
         if (!control) throw new Error("Field changed. Scan the page again.");
         if (aborted) throw new Error("Filling stopped after an unexpected form change. Rescan and review.");
         const {element, members, field} = control;
-        if (!element.isConnected || !visible(element)) throw new Error("Field is no longer visible. Scan again.");
+        if (!element.isConnected || !controlVisible(element)) throw new Error("Field is no longer visible. Scan again.");
+        checkPortal(control);
         if (fingerprint(element) !== control.fingerprint) throw new Error("Question or control identity changed. Rescan before filling.");
         if (field.record?.index === null) throw new Error(field.record.error || "Choose a profile record or manual answers for this row before filling.");
         checkHistory(control);
-        if (field.blocked || protectedTerms.test(`${labelFor(element)} ${element.name || ""}`)) throw new Error("This field is manual only.");
+        if (field.blocked || protectedTerms.test(`${labelFor(element)} ${element.name || ""}`) || globalThis.PortalGreenhouse?.protectedField(element)) throw new Error("This field is manual only.");
         if (element.disabled || element.readOnly) throw new Error("This field cannot be edited.");
         const current = field.type === "combobox" ? read(control) : field.type === "radio" ? members.find(item => item.checked)?.value || ""
           : field.type === "checkbox" ? element.checked : field.type === "file" ? element.files.length : element.value;
@@ -314,6 +330,7 @@
         await new Promise(resolve => setTimeout(resolve, 500));
         checkCollateral();
         checkHistory(control);
+        checkPortal(control);
         const actual = field.type === "combobox" ? read(control) : field.type === "file" ? element.files[0]?.name : field.type === "radio" ? members.find(item => item.checked)?.value : element.value;
         if (actual !== expected) throw new Error("Portal did not retain the value. Review this field manually.");
         if (!element.isConnected) throw new Error("Portal replaced the field after filling. Scan again to verify.");

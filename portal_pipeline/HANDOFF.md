@@ -20,28 +20,29 @@ Provenance: the original prototype worktree is `D:\Code\Resume_portal_pipeline`,
 - A page permits only one active fill. Review controls and Rescan wait for its result, while structure export remains available. History-scoped questions no longer borrow personal contact or prospective salary answers.
 - A structure-only inspection export supports the next real-portal walkthrough. It omits entered answers, profile proposals, option text, protected fields, and URL query strings. Inspecting does not reset an active scan or open dropdowns.
 - Version `0.3.1` adds a dedicated **Inspect page only** popup action. Its panel works without helper pairing, candidate profile loading, or application import. It lists structural controls and exports each manually navigated page. The page bridge rejects candidate scans and fills originating from this inspection panel. Employer scanning in the popup is now restricted to Workday.
+- Version `0.4.0` adds Greenhouse to the popup and injects its dedicated adapter. The adapter scopes one unique hosted application form, excludes ARIA-hidden internal inputs, protects the whole demographic container, and recognizes the labelled hidden resume input. Native selected filling and checksum-verified resume attachment pass synthetic tests. Editable dropdowns and remote upload completion remain manual.
 - A three-page synthetic Workday fixture containing five employment rows and deliberately unsupported or protected controls. Navigation and submission remain manual.
 - Backend, import, and browser integration tests, including an actual loaded extension in Chromium. All production tracker and reference writes remain outside the prototype.
 
 ## Acceptance status
 
-The prototype proves the local profile, review, selected-fill, and audited-resume handoff mechanisms. It does not establish compatibility with a real Workday tenant. The research plan's real-portal milestones remain incomplete. Greenhouse, Lever, and Oracle are outside the current popup scope and have no completed integrations.
+The prototype proves the local profile, review, selected-fill, and audited-resume handoff mechanisms. It does not establish a complete real employer application on either Workday or Greenhouse. The user explicitly requested the second portal track. The Greenhouse contract was inspected from the public Justworks form and its supported structures were verified on synthetic fixtures. Lever and Oracle remain outside scope.
 
 The initial portal priority remains unconfirmed. Workday is the development assumption because the synthetic fixture exercises its likely field categories. No account login, live employer form filling, or application submission occurred.
 
 ## Next exact task
 
-Choose one Workday application and inspect its real form during a user-authorized application session. A question requesting the employer URL was sent during this development pass and remains unanswered. Use **Export field structure** at each page, and follow [INSPECTION.md](INSPECTION.md). Record the employer host, page sequence, label and automation IDs, date widgets, custom dropdowns, upload completion indicator, and repeated history behavior. Do not submit the application.
+Connect a real browser and continue one employer-specific walkthrough at a time. Workday still needs a selected employer URL and real form inspection. Greenhouse has the public Justworks structural reference, but its editable dropdown and upload completion contracts need rendered browser observations. Use **Export field structure** and follow [INSPECTION.md](INSPECTION.md). Record real page behavior and final-review persistence without submitting. See [GREENHOUSE_CONTRACT.md](../docs/GREENHOUSE_CONTRACT.md) for that track's next exact control.
 
 The latest session attempted a public Workday reference inspection through the browser tools. Edge was unavailable and the browser inventory returned no connected browsers. A public posting fetched through web search exposed no form content, so it does not provide a verified adapter contract. Do not replace live inspection with assumptions or another generic feature cycle. The new inspection-only mode removes the import and pairing prerequisites for Yazad's first walkthrough in his own browser.
 
-Then implement one portal-specific adapter behind the current engine. Start with the most common demonstrated unsupported control, add a representative fixture for it, and verify that unselected fields and submission controls remain unchanged. Do not begin several portal adapters in the same session.
+Implement the next demonstrated unsupported control behind the current engine, with a representative fixture and checks for unselected fields and submission boundaries. Keep each completed phase independently validated, documented, and committed. Maintain separate live acceptance evidence for Workday and Greenhouse.
 
 Continue preparing real resumes through the current pipeline and use audited import for browser handoff. The sandbox builder remains a development tool. Do not make current resume generation depend on this unfinished extension.
 
 ## Known limits
 
-- Editable or otherwise unsupported custom dropdowns, hidden uploads, iframe discovery, automatic history creation, and portal-specific date widgets are pending. The select-only ARIA listbox adapter is verified on fixtures and through the loaded extension only.
+- Editable or otherwise unsupported custom dropdowns, hidden uploads outside the exact Greenhouse contract, iframe discovery, automatic history creation, and portal-specific date widgets are pending. The select-only ARIA listbox adapter is verified on fixtures and through the loaded extension only.
 - History grouping uses recognized wrappers from the synthetic fixtures. Candidate records require explicit choices instead of DOM-order inference. Row choices are deliberately not persisted across panel closure, Rescan, page refresh, or replacement DOM nodes. Real employer grouping still needs validation.
 - Word page count and widows require manual review. Programmatic word and bullet checks are not a visual page-count guarantee.
 - Readback proves the DOM retained the selected value, not that a remote employer saved it. File input verification is not remote upload completion.
@@ -56,6 +57,8 @@ Validation on October 3, 2026: the complete combined suite passed 76 tests in 46
 Version `0.3.1` adds a three-page loaded-extension inspection regression. It checks no API calls, no candidate values in reports or the panel, no fill controls, rejected scan/fill messages, manual page progression, and protected-only review behavior. The routed synthetic employer host uses test-only host permissions in a temporary extension copy. Opening popup.html as a test tab does not grant activeTab, so this is not proof of the production browser-action permission flow.
 
 The dedicated repository export was validated independently: the same 76 tests passed in 46.676 seconds using explicit `PORTAL_SOURCE`. Export inspection found only 36 text files, with no candidate document artifacts or detected credential patterns. No source repository history was copied.
+
+Version `0.4.0`: the combined suite passed 81 tests in 50.944 seconds, comprising 13 backend, 10 import, and 58 browser tests. Five new Greenhouse regressions passed, and the existing loaded-extension inspection test now exercises the Greenhouse adapter and its hidden upload structure. JavaScript syntax checks passed. No live candidate data was sent to either portal.
 
 New browser coverage includes exact custom dropdown selection, preservation and explicit overwrite, lazy popup creation, duplicate and disabled options, changed popup ownership, changed questions and options during opening, value reversion, collateral changes before option selection, submission controls and nested submission buttons, punctuation-sensitive matching, protected password inputs with a misleading ARIA role, and structure export. The loaded MV3 extension fills the custom dropdown and exports the structure through its real page messaging bridge.
 
