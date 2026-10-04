@@ -108,9 +108,18 @@
   const demographicContainers = '[id^="countrySurvey_"],[data-qa*="demographic"],[data-qa*="survey"],[id*="demographic" i],[class*="demographic" i]';
   const honeypotTerms = /(honey.?pot|bee.?catcher|robots? only|do not enter if you are human|do not enter if you.?re human|leave (this )?(field )?(blank|empty))/i;
 
+  function protectionHeading(element) {
+    const scopes = "fieldset,section,[role=group],form";
+    const scope = element.closest(scopes) || document.body;
+    const headings = [...scope.querySelectorAll("h1,h2,h3,h4,h5,h6,[role=heading],legend")].filter(heading =>
+      (heading.closest(scopes) || document.body) === scope && !!(heading.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING));
+    return headings.at(-1)?.textContent || "";
+  }
+
   function protectedControl(element) {
-    const text = `${labelFor(element)} ${element.name || ""} ${element.id || ""} ${element.getAttribute("data-automation-id") || ""} ${element.closest("fieldset")?.querySelector("legend")?.textContent || ""}`;
-    return element.type === "password" || honeypotTerms.test(text) || !!element.closest(demographicContainers) || protectedTerms.test(text) || demographicTerms.test(text) || !!globalThis.PortalGreenhouse?.protectedField(element);
+    const text = `${labelFor(element)} ${element.name || ""} ${element.id || ""} ${element.getAttribute("data-automation-id") || ""} ${element.closest("fieldset")?.querySelector("legend")?.textContent || ""} ${protectionHeading(element)}`;
+    return element.type === "password" || honeypotTerms.test(text) || !!element.closest(demographicContainers) || protectedTerms.test(text)
+      || !!globalThis.PortalClassifier?.hasAttestationText(text) || demographicTerms.test(text) || !!globalThis.PortalGreenhouse?.protectedField(element);
   }
 
   function radioMembers(element) {

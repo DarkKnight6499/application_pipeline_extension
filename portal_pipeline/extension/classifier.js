@@ -130,15 +130,17 @@
     return survivors.length === 1 ? survivors[0] : null;
   }
 
-  const ATTESTATION_WORDS = ["attest", "certify", "certification", "consent", "agree", "acknowledge", "acknowledgement", "acknowledgment", "declare",
+  const ATTESTATION_WORDS = ["attest", "attestation", "certify", "certification", "consent", "agree", "acknowledge", "acknowledgement", "acknowledgment", "declare",
     "declaration", "terms", "privacy policy", "authorize", "i understand", "i confirm", "true and complete", "true and accurate", "signature"];
 
   // Attestations are never ticked by the helper; an unchecked required box with no profile key is treated the same way.
+  const hasAttestationText = text => labelHas(text, ATTESTATION_WORDS);
+
   function isAttestationCheckbox(field) {
     if (!field || field.type !== "checkbox") return false;
-    if (labelHas(field.label, ATTESTATION_WORDS)) return true;
+    if (hasAttestationText(field.label)) return true;
     return !!field.required && !field.checked && !field.key;
   }
 
-  globalThis.PortalClassifier = {labelHas, findBadWord, classify, workAuthIntent, matchOption, isAttestationCheckbox, placeDependent};
+  globalThis.PortalClassifier = {labelHas, findBadWord, classify, workAuthIntent, matchOption, isAttestationCheckbox, hasAttestationText, placeDependent};
 })();
