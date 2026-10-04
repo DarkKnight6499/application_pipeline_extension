@@ -242,7 +242,7 @@
       exportSheet.onclick = async () => {
         try {
           const payload = fields.filter(item => !item.blocked || item.forced_manual).map(item => {
-            const row = rows.get(item.id), chosen = row ? (row.answer.tagName === "SELECT" ? row.answer.selectedOptions[0]?.textContent || "" : row.answer.value) : item.proposal;
+            const row = rows.get(item.id), chosen = row ? (row.answer.tagName === "SELECT" ? (row.answer.value ? row.answer.selectedOptions[0]?.textContent || "" : "") : row.answer.value) : item.proposal;
             const edited = !item.blocked && item.type !== "file" && chosen !== "" && chosen !== item.proposal;
             return {label: item.label, required: item.required, type: item.type, options: item.options.map(option => option.label), blocked: item.blocked, forced_manual: item.forced_manual === true,
               proposal: item.blocked ? "" : chosen, source: edited ? "Edited in review panel" : item.source, status: edited ? "draft_needs_review" : item.status, structure: {maxlength: item.structure?.maxlength ?? null}};

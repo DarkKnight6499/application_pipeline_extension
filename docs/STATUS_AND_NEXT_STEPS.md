@@ -1,7 +1,7 @@
 ---
 author: Yazad Madan
 updated: 2026-10-04
-status: P7 validated in feat/p7-progression, guarded Next remains off, FULL 304 and PUBLIC 223 OK with 2 skips each
+status: P7 validated in feat/p7-progression, guarded Next remains off, FULL 304 and PUBLIC 223 OK with 2 skips each; placeholder export fix rebased for validation on 996a674
 ---
 
 # Status and next steps
@@ -13,6 +13,8 @@ This replaces the earlier probe reports and the two-prototype review. Their find
 A Manifest V3 extension and a local Python helper that review and fill only the fields the user selects. The human logs in, navigates and submits. The tool never submits, signs, attests, or handles passwords or CAPTCHAs. Sponsorship now and sponsorship in the future stay separate answers, and unknown answers stay pending.
 
 ## Done so far
+
+**Pending select answer sheet export fix (synthetic only, October 4, 2026).** The panel now exports an unanswered select as an empty proposal, preserving its pending status instead of exporting the placeholder label as an edited draft. `answer_sheet.py` already clears empty proposals and normalizes them to pending, so no backend change was needed. Two new synthetic browser regression tests pass, including selected-only fill with zero submit clicks or events. Full validation is running after rebase onto P7.
 
 **Sponsorship toggle landing (synthetic only, October 4, 2026).** Rebased over main `2904ded`, preserving P8 record routes and the session-profile allowlist. The per-application toggle defaults to truthful, changes only future and combined sponsorship proposals, displays the boilerplate answer beside the proposal, and never selects fields automatically. Mode changes clear affected answers, selections, and overwrite choices while preserving unrelated edits. Cached sponsorship reviews from another mode are discarded. The toggle is disabled during filling, and Fill is disabled during mode saving. The original nine backend tests and five new browser tests pass; FULL 284 tests and PUBLIC 203 tests both end OK with two symlink-privilege skips. JavaScript syntax, Python compilation, and diff checks pass. Existing tests were not edited. No live portal validation occurred.
 
