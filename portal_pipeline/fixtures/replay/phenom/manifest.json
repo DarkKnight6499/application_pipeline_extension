@@ -1,0 +1,17 @@
+{"cases": [
+  {"name": "phenom_step_1", "portal": "phenom", "adapter": "phenom", "pages": ["phenom/page_1.html"], "url": "https://careers.marsh.com/synthetic/apply",
+   "expect": {"fields": 7, "required": 4, "keys": ["city", "email", "first_name", "last_name", "phone"], "human_gate": null, "final_review": false, "next_kind": "next"},
+   "fill": [{"key": "first_name", "value": "Synthetic", "selector": "[id='name.first']", "status": "filled", "after": "Synthetic"}],
+   "untouched": [{"selector": "[id='name.last']", "value": ""}]},
+  {"name": "phenom_step_2", "portal": "phenom", "adapter": "phenom", "pages": ["phenom/page_2.html"], "url": "https://careers.marsh.com/synthetic/apply",
+   "expect": {"fields": 2, "required": 0, "keys": ["linkedin"], "human_gate": null, "final_review": false, "next_kind": "next"}},
+  {"name": "phenom_step_3", "portal": "phenom", "adapter": "phenom", "pages": ["phenom/page_3.html"], "url": "https://careers.franklintempleton.com/synthetic/apply",
+   "expect": {"fields": 3, "required": 3, "keys": ["authorized_us", "sponsorship_future", "sponsorship_now"], "human_gate": null, "final_review": false, "next_kind": "next"}},
+  {"name": "phenom_step_4", "portal": "phenom", "adapter": "phenom", "pages": ["phenom/page_4.html"], "url": "https://careers.marsh.com/synthetic/apply",
+   "expect": {"fields": 3, "required": 0, "keys": [], "human_gate": null, "final_review": false, "next_kind": "next"}},
+  {"name": "phenom_step_5_review", "portal": "phenom", "adapter": "phenom", "pages": ["phenom/page_5.html"], "url": "https://careers.marsh.com/synthetic/apply",
+   "expect": {"fields": 0, "required": 0, "keys": [], "human_gate": null, "final_review": true, "next_kind": "final_review"}},
+  {"name": "phenom_recaptcha_gate", "portal": "phenom", "adapter": "phenom", "pages": ["phenom/gate_recaptcha.html"], "url": "https://careers.marsh.com/synthetic/apply",
+   "expect": {"fields": 2, "required": 0, "keys": ["first_name"], "human_gate": "captcha", "final_review": false, "next_kind": "next"},
+   "fill": [{"key": "first_name", "value": "Synthetic", "selector": "[id='name.first']", "status": "blocked_by_human_gate", "after": ""}]}
+]}

@@ -21,7 +21,7 @@ async function rescan() {
     if (!/^https?:/.test(tab.url || "")) throw new Error("The target page is not available.");
     const {server: pairedServer} = await chrome.storage.local.get("server");
     PortalHostPolicy.assertSupported(tab.url, pairedServer);
-    await chrome.scripting.executeScript({target: {tabId}, files: ["adapters/registry.js", "adapters/generic.js", "adapters/aria-listbox.js", "adapters/greenhouse.js", "adapters/greenhouse-select.js", "classifier.js", "engine.js", "progress.js", "page-bridge.js"]});
+    await chrome.scripting.executeScript({target: {tabId}, files: ["adapters/registry.js", "adapters/generic.js", "adapters/aria-listbox.js", "adapters/greenhouse.js", "adapters/greenhouse-select.js", "adapters/phenom.js", "classifier.js", "engine.js", "progress.js", "page-bridge.js"]});
     await PortalPanel.open(api, storage, {extensionPage: true, targetUrl: tab.url, inspectionOnly,
       onFillState: busy => {document.getElementById("rescan").disabled = busy;},
       transport: {scan: (profile, bindings) => command("portal-scan", {profile, bindings}), fill: (selections, options) => command("portal-fill", {selections, options}), inspect: () => command("portal-inspect"), progress: action => command("portal-progress", {action})}});

@@ -17,7 +17,8 @@ MAX_FIELDS = 500
 MAX_HEADING = 80
 MAX_SLUG = 60
 KNOWN_STATUSES = {"prepared", "pending", "manual_only", "draft_needs_review"}
-PORTAL_HOSTS = {"myworkdayjobs.com": "workday", "greenhouse.io": "greenhouse"}
+PORTAL_HOSTS = {"myworkdayjobs.com": "workday", "greenhouse.io": "greenhouse",
+                "careers.marsh.com": "phenom", "careers.franklintempleton.com": "phenom"}
 RESUME_LABEL = re.compile(r"\b(resume|cv)\b", re.I)
 RESUME_FILE_NAME = "Yazad_Madan.docx"
 TEXT_TYPES = {"text", "textarea", "email", "tel", "url", "search", "number"}

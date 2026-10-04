@@ -86,6 +86,10 @@ The existing `_Reference` scripts have not been modified. Only this worktree's r
 
 Author: Yazad Madan.
 
+## PF5 Phenom, October 4, 2026
+
+Phenom support uses synthetic fixtures only. The two registered career-site hosts, five wizard pages, native controls, LinkedIn iframe, and reCAPTCHA gate are documented in `docs/contracts/PHENOM_CONTRACT.md`; live apply hosts, page markup, and CAPTCHA placement remain UNVERIFIED. The adapter fills selected fields through the shared engine, preserves existing values, never enters the iframe, and only reports Next and final review. A visible CAPTCHA blocks all writes. The answer sheet identifies the two hosts as Phenom. Seventeen isolated Edge tests passed before integration with P7. No real portal was opened, no application was submitted, and no tracker or Resume file was changed.
+
 Six read-only lanes inspected baseline `de2e51b5e424634d2be66a32bcfa5627f5e1fbef` using synthetic data only. The coordinator personally reproduced four high findings: cross-form radio writes into protected attestation, omitted protected collateral monitoring, uncertainty stripped from profile answers, and stale upload protection after checksum await. Medium and low findings and all 14 earlier-review statuses are consolidated in PROBE_REPORT_2026-10-03.md (original kept in Git history).
 
 Current public-checkout discovery produced three import errors and zero actual tests executed. All 81 test methods are blocked by the missing external workflow, recorded as SKIPPED-BY-ENVIRONMENT rather than passing. Default Playwright Chromium is missing; independent synthetic probes used fresh headless Edge contexts. Existing historical 81-pass results are retained and were not reproduced here. Real source data was not read or copied.

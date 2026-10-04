@@ -1,7 +1,7 @@
 ---
 author: Yazad Madan
 updated: 2026-10-04
-status: P7 validated in feat/p7-progression, guarded Next remains off, FULL 304 and PUBLIC 223 OK with 2 skips each
+status: PF5 Phenom adapter built against synthetic fixtures only; live apply hosts and page structure UNVERIFIED
 ---
 
 # Status and next steps
@@ -31,6 +31,7 @@ A Manifest V3 extension and a local Python helper that review and fill only the 
 5. **Preflight gates (P4, synthetic only).** `portal_pipeline/preflight.py` reads the tracker read-only and the JD document, and the panel lists the results before any fill. Duplicate postings, a Blocked, Skipped or Expired tracker status, and a no-sponsorship JD block until acknowledged; knock-out questions need acknowledgement; status and sensitive questions are forced manual. A gate that cannot run is shown as a warning, and a failed preflight request keeps Fill disabled.
 6. **Answer sheet (P5, synthetic only).** `portal_pipeline/answer_sheet.py` and `POST /api/sessions/<id>/answer-sheet` turn a read-only scan into a per-page JSON and offline HTML sheet under the session folder, with sources, required flags, UTF-16 character counts and limits (`maxlength` is now in the scan structure). Protected fields never appear, pending and manual rows carry no value. The panel also lists required and pending fields, saves an edited answer through the override route, and logs pending questions to the corpus.
 7. **Portal record (P8, synthetic only).** `portal_pipeline/portal_record.py` keeps one record per tracker Application ID under ignored `portal_pipeline/data/records/`, with each page's proposed, selected, filled and read-back answers, the resume hash and an optional `sponsorship_answer_mode` (defaults to truthful). Routes: `GET/POST /api/sessions/<id>/record` and `POST /api/sessions/<id>/reported-submitted`. The helper never writes the tracker: after the user reports a submission it only prints the `mark_application_status.py` command, with the employer reference kept separate from the Application ID.
+8. **Phenom (PF5, synthetic only).** The registered adapter routes the two documented career-site hosts, scans a fabricated five-step wizard, reports step and final-review markers, skips the LinkedIn iframe, and blocks every write when synthetic CAPTCHA markup is present. The answer sheet names Phenom on those hosts. Seventeen Phenom tests cover selected fill, preservation, read-only answer-sheet export, all wizard pages, gate behavior, final-control precedence, and zero submit events. Real apply hosts, page structure, and CAPTCHA placement remain UNVERIFIED. See `docs/contracts/PHENOM_CONTRACT.md`; obtain Inspect-only exports before treating this as live compatibility.
 
 ## What the probes established
 

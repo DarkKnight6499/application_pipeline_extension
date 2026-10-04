@@ -1,0 +1,17 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Synthetic Phenom step 1</title></head><body>
+<nav aria-label="Application progress"><ol><li aria-current="step"><span>1 of 5</span> <span>My Information</span></li><li><span>2 of 5</span> <span>My Experience</span></li><li><span>3 of 5</span> <span>Application Questions</span></li><li><span>4 of 5</span> <span>Voluntary Disclosures</span></li><li><span>5 of 5</span> <span>Review</span></li></ol></nav>
+<h1>My Information</h1>
+<form id="step-form" novalidate>
+<label for="cntryFields.country">Country</label>
+<select id="cntryFields.country" name="cntryFields.country" required aria-required="true"><option value="">Select</option><option>United States</option><option>Canada</option></select>
+<label>First name<input id="name.first" name="name.first" required aria-required="true"></label>
+<label>Last name<input id="name.last" name="name.last" required aria-required="true"></label>
+<label>Email<input id="contact.email" name="contact.email" type="email" required aria-required="true"></label>
+<label for="phoneWidget.countryCode">Phone country code</label>
+<select id="phoneWidget.countryCode" name="phoneWidget.countryCode"><option value="">Select</option><option>+1</option><option>+44</option></select>
+<label>Phone<input id="phoneWidget.phoneNumber" name="phoneWidget.phoneNumber"></label>
+<label>City<input id="cntryFields.city" name="cntryFields.city"></label>
+<iframe title="LinkedIn profile import" src="about:blank" srcdoc="&lt;label&gt;LinkedIn import field&lt;input id=&quot;li-frame-input&quot;&gt;&lt;/label&gt;"></iframe>
+<button type="button" id="next">Next</button>
+</form>
+</body></html>
