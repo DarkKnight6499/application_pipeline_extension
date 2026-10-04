@@ -150,7 +150,7 @@
     const fact = field.key ? datePartFact(profile, field.key, element, options) : null;
     const derived = /^(employment|education)\.\d+\.(start|end)_(month|year)$/.test(field.key || "");
     return {key: field.key, value: fact?.value ?? "", source: fact?.source || "Manual answer required",
-      status: field.blocked ? "manual_only" : !fact && field.type !== "file" ? "pending" : "prepared", basis: derived ? "derived" : "exact_alias"};
+      status: field.blocked ? "manual_only" : !fact && field.type !== "file" ? "pending" : "prepared", basis: fact?.basis || (derived ? "derived" : "exact_alias"), truth: fact?.truth || null};
   }
 
   function scanCore(profile, {register = true, bindings = {}} = {}) {
@@ -219,7 +219,7 @@
                        dom_id: element.id, role: element.getAttribute("role") || "", controls: element.getAttribute("aria-controls") || "", popup: element.getAttribute("aria-haspopup") || "",
                        maxlength: element.maxLength > 0 ? element.maxLength : null},
                      proposal: proposal.value, source: record?.error || (record?.index === null ? "Choose a profile record for this row first." : proposal.source),
-                     status: proposal.status};
+                     status: proposal.status, truth: proposal.truth};
       fields.push(field);
       if (register) controls.set(id, {element, members, field, context, nativeForm: element.form, portalForm: globalThis.PortalGreenhouse?.formFor(element), contextIdentity: contextIdentity(context), fingerprint: fingerprint(element), identity: controlIdentity(element)});
     }

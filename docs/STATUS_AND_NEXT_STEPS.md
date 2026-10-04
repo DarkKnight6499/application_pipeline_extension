@@ -1,7 +1,7 @@
 ---
 author: Yazad Madan
 updated: 2026-10-04
-status: P8 landed: per-application portal record and printed tracker command; P6 fill read-back failures; P5 answer sheet export; P4 preflight gates, TE question corpus and P3 classifier before it
+status: sponsorship toggle rebased for validation (truthful default); P8 landed: per-application portal record and printed tracker command; P6 fill read-back failures; P5 answer sheet export; P4 preflight gates, TE question corpus and P3 classifier before it
 ---
 
 # Status and next steps
