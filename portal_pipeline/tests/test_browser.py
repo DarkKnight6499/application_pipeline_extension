@@ -71,9 +71,14 @@ class BrowserTests(unittest.TestCase):
 
     def fill_keys(self, keys, bindings=None, **options):
         fields = self.scan(bindings)
-        selected = [{"id": field["id"], "value": field["proposal"]} for field in fields if field["key"] in keys]
-        return self.page.evaluate("async ({selected, options}) => await PortalEngine.fill(selected, options)",
-                                  {"selected": selected, "options": options})
+        matching = [field for field in fields if field["key"] in keys]
+        self.assertTrue(keys, "A fill test must request at least one field.")
+        self.assertCountEqual([field["key"] for field in matching], keys)
+        selected = [{"id": field["id"], "value": field["proposal"]} for field in matching]
+        results = self.page.evaluate("async ({selected, options}) => await PortalEngine.fill(selected, options)",
+                                     {"selected": selected, "options": options})
+        self.assertCountEqual([result["id"] for result in results], [field["id"] for field in matching])
+        return results
 
     def test_scan_does_not_change_form(self):
         fields = self.scan()
@@ -147,6 +152,7 @@ class BrowserTests(unittest.TestCase):
         self.page.locator("#next-one").click()
         keys = {f"employment.{index}.{key}" for index in range(5) for key in ("company", "title", "start_date", "end_date")}
         results = self.fill_keys(keys, bindings=self.history_bindings("employment"))
+        self.assertEqual(len(results), len(keys))
         self.assertTrue(all(result["status"] == "filled" for result in results), results)
         self.assertEqual(self.page.locator("#start-2").input_value(), "2023-08")
         self.assertEqual(self.page.locator("#end-4").input_value(), "2022-05")
@@ -351,8 +357,10 @@ class BrowserTests(unittest.TestCase):
         self.page.locator("#next-one").click()
         self.page.locator("#next-two").click()
         fields = self.scan()
+        self.assertCountEqual([field["structure"]["dom_id"] for field in fields], ["attestation", "signature"])
         self.assertTrue(all(field["blocked"] for field in fields))
         result = self.page.evaluate("async fields => PortalEngine.fill(fields.map(field => ({id: field.id, value: 'Yes'})))", fields)
+        self.assertCountEqual([item["id"] for item in result], [field["id"] for field in fields])
         self.assertTrue(all(item["status"] == "failed" for item in result))
         self.assertFalse(self.page.locator("#attestation").is_checked())
         self.assertEqual(self.page.locator("#signature").input_value(), "")
