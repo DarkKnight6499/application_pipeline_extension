@@ -35,3 +35,21 @@ class AttestationHeadingAncestryTests(SyntheticBrowserTest):
         self.assertTrue(signature["blocked"])
         self.assertFalse(contact["blocked"])
         self.assertEqual(contact["proposal"], "Synthetic Person")
+
+    def test_ordinary_fieldset_legend_does_not_clear_signature_heading(self):
+        self.open_markup("""
+          <form>
+            <h2>Electronic signature</h2>
+            <fieldset>
+              <legend>Name</legend>
+              <label>Legal name<input id="legal-name"></label>
+            </fieldset>
+          </form>
+        """)
+        field = next(field for field in self.scan({"full_name": {"value": "Synthetic Person", "source": "Fabricated fixture"}})
+                     if field["structure"]["dom_id"] == "legal-name")
+        self.assertTrue(field["blocked"])
+        self.assertEqual((field["proposal"], field["status"]), ("", "manual_only"))
+        result = self.fill([{"id": field["id"], "value": "Synthetic Person"}])
+        self.assertNotEqual(result[0]["status"], "filled")
+        self.assertEqual(self.page.locator("#legal-name").input_value(), "")
