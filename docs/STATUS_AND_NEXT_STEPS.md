@@ -65,6 +65,8 @@ Also found:
 
 Phase order lives in D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md. The user authorized parallel lower-tier agents on October 4, 2026 and direct pushes to main after validation. Sponsorship and P7 are landed. PF5 and placeholder fixes are landed at main 2c981b8. Manual-field, attestation, and upload hardening are saved separately because final FULL validation has an inherited CSP harness error. Session-profile review preparation is isolated pending explicit approval for existing synthetic mock setup edits. No live trial is authorized by the current handoff.
 
+The exact CSP test-only proposal and passing proof are saved on branch test/csp-safe-popup-wait at b39cb5f, in docs/CSP_POPUP_WAIT_PROPOSAL.md. The session-profile proposal and six regression cases are saved on fix/session-profile-review at c49d86c. No inherited tests have been changed.
+
 The next action is approval and repair of the inherited CSP wait so the safety integration can receive a passing FULL validation and land. Session-profile review also needs its listed mock setup approval, then PF4 Greenhouse completion follows. P9 cannot begin until PF1 and PF2 are merged and its approved pending-question corpus requirement is satisfied. Workday and Oracle live compatibility remain blocked on Inspect-only exports; synthetic success does not replace those exports.
 
 ## Rules to keep when working here
