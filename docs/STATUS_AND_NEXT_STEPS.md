@@ -1,7 +1,7 @@
 ---
 author: Yazad Madan
 updated: 2026-10-04
-status: P6 landed: fill reports reverted and validation_error failures with read-back; P5 answer sheet export; P4 preflight gates, TE question corpus and P3 classifier before it
+status: per-application sponsorship answer toggle landed (truthful default); P6 landed: fill reports reverted and validation_error failures with read-back; P5 answer sheet export; P4 preflight gates, TE question corpus and P3 classifier before it
 ---
 
 # Status and next steps

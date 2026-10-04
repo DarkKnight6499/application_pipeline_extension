@@ -64,8 +64,11 @@
       return host;
     }
     try {
-      const [profile, session] = await Promise.all([api("/api/profile"), api("/api/current")]);
+      const [baseProfile, session] = await Promise.all([api("/api/profile"), api("/api/current")]);
+      let profile = baseProfile;
       if (!session) throw new Error("Import an audited application or create a sandbox application in the dashboard first.");
+      // Session profile carries the per-application sponsorship toggle; fall back to the global profile.
+      try { const scoped = await api(`/api/sessions/${session.id}/profile`); if (scoped?.values) profile = scoped; } catch (error) { /* global profile stays */ }
       const targetUrl = options.targetUrl || location.href;
       const target = new URL(targetUrl);
       if (session.mode !== "audited_import" && !(target.hostname === "127.0.0.1" && target.pathname === "/fixture")) throw new Error("Sandbox sessions are only for the local fixture. Import an audited application for an employer portal.");
@@ -90,6 +93,15 @@
       posting.textContent = `Selected posting: ${session.url || "No posting URL set"}. Current page: ${targetUrl}`;
       if (session.tracker_url && session.tracker_url !== session.url) posting.textContent += ` Tracker link: ${session.tracker_url}. Portal URL override was set during import.`;
       panel.append(posting);
+      const sponsorBox = element("input", "", {type: "checkbox", "aria-label": "Answer No to sponsorship questions for this application"});
+      sponsorBox.checked = profile.sponsorship_answer_mode === "screening_no";
+      const sponsorLabel = element("label", "", {class: "source"});
+      sponsorLabel.append(sponsorBox, document.createTextNode(" Answer No to sponsorship questions for this application. This is a statement on the application. Your boilerplate answer is shown beside each proposal."));
+      sponsorBox.onchange = async () => {
+        try { await api(`/api/sessions/${session.id}/sponsorship-mode`, {mode: sponsorBox.checked ? "screening_no" : "truthful"}); document.getElementById("rescan")?.click(); }
+        catch (error) { sponsorBox.checked = !sponsorBox.checked; status.textContent = error.message; }
+      };
+      panel.append(sponsorLabel);
       const acknowledgements = [];
       const gates = element("div", "", {class: "preflight"});
       if (preflightError) gates.append(element("p", `Preflight failed: ${preflightError} Fill stays disabled.`, {class: "note failed"}));
@@ -172,6 +184,7 @@
         card.append(answer);
         const result = element("div", "", {class: "result", role: "status"});
         card.append(element("div", field.blocked ? "Manual only. This control is excluded." : field.manual_reason || field.source, {class: "source"}));
+        if (field.truth && !field.blocked) card.append(element("div", `Proposing ${field.proposal} by your toggle; boilerplate says ${field.truth.value} (${field.truth.source}).`, {class: "source"}));
         card.append(element("div", `Current: ${field.current || "empty"}`, {class: "current"}));
         if (field.key && !field.blocked && !field.options.length && field.type !== "file") {
           const saveEdit = element("button", "Save edit to profile", {type: "button", "aria-label": `Save edit to profile for ${field.label}`});
