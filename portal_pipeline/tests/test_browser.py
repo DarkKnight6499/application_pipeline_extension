@@ -1,6 +1,7 @@
 """Exercise the browser engine, review panel, dashboard, and real MV3 extension."""
 import hashlib
 import json
+import re
 import shutil
 import sys
 import tempfile
@@ -12,7 +13,7 @@ HERE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(HERE))
 from portal_profile import resolve_profile
 from server import Pipeline, make_server
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 
 from test_support import INTEGRATION_SKIP_REASON, audited_fixture, workflow_source
 SOURCE = workflow_source()
@@ -756,7 +757,7 @@ class BrowserTests(unittest.TestCase):
                 popup.goto(f"chrome-extension://{extension_id}/popup.html")
                 page.bring_to_front()
                 popup.locator("#inspect").click()
-                popup.wait_for_function("document.getElementById('status').textContent.includes('limited to Workday')")
+                expect(popup.locator("#status")).to_contain_text("limited to Workday", timeout=30000)
                 self.assertFalse(page.evaluate("Boolean(globalThis.PortalEngine)"))
             finally:
                 context.close()
@@ -860,7 +861,7 @@ class BrowserTests(unittest.TestCase):
                 popup.locator("#server").fill(self.url)
                 popup.locator("#token").fill("browser-test-token")
                 popup.locator("#pair").click()
-                popup.wait_for_function("document.getElementById('status').textContent.startsWith('Paired.')")
+                expect(popup.locator("#status")).to_have_text(re.compile(r"^Paired\."), timeout=30000)
                 # Test the actual extension-owned review page and page messaging bridge.
                 tab_id = popup.evaluate("async () => (await chrome.tabs.query({})).find(tab => tab.url?.includes('/fixture')).id")
                 page.bring_to_front()
