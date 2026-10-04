@@ -36,21 +36,29 @@
 
   const COUNTRY_STYLE = ["country of citizenship", "citizenship country", "country of nationality", "nationality"];
 
-  // Order matters: sponsorship words first, then authorization, then citizenship, then status wording.
+  const US_RAW = /(?<![A-Za-z])(?:US|USA|U\.S\.A?\.?|[Uu]nited [Ss]tates)(?![A-Za-z])/;
+  const OTHER_PLACES = /\b(united kingdom|uk|u k|great britain|england|canada|india|europe|european union|eu|germany|france|ireland|australia|singapore|hong kong|japan|china|mexico|brazil|emea|apac)\b/;
+  const NEGATION_WORDS = /\b(without|no need|unless|if|not|never|cannot|cant|wont|dont|doesnt)\b/;
+  const HOLDS_VISA = /\b(currently on|are you on|you on|on an?|hold|holds|holder of|have an?|possess)\b.{0,30}\bvisa\b/;
+
+  // Order matters: negation, place, held-visa status, sponsorship, then citizenship and status words, then authorization.
+  // When in doubt the answer is null so the field stays pending.
   function workAuthIntent(text) {
     const t = plain(text);
-    if (/\b(without|no need|do not need|dont need|unless|if)\b/.test(t) || /\bdon t need\b/.test(t)) return null;
+    if (NEGATION_WORDS.test(t)) return null;
     if (placeDependent(text)) return null;
+    if (HOLDS_VISA.test(t)) return "status_question";
     const sponsor = /\b(sponsor|sponsorship|sponsored|visa|immigration support|work permit)\b/.test(t);
     const needs = /\b(require|requires|need|needs|needing)\b/.test(t);
     if (sponsor && needs) {
       const now = /\b(now|currently|at present)\b/.test(t), future = /\b(future|ever|any point|going forward)\b/.test(t);
       return now && future ? "sponsorship_now_or_future" : future ? "sponsorship_future" : now ? "sponsorship_now" : null;
     }
-    const inUS = /\b(us|usa|u s|united states)\b/.test(t);
-    if (!sponsor && !needs && inUS && /\b(authori[sz]ed to (lawfully |legally )?work|eligible to work|work authori[sz]ed to work)\b/.test(t)) return "authorized_us";
-    if (/\b(citizen|citizenship|nationality)\b/.test(t)) return COUNTRY_STYLE.includes(t) ? "citizenship" : "status_question";
-    if (/\b(immigration status|visa status|current status|green card|permanent resident)\b/.test(t)) return "status_question";
+    if (/\b(citizen|citizenship|nationality|green card|permanent resident)\b/.test(t)) return COUNTRY_STYLE.includes(t) ? "citizenship" : "status_question";
+    if (/\b(immigration status|visa status|current status)\b/.test(t)) return "status_question";
+    // Case-sensitive on the raw label so the pronoun "us" is never read as the country.
+    if (!sponsor && !needs && US_RAW.test(String(text ?? "")) && !OTHER_PLACES.test(t)
+      && /\b(authori[sz]ed to (lawfully |legally )?work|eligible to work|work authori[sz]ed to work)\b/.test(t)) return "authorized_us";
     return null;
   }
 
@@ -103,7 +111,7 @@
     return PROFILE_INTENTS.has(intent) ? intent : null;
   }
 
-  const NEGATIONS = ["not", "no", "dont", "do not", "will not", "wont", "never", "unable"];
+  const NEGATIONS = ["not", "no", "dont", "do not", "will not", "wont", "never", "unable", "cannot", "cant", "doesnt", "does not"];
 
   // Exact label or value first; otherwise only a Yes or No answer may use the polarity rules; two survivors return null.
   function matchOption(options, answer) {

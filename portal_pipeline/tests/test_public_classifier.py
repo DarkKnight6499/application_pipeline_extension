@@ -133,3 +133,47 @@ class PublicClassifierTests(SyntheticBrowserTest):
         self.assertFalse(self.call("PortalClassifier.isAttestationCheckbox({type: 'text', label: 'I certify this is correct', key: null, required: true})"))
         self.assertFalse(self.call("PortalClassifier.isAttestationCheckbox({type: 'checkbox', label: 'Open to relocation', key: 'relocation', required: true, checked: false})"))
         self.assertEqual(json.dumps(self.page.evaluate("PortalEngine.inspect().fields.map(f => f.label)")).count("acknowledge"), 0)
+
+
+class PublicClassifierReviewFixTests(SyntheticBrowserTest):
+    def intent(self, label):
+        return self.page.evaluate("label => PortalClassifier.workAuthIntent(label)", label)
+
+    def setUp(self):
+        super().setUp()
+        self.open_markup("<p>blank</p>")
+
+    def test_negated_sponsorship_wordings_return_null(self):
+        for label in ("I am authorized to work and will not require sponsorship now or in the future",
+                      "Can you confirm you won't need visa sponsorship in the future?",
+                      "Do you not require sponsorship now?", "I do not require visa sponsorship now or in the future",
+                      "Does the candidate not need sponsorship in the future?", "I cannot require sponsorship now",
+                      "Candidates who can't need sponsorship now"):
+            with self.subTest(label=label):
+                self.assertIsNone(self.intent(label))
+
+    def test_citizen_or_green_card_never_becomes_authorized_us(self):
+        label = "Are you a U.S. citizen or green card holder authorized to work in the U.S.?"
+        self.assertEqual(self.intent(label), "status_question")
+        self.assertEqual(self.intent("Are you a permanent resident authorized to work in the United States?"), "status_question")
+
+    def test_pronoun_us_and_other_countries_are_not_the_us(self):
+        for label in ("Are you legally eligible to work for us?", "Are you authorized to work in the United Kingdom? Tell us.",
+                      "Are you authorized to work in the US or Canada?", "Are you eligible to work in the UK?",
+                      "Are you eligible to work in the us?"):
+            with self.subTest(label=label):
+                self.assertIsNone(self.intent(label))
+        self.assertEqual(self.intent("Are you legally eligible to work in the U.S.?"), "authorized_us")
+        self.assertEqual(self.intent("Are you authorized to work in the United States?"), "authorized_us")
+
+    def test_option_negations_include_cannot_and_cant(self):
+        for options in (["Yes, I can't", "No"], ["Yes, I cannot work there", "Maybe"]):
+            with self.subTest(options=options):
+                result = self.page.evaluate("options => PortalClassifier.matchOption(options.map(o => ({label: o, value: o})), 'Yes')", options)
+                self.assertIsNone(result)
+
+    def test_current_visa_holder_question_is_status_not_sponsorship(self):
+        for label in ("Are you currently on a visa that will require sponsorship?", "Do you currently hold an H-1B visa that requires sponsorship now?"):
+            with self.subTest(label=label):
+                self.assertEqual(self.intent(label), "status_question")
+                self.assertIsNone(self.page.evaluate("label => PortalClassifier.classify(label, '', 'contact')", label))
