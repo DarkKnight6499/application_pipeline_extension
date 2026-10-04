@@ -353,6 +353,7 @@
         transfer.items.add(new File([bytes], attachment.name, {type: attachment.mime}));
         checkCollateral();
         checkCurrent(control);
+        if (element.multiple) throw new Error("Multiple-file upload requires manual selection in this prototype.");
         element.files = transfer.files;
         element.dispatchEvent(new Event("change", {bubbles: true}));
         expected = attachment.name;
