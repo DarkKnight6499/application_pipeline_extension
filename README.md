@@ -39,7 +39,7 @@ The production helper still depends on that external source checkout. It is not 
 
 ## Development status
 
-Version `0.7.0` includes selected-field review, the per-application sponsorship toggle, guarded Next with its switch off by default, checksum-verified resume attachment, and a synthetic-only Phenom adapter alongside Workday and Greenhouse. Phenom applies only to the two documented career-site hosts; actual apply hosts and markup remain unverified. See [current validation and remaining work](docs/STATUS_AND_NEXT_STEPS.md). No real employer application has been validated through final review.
+Version `0.8.0` includes application-specific profile review with stale-cache invalidation and separately displayed tailored drafts, selected-field review, the per-application sponsorship toggle, guarded Next with its switch off by default, checksum-verified resume attachment, and a synthetic-only Phenom adapter alongside Workday and Greenhouse. Phenom applies only to the two documented career-site hosts; actual apply hosts and markup remain unverified. See [current validation and remaining work](docs/STATUS_AND_NEXT_STEPS.md). No real employer application has been validated through final review.
 
 The extension's persistent host permission covers only the local helper. Real application page access is requested by user action. The routed-host inspection test uses a temporary extension copy with test-only host permissions because opening a popup as a test tab does not grant `activeTab`; it does not establish the real browser permission flow.
 
