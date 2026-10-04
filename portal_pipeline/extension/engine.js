@@ -319,10 +319,14 @@
         const existing = [...element.files].find(file => file.name === attachment.name);
         const existingBytes = await existing.arrayBuffer();
         const existingHash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", existingBytes))].map(v => v.toString(16).padStart(2, "0")).join("");
+        if (element.multiple) throw new Error("Multiple-file upload requires manual selection in this prototype.");
         if (element.files.length !== 1 || element.files[0] !== existing) throw new Error("Resume file changed during verification. Rescan before filling.");
         checkCollateral();
         checkCurrent(control);
         if (existingHash === attachment.sha256) {
+          const check = guard.verify(control, attachment.name);
+          if (!check.ok) return {id: field.id, status: "failed", message: check.message || check.reason, reason: check.reason,
+            failure_kind: check.failure_kind || "error", validation_error: check.validation_error || ""};
           return {id: field.id, status: "skipped_existing", message: "Reviewed resume already attached.", reason: "", failure_kind: "", validation_error: ""};
         }
         if (!(selection.overwrite === true || overwrite)) throw new Error("Existing file with the same name does not match the reviewed resume.");
