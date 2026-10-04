@@ -1,5 +1,9 @@
 # Portal development handoff
 
+## Session-profile review fix, October 4, 2026
+
+An isolated branch now requires the per-session profile before scanning or filling. It rejects malformed profile facts, keeps a valid empty values object pending, and clears stale cached review state when sourced proposals or tailored drafts change. Matching employment description drafts appear separately for review and are never inserted automatically. Eleven focused regressions and 23 approved mock-dependent tests pass. JavaScript syntax, Python compilation, and diff checks pass. Synthetic evidence only; no live portal validation or source checkout write.
+
 ## October 4, 2026: sponsorship toggle landing
 
 Author: Yazad Madan.

@@ -169,7 +169,8 @@ class PanelWiringTests(SyntheticBrowserTest):
           const session = {id: 'a'.repeat(32), mode: 'audited_import', company: 'Synthetic Co', role: 'Synthetic Role', url: location.href};
           const api = async (path, body) => {
             calls.push({path, body});
-            if (path === '/api/profile') return {values: {first_name: {value: 'Synthetic', source: 'Fabricated fixture'}}};
+            if (path === `/api/sessions/${session.id}/profile`) return {values: {first_name: {value: 'Synthetic', source: 'Fabricated fixture'}}};
+            if (path === '/api/profile') throw new Error('Global profile must not load');
             if (path === '/api/current') return session;
             if (path.endsWith('/preflight')) return {items: [], manual_field_ids: [], ack_required: false};
             if (path.endsWith('/answer-sheet')) return {html: '<p>sheet</p>', sheet: {rows: []}};

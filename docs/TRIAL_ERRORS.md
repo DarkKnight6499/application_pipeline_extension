@@ -51,6 +51,10 @@ Latest completed validation before Greenhouse development: 76 tests passed in 46
 - Five new browser regressions and the extended loaded-extension inspection test pass. The full suite passed 81 tests in 50.944 seconds. JavaScript syntax checks passed.
 - Public HTML inspection and synthetic verification do not establish live persistence or upload completion. Detailed evidence and the next task are in [GREENHOUSE_CONTRACT.md](GREENHOUSE_CONTRACT.md).
 
+## Session-profile review repair, October 4, 2026
+
+The panel previously fell back to a global profile when session loading failed, accepted malformed response shapes, and reused stale cached answers after a new application proposal. Synthetic regressions reproduced these failures. The panel now requires a valid session profile before scanning, invalidates cached rows when their sourced proposal or matching draft changes, and displays tailored employment drafts for human review without selecting them. Eleven focused regressions and 23 approved inherited mock cases pass. Live portal behavior remains unverified.
+
 ## Acceptance still pending
 
 DOM readback does not prove remote saving. A file input's filename does not prove remote upload completion. Neither Workday nor Greenhouse has a real employer application validated through final review. Final submission stays manual.

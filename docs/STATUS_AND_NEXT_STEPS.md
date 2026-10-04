@@ -14,6 +14,8 @@ A Manifest V3 extension and a local Python helper that review and fill only the 
 
 ## Done so far
 
+**Session-profile review fix (synthetic only, October 4, 2026).** The review panel requires a valid per-session profile before scan or Fill. It rejects malformed facts and keeps an empty values object pending. Per-row snapshots clear stale selected answers after proposal, source, status, sponsorship, or tailored draft changes. Matching employment description drafts show source and review status without filling. Eleven focused regressions and 23 approved mock-dependent tests pass; syntax, compilation, and diff checks pass. No live portal action occurred.
+
 **Parallel safety integration held for harness approval (October 4, 2026).** Final validation at code commit dd92b4b: FULL 345 tests in 198.366 seconds has one inherited CSP harness error and two symlink skips. The isolated case failed again after an earlier isolated pass. PUBLIC 264 tests in 148.794 seconds passes with two skips. JSCHECK, PYCHECK and diff checks pass. No production safety rule was weakened, no inherited test was edited, and no live portal actions occurred. The completed code and failure evidence are saved on integration/validated-portal-phases, held off main until the inherited test wait can be repaired with approval and FULL rerun successfully.
 
 **Pending select answer sheet export fix (synthetic only, October 4, 2026).** The panel now exports an unanswered select as an empty proposal, preserving its pending status instead of exporting the placeholder label as an edited draft. `answer_sheet.py` already clears empty proposals and normalizes them to pending, so no backend change was needed. Two new synthetic browser regression tests pass. The second fills only the selected native select, preserves other controls, and observes zero submit clicks or events. FULL 306 and PUBLIC 225 pass with two symlink-privilege skips each. JSCHECK, PYCHECK, and diff checks pass. Rebased onto P7 commit `996a674`; no live portal interaction occurred.
@@ -63,11 +65,11 @@ Also found:
 
 ## Way ahead
 
-Phase order lives in D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md. The user authorized parallel lower-tier agents on October 4, 2026 and direct pushes to main after validation. Sponsorship and P7 are landed. PF5 and placeholder fixes are landed at main 2c981b8. Manual-field, attestation, and upload hardening are saved separately because final FULL validation has an inherited CSP harness error. Session-profile review preparation is isolated pending explicit approval for existing synthetic mock setup edits. No live trial is authorized by the current handoff.
+Phase order lives in D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md. Sponsorship, P7, PF5, and placeholder fixes are landed. Manual-field, attestation, and upload hardening remain on the integration branch for coordinator review. The session-profile review fix is saved on its isolated branch. No live trial is authorized by the current handoff.
 
-The exact CSP test-only proposal and passing proof are saved on branch test/csp-safe-popup-wait at b39cb5f, in docs/CSP_POPUP_WAIT_PROPOSAL.md. The session-profile proposal and six regression cases are saved on fix/session-profile-review at c49d86c. No inherited tests have been changed.
+The CSP test-only proposal and passing proof are saved on branch test/csp-safe-popup-wait at b39cb5f, in docs/CSP_POPUP_WAIT_PROPOSAL.md. The session-profile proposal was prepared at c49d86c; its approved five mock setup files are now updated on the isolated repair branch, without changing inherited assertions.
 
-The next action is approval and repair of the inherited CSP wait so the safety integration can receive a passing FULL validation and land. Session-profile review also needs its listed mock setup approval, then PF4 Greenhouse completion follows. P9 cannot begin until PF1 and PF2 are merged and its approved pending-question corpus requirement is satisfied. Workday and Oracle live compatibility remain blocked on Inspect-only exports; synthetic success does not replace those exports.
+The coordinator will run FULL and PUBLIC suites on the combined branch before a main push. PF4 Greenhouse completion follows reviewed integration. P9 cannot begin until PF1 and PF2 are merged and its approved pending-question corpus requirement is satisfied. Workday and Oracle live compatibility remain blocked on Inspect-only exports; synthetic success does not replace those exports.
 
 ## Rules to keep when working here
 
