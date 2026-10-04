@@ -14,6 +14,11 @@
     } else if (message.type === "portal-scan") {
       try { sendResponse({ok: true, value: PortalEngine.scan(message.profile, {bindings: message.bindings || {}})}); }
       catch (error) { sendResponse({ok: false, error: error.message}); }
+    } else if (message.type === "portal-progress") {
+      const adapter = PortalAdapters.forLocation(location.href);
+      (message.action === "next" ? PortalProgress.guardedNext(adapter) : PortalProgress.pageCheck(adapter)).then(value => sendResponse({ok: true, value}))
+        .catch(error => sendResponse({ok: false, error: error.message}));
+      return true;
     } else if (message.type === "portal-fill") {
       PortalEngine.fill(message.selections, message.options).then(value => sendResponse({ok: true, value}))
         .catch(error => sendResponse({ok: false, error: error.message}));

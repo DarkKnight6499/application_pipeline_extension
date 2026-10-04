@@ -301,6 +301,9 @@
       if (field.record?.index === null) throw new Error(field.record.error || "Choose a profile record or manual answers for this row before filling.");
       const current = field.type === "combobox" ? read(control) : field.type === "radio" ? members.find(item => item.checked)?.value || ""
         : field.type === "checkbox" ? element.checked : field.type === "file" ? element.files.length : element.value;
+      if (field.type === "file" && attachment && [...element.files].some(file => file.name === attachment.name)) {
+        return {id: field.id, status: "skipped_existing", message: "Resume already attached with the same filename.", reason: "", failure_kind: "", validation_error: ""};
+      }
       if (!(selection.overwrite === true || overwrite) && current !== "" && current !== false && current !== 0) {
         return {id: field.id, status: "preserved", message: "Existing portal value preserved."};
       }
