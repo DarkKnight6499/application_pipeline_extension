@@ -95,3 +95,7 @@ Native and coverage regressions initially produced five failed subcases and two 
 Root corrected two test assertions: panel text resides in its shadow root; the omitted-protection count is three because it includes the password and both boundary controls. Final result: 61 passed, 81 environment skips, 142 total, zero failures/errors in 46.816 seconds. Both visible Edge trials passed in 15.173 seconds; submission counters remained zero. Screenshots were inspected and remain local. Syntax/diff checks passed. See [follow-up evidence and deferred findings](PROBE_FOLLOWUP_2026-10-03.md).
 
 Follow-up is published as [open PR 2](https://github.com/DarkKnight6499/application_pipeline_extension/pull/2), stacked on PR 1. Neither is merged; main and employer applications remain unchanged.
+
+## Continued gap validation, October 3, 2026
+
+Author: Yazad Madan. Four dynamic protected-side-effect cases were reproduced after the follow-up batch. Cached protection exempted a newly protected selected value, stale radio members hid replacement state, and new/revealed consent controls were absent from monitoring. Five root regressions failed before repair, including a newly introduced control before filling. Live protection and visible/radio membership checks now stop subsequent writes and redact protected collateral. Five new tests and 16 existing engine tests pass. Reordering remains allowed; topology changes need Rescan. Already-triggered portal side effects are reported without rollback. No live forms or submissions were used.

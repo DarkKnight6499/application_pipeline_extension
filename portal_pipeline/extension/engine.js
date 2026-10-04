@@ -6,6 +6,7 @@
   const normalize = value => String(value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   const answerKey = value => String(value ?? "").toLowerCase().replace(/\s+/g, " ").trim();
   let controls = new Map();
+  let registeredSurface = [];
   let filling = false;
   const recordIds = new WeakMap();
   const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -83,6 +84,14 @@
   function controlVisible(element) {
     const upload = globalThis.PortalGreenhouse?.uploadGroup(element);
     return upload ? visible(upload) && !element.closest('[aria-hidden="true"],[hidden]') : visible(element);
+  }
+
+  function visibleControls() {
+    return [...document.querySelectorAll("input,select,textarea,[role=combobox]")].filter(element => {
+      if (element.closest("#portal-panel-host") || !controlVisible(element)) return false;
+      if (globalThis.PortalGreenhouse?.active() && !PortalGreenhouse.formFor(element)) return false;
+      return !["hidden", "submit", "button", "reset", "image"].includes(element.type);
+    });
   }
 
   function classify(label, identity, section) {
@@ -184,9 +193,9 @@
         record.index = null; record.error = "The same profile record is assigned to multiple visible rows. Choose different records or manual answers.";
       }
     });
-    for (const element of document.querySelectorAll("input, select, textarea, [role='combobox']")) {
-      if (element.closest("#portal-panel-host") || !controlVisible(element)) continue;
-      if (globalThis.PortalGreenhouse?.active() && !PortalGreenhouse.formFor(element)) continue;
+    const surface = visibleControls();
+    if (register) registeredSurface = surface;
+    for (const element of surface) {
       const custom = element.getAttribute("role") === "combobox" && element.tagName !== "SELECT";
       const type = custom ? "combobox" : element.type || element.getAttribute("role") || element.tagName.toLowerCase();
       if (["hidden", "submit", "button", "reset", "image"].includes(type)) continue;
@@ -278,11 +287,19 @@
     const selectedIds = new Set(selections.map(selection => selection.id));
     const baseline = new Map([...controls].map(([id, control]) => [id, read(control)]));
     let aborted = false;
+    const liveProtected = control => control.field.blocked || control.members.some(protectedControl);
     const checkCollateral = () => {
-      const collateral = [...baseline].filter(([id, value]) => (!selectedIds.has(id) || controls.get(id).field.blocked) && read(controls.get(id)) !== value);
+      const surface = visibleControls();
+      const changedMembership = [...controls.values()].some(control => control.field.type === "radio" &&
+        (radioMembers(control.element).length !== control.members.length || radioMembers(control.element).some(item => !control.members.includes(item))));
+      if (surface.length !== registeredSurface.length || surface.some(element => !registeredSurface.includes(element)) || changedMembership) {
+        aborted = true;
+        throw new Error("The visible form structure changed. Stop and rescan before filling more fields.");
+      }
+      const collateral = [...baseline].filter(([id, value]) => (!selectedIds.has(id) || liveProtected(controls.get(id))) && read(controls.get(id)) !== value);
       if (collateral.length) {
         aborted = true;
-        const labels = collateral.map(([id]) => controls.get(id).field.blocked ? "a protected field" : controls.get(id).field.label);
+        const labels = collateral.map(([id]) => liveProtected(controls.get(id)) ? "a protected field" : controls.get(id).field.label);
         throw new Error("An unselected field changed: " + labels.join(", ") + ". Review the form manually.");
       }
     };
@@ -311,6 +328,7 @@
         if (!control) throw new Error("Field changed. Scan the page again.");
         if (aborted) throw new Error("Filling stopped after an unexpected form change. Rescan and review.");
         const {element, members, field} = control;
+        checkCollateral();
         checkCurrent(control);
         if (fingerprint(element) !== control.fingerprint) throw new Error("Question or control identity changed. Rescan before filling.");
         if (field.record?.index === null) throw new Error(field.record.error || "Choose a profile record or manual answers for this row before filling.");

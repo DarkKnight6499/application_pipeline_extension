@@ -117,3 +117,9 @@ C5-02 now reports visible iframe, open-shadow-host, and unsupported spinbutton c
 Final follow-up discovery: 142 total, 61 passed, 81 SKIPPED-BY-ENVIRONMENT, zero failures/errors in 46.816 seconds. Two visible Edge trials passed in 15.173 seconds with zero submissions. Nine native/inspection tests pass; extension syntax and diff checks pass. New coverage screenshot was inspected and remains ignored with author metadata. Full evidence and deferred limits are in [PROBE_FOLLOWUP_2026-10-03.md](../docs/PROBE_FOLLOWUP_2026-10-03.md). No private workflow or live employer acceptance was tested.
 
 Published as [PR 2](https://github.com/DarkKnight6499/application_pipeline_extension/pull/2), stacked onto `fix/probe-safety-1-5`. PR 1 and PR 2 are open and unmerged; main remains unchanged. Human review is next. Remaining work is explicitly deferred in the follow-up report.
+
+## Continued verified-gap phases, October 3, 2026
+
+Author: Yazad Madan. The user requested continued unattended work. Work remains synthetic, within existing portal scope, on `fix/remaining-probe-boundaries` stacked onto the unmerged follow-up branch.
+
+Further probes reproduced dynamic collateral omissions: a selected field newly labelled as certification remained exempt from collateral monitoring; replacing a non-leading protected radio member, adding consent, or revealing hidden consent did not stop later selected writes. Five regressions failed before repair. Live protection now governs collateral exemption and redaction. The registered visible control membership and native radio membership must remain stable; new, revealed, or replaced controls require Rescan, while reordering remains permitted. All five regressions and 16 existing engine tests pass. Detection reports existing portal side effects and stops later writes; it does not roll them back. Unobserved hidden/unsupported surfaces and changes after the settling window remain limits.
