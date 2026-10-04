@@ -1,13 +1,65 @@
 """Regression tests use only synthetic answers and isolated local pages."""
+import base64
+import hashlib
 import unittest
 
 from browser_test_support import SyntheticBrowserTest
 
 # Synthetic answer configuration
 AUTHORIZATION_FACT = {"authorized_us": {"value": "Yes", "source": "Synthetic fixture"}}
+ATTACHMENT_BYTES = b"\x01\x02\x03"
+ATTACHMENT = {"base64": base64.b64encode(ATTACHMENT_BYTES).decode(),
+              "sha256": hashlib.sha256(ATTACHMENT_BYTES).hexdigest(),
+              "name": "Synthetic_Resume.docx", "mime": "application/octet-stream"}
 
 
 class PublicEngineTests(SyntheticBrowserTest):
+    def upload_with_microtask(self, mutation):
+        self.open_markup('<form id="original"><label id="upload-label">Resume<input id="upload" type="file"></label></form><form id="other"></form>')
+        upload = next(field for field in self.scan() if field["type"] == "file")
+        return self.page.evaluate("""async ({id, attachment, mutation}) => {
+          queueMicrotask(() => new Function(mutation)());
+          return PortalEngine.fill([{id}], {attachment});
+        }""", {"id": upload["id"], "attachment": ATTACHMENT, "mutation": mutation})
+
+    def test_upload_rechecks_protection_after_checksum_await(self):
+        result = self.upload_with_microtask("document.getElementById('upload-label').firstChild.textContent='I attest and certify';")
+        self.assertEqual(result[0]["status"], "failed")
+        self.assertEqual(self.page.locator("#upload").evaluate("node => node.files.length"), 0)
+
+    def test_upload_rechecks_editability_after_checksum_await(self):
+        result = self.upload_with_microtask("document.getElementById('upload').disabled=true;")
+        self.assertEqual(result[0]["status"], "failed")
+        self.assertEqual(self.page.locator("#upload").evaluate("node => node.files.length"), 0)
+
+    def test_upload_rechecks_detachment_after_checksum_await(self):
+        result = self.upload_with_microtask("window.detachedUpload=document.getElementById('upload');detachedUpload.remove();")
+        self.assertEqual(result[0]["status"], "failed")
+        self.assertEqual(self.page.evaluate("detachedUpload.files.length"), 0)
+
+    def test_upload_rechecks_form_owner_after_checksum_await(self):
+        result = self.upload_with_microtask("document.getElementById('other').append(document.getElementById('upload-label'));")
+        self.assertEqual(result[0]["status"], "failed")
+        self.assertEqual(self.page.locator("#upload").evaluate("node => node.files.length"), 0)
+
+    def test_valid_checksum_upload_and_wrong_checksum_refusal(self):
+        self.open_markup('<label>Resume<input id="upload" type="file"></label>')
+        upload = next(field for field in self.scan() if field["type"] == "file")
+        wrong = {**ATTACHMENT, "sha256": "0" * 64}
+        result = self.fill([{"id": upload["id"]}], {"attachment": wrong})
+        self.assertEqual(result[0]["status"], "failed")
+        self.assertEqual(self.page.locator("#upload").evaluate("node => node.files.length"), 0)
+        result = self.fill([{"id": upload["id"]}], {"attachment": ATTACHMENT})
+        self.assertEqual(result[0]["status"], "filled")
+        self.assertEqual(self.page.locator("#upload").evaluate("node => node.files[0].name"), ATTACHMENT["name"])
+
+    def test_question_changed_after_write_is_not_reported_filled(self):
+        self.open_markup('<label id="question">First name<input id="first"></label>')
+        field = next(field for field in self.scan() if field["key"] == "first_name")
+        self.page.evaluate("document.getElementById('first').oninput=()=>{document.getElementById('question').firstChild.textContent='I certify';}")
+        result = self.fill([{"id": field["id"], "value": "Synthetic"}])
+        self.assertEqual(result[0]["status"], "failed")
+
     def test_protected_collateral_stops_later_selected_writes(self):
         self.open_markup("""
           <label>First name<input id="first" oninput="document.getElementById('consent').checked=true"></label>

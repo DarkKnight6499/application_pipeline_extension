@@ -220,7 +220,7 @@
                      proposal: fact?.value ?? "", source: record?.error || (record?.index === null ? "Choose a profile record for this row first." : fact?.source || "Manual answer required"),
                      status: blocked ? "manual_only" : !fact && type !== "file" ? "pending" : "prepared"};
       fields.push(field);
-      if (register) controls.set(id, {element, members, field, context, radioForm: element.form, portalForm: globalThis.PortalGreenhouse?.formFor(element), contextIdentity: contextIdentity(context), fingerprint: fingerprint(element), identity: controlIdentity(element)});
+      if (register) controls.set(id, {element, members, field, context, nativeForm: element.form, portalForm: globalThis.PortalGreenhouse?.formFor(element), contextIdentity: contextIdentity(context), fingerprint: fingerprint(element), identity: controlIdentity(element)});
     }
     return fields;
   }
@@ -277,6 +277,17 @@
       if (globalThis.PortalGreenhouse?.active() && (!control.portalForm || PortalGreenhouse.formFor(control.element) !== control.portalForm)) throw new Error("The Greenhouse application form changed. Rescan before filling.");
       if (globalThis.PortalGreenhouse?.protectedField(control.element)) throw new Error("This field is manual only.");
     };
+    const checkCurrent = control => {
+      const {element, members, field} = control;
+      if (!element.isConnected || !controlVisible(element)) throw new Error("Field is no longer visible. Scan again.");
+      if (element.form !== control.nativeForm) throw new Error("The field's form changed. Rescan before filling.");
+      checkHistory(control);
+      checkPortal(control);
+      if (field.blocked || members.some(protectedControl)) throw new Error("This field is manual only.");
+      if (element.disabled || element.readOnly || element.getAttribute("aria-disabled") === "true" || element.getAttribute("aria-readonly") === "true") throw new Error("This field cannot be edited.");
+      const changed = field.type === "combobox" ? controlIdentity(element) !== control.identity : fingerprint(element) !== control.fingerprint;
+      if (changed) throw new Error("Question or control identity changed. Rescan before filling.");
+    };
     for (const selection of selections) {
       const control = controls.get(selection.id);
       let outcome;
@@ -284,13 +295,9 @@
         if (!control) throw new Error("Field changed. Scan the page again.");
         if (aborted) throw new Error("Filling stopped after an unexpected form change. Rescan and review.");
         const {element, members, field} = control;
-        if (!element.isConnected || !controlVisible(element)) throw new Error("Field is no longer visible. Scan again.");
-        checkPortal(control);
+        checkCurrent(control);
         if (fingerprint(element) !== control.fingerprint) throw new Error("Question or control identity changed. Rescan before filling.");
         if (field.record?.index === null) throw new Error(field.record.error || "Choose a profile record or manual answers for this row before filling.");
-        checkHistory(control);
-        if (field.blocked || protectedTerms.test(`${labelFor(element)} ${element.name || ""}`) || globalThis.PortalGreenhouse?.protectedField(element)) throw new Error("This field is manual only.");
-        if (element.disabled || element.readOnly) throw new Error("This field cannot be edited.");
         const current = field.type === "combobox" ? read(control) : field.type === "radio" ? members.find(item => item.checked)?.value || ""
           : field.type === "checkbox" ? element.checked : field.type === "file" ? element.files.length : element.value;
         if (!(selection.overwrite === true || overwrite) && current !== "" && current !== false && current !== 0) {
@@ -307,6 +314,8 @@
           if (hash !== attachment.sha256) throw new Error("Resume checksum does not match.");
           const transfer = new DataTransfer();
           transfer.items.add(new File([bytes], attachment.name, {type: attachment.mime}));
+          checkCollateral();
+          checkCurrent(control);
           element.files = transfer.files;
           element.dispatchEvent(new Event("change", {bubbles: true}));
           expected = attachment.name;
@@ -316,7 +325,7 @@
           expected = option.value;
           if (field.type === "radio") {
             const target = members.find(item => item.value === option.value);
-            if (element.form !== control.radioForm || !radioMembers(element).includes(target)) throw new Error("The radio group changed. Rescan before filling.");
+            if (element.form !== control.nativeForm || !radioMembers(element).includes(target)) throw new Error("The radio group changed. Rescan before filling.");
             if (members.some(protectedControl)) throw new Error("This radio group is manual only.");
             if (!target?.isConnected || !visible(target) || target.disabled) throw new Error("The selected radio option is unavailable. Rescan before filling.");
             Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "checked").set.call(target, true);
@@ -327,7 +336,7 @@
           if (!field.adapter || !globalThis.PortalListbox) throw new Error(field.manual_reason || "This custom dropdown requires manual review.");
           expected = await PortalListbox.choose(element, expected, () => {
             checkCollateral();
-            checkHistory(control);
+            checkCurrent(control);
             if (controlIdentity(element) !== control.identity) throw new Error("The dropdown question changed while opening. Rescan before filling.");
           });
         } else if (field.type === "checkbox") {
@@ -340,8 +349,7 @@
         }
         await new Promise(resolve => setTimeout(resolve, 500));
         checkCollateral();
-        checkHistory(control);
-        checkPortal(control);
+        checkCurrent(control);
         const actual = field.type === "combobox" ? read(control) : field.type === "file" ? element.files[0]?.name : field.type === "radio" ? members.find(item => item.checked)?.value : element.value;
         if (actual !== expected) throw new Error("Portal did not retain the value. Review this field manually.");
         if (!element.isConnected) throw new Error("Portal replaced the field after filling. Scan again to verify.");
