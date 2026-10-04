@@ -17,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from portal_profile import hard_fact_errors, resolve_profile
+from portal_profile import hard_fact_errors, resolve_for_application, resolve_profile, save_override
 from audited_import import check_source, inspect_application, posting_url
 
 sys.dont_write_bytecode = True
@@ -286,6 +286,9 @@ def make_server(pipeline, port=8766, token=None):
                         return self.send(200, {"templates": pipeline.templates(), "current": pipeline.current()})
                     if path == "/api/current":
                         return self.send(200, pipeline.current())
+                    match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/profile", path)
+                    if match:
+                        return self.send(200, resolve_for_application(pipeline.source, pipeline.folder(match[1])))
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/(download|attachment)", path)
                     if match:
                         data = pipeline.resume(match[1], for_upload=match[2] == "attachment")
@@ -326,6 +329,9 @@ def make_server(pipeline, port=8766, token=None):
                         return self.send(201, pipeline.create(body))
                     if path == "/api/import":
                         return self.send(201, pipeline.import_application(body))
+                    match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/override", path)
+                    if match:
+                        return self.send(200, save_override(pipeline.folder(match[1]), body.get("key"), body.get("value"), body.get("reason")))
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/(build|approve-upload)", path)
                     if match:
                         method = pipeline.build if match[2] == "build" else pipeline.approve_upload
