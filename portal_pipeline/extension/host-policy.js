@@ -5,7 +5,10 @@
       const url = new URL(targetUrl);
       if (!["http:", "https:"].includes(url.protocol)) return false;
       const localFixture = !!pairedServer && url.origin === pairedServer && url.pathname === "/fixture";
-      return localFixture || /(^|\.)(myworkdayjobs\.com|greenhouse\.io)$/.test(url.hostname);
+      // Registered non-generic adapters define the supported hosts; the literal pattern covers pages without the registry.
+      const adapter = globalThis.PortalAdapters?.forLocation(targetUrl);
+      const hosted = adapter ? adapter.id !== "generic" : /(^|\.)(myworkdayjobs\.com|greenhouse\.io)$/.test(url.hostname);
+      return localFixture || hosted;
     } catch { return false; }
   }
 

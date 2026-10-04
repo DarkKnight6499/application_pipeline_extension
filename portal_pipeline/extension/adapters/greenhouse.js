@@ -27,4 +27,9 @@
   }
   const protectedField = node => !!formFor(node) && !!node.closest("#demographic-section,.demographic--container");
   globalThis.PortalGreenhouse = {active, form, formFor, uploadGroup, label, protectedField};
+  // Form scoping and dropdown handling stay in these globals; the registry entry reuses the generic methods.
+  const generic = globalThis.PortalAdapters?.forLocation("");
+  if (generic && !PortalAdapters.list().some(item => item.id === "greenhouse")) {
+    PortalAdapters.register({...generic, id: "greenhouse", hosts: [/(^|\.)greenhouse\.io$/]});
+  }
 })();

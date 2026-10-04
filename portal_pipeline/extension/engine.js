@@ -196,7 +196,16 @@
       : field.type === "checkbox" ? element.checked : field.type === "file" ? [...element.files].map(file => file.name).join(",") : element.value || "";
   }
 
-  function scan(profile, {register = true, bindings = {}} = {}) {
+  const route = () => globalThis.PortalAdapters?.forLocation(location.href) || null;
+
+  function proposeCore(field, profile, {element, options = field.options || []} = {}) {
+    const fact = field.key ? datePartFact(profile, field.key, element, options) : null;
+    const derived = /^(employment|education)\.\d+\.(start|end)_(month|year)$/.test(field.key || "");
+    return {key: field.key, value: fact?.value ?? "", source: fact?.source || "Manual answer required",
+      status: field.blocked ? "manual_only" : !fact && field.type !== "file" ? "pending" : "prepared", basis: derived ? "derived" : "exact_alias"};
+  }
+
+  function scanCore(profile, {register = true, bindings = {}} = {}) {
     if (register && filling) throw new Error("A fill is running. Wait for its results before rescanning.");
     if (register) controls = new Map();
     const fields = [], counts = new Map(), seenRadio = new Set();
@@ -250,7 +259,7 @@
         : type === "checkbox" ? element.checked : type === "file" ? [...element.files].map(file => file.name).join(", ") : element.value || "";
       const options = custom ? customInfo.options : element.tagName === "SELECT" ? [...element.options].map(option => ({value: option.value, label: option.textContent.trim(), disabled: optionDisabled(option)}))
         : type === "radio" ? members.map(item => ({value: item.value, label: labelFor(item), disabled: unavailable(item) || !visible(item)})) : [];
-      const fact = key ? datePartFact(profile, key, element, options) : null;
+      const proposal = proposeCore({key, blocked, type, options}, profile, {element, options});
       const field = {id, label, key, section: key?.split(".")[0] || section, type, current, options, record,
                      required: element.required || element.getAttribute("aria-required") === "true" || globalThis.PortalGreenhouse?.uploadGroup(element)?.getAttribute("aria-required") === "true",
                      blocked, disabled: unavailable(element),
@@ -258,8 +267,8 @@
                      dropdown_state: customInfo?.dropdown_state || null,
                      structure: {tag: element.tagName.toLowerCase(), name: element.name || "", automation_id: element.getAttribute("data-automation-id") || "",
                        dom_id: element.id, role: element.getAttribute("role") || "", controls: element.getAttribute("aria-controls") || "", popup: element.getAttribute("aria-haspopup") || ""},
-                     proposal: fact?.value ?? "", source: record?.error || (record?.index === null ? "Choose a profile record for this row first." : fact?.source || "Manual answer required"),
-                     status: blocked ? "manual_only" : !fact && type !== "file" ? "pending" : "prepared"};
+                     proposal: proposal.value, source: record?.error || (record?.index === null ? "Choose a profile record for this row first." : proposal.source),
+                     status: proposal.status};
       fields.push(field);
       if (register) controls.set(id, {element, members, field, context, nativeForm: element.form, portalForm: globalThis.PortalGreenhouse?.formFor(element), contextIdentity: contextIdentity(context), fingerprint: fingerprint(element), identity: controlIdentity(element)});
     }
@@ -267,7 +276,7 @@
   }
 
   function inspect() {
-    const fields = scan({values: {}}, {register: false});
+    const fields = (route() ? route().scan.bind(route()) : scanCore)({values: {}}, {register: false});
     const outsidePanel = node => !node.closest("#portal-panel-host") && visible(node);
     const frames = [...document.querySelectorAll("iframe")].filter(outsidePanel).length;
     const shadowHosts = [...document.querySelectorAll("*")].filter(node => node.shadowRoot && outsidePanel(node)).length;
@@ -305,23 +314,116 @@
     element.dispatchEvent(new Event("blur", {bubbles: true}));
   }
 
+  function verifyCore(control, expected) {
+    const {element, members, field} = control;
+    const actual = field.type === "combobox" ? read(control) : field.type === "file" ? element.files[0]?.name : field.type === "radio" ? members.find(item => item.checked)?.value : element.value;
+    if (actual !== expected) return {ok: false, actual, reason: "Portal did not retain the value. Review this field manually."};
+    if (!element.isConnected) return {ok: false, actual, reason: "Portal replaced the field after filling. Scan again to verify."};
+    if (element.validity && !element.validity.valid) return {ok: false, actual, reason: "Portal validation rejected the value."};
+    return {ok: true, actual, reason: ""};
+  }
+
+  // One selected field, written only through the guard's live-structure checks; selection is the proposal.
+  async function fillField(control, selection, guard) {
+    const {checkCollateral, checkCurrent, attachment, overwrite} = guard;
+    try {
+      if (!control) throw new Error("Field changed. Scan the page again.");
+      if (guard.state.aborted) throw new Error("Filling stopped after an unexpected form change. Rescan and review.");
+      const {element, members, field} = control;
+      checkCollateral();
+      checkCurrent(control);
+      if (fingerprint(element) !== control.fingerprint) throw new Error("Question or control identity changed. Rescan before filling.");
+      if (field.record?.index === null) throw new Error(field.record.error || "Choose a profile record or manual answers for this row before filling.");
+      const current = field.type === "combobox" ? read(control) : field.type === "radio" ? members.find(item => item.checked)?.value || ""
+        : field.type === "checkbox" ? element.checked : field.type === "file" ? element.files.length : element.value;
+      if (!(selection.overwrite === true || overwrite) && current !== "" && current !== false && current !== 0) {
+        return {id: field.id, status: "preserved", message: "Existing portal value preserved."};
+      }
+      let expected = selection.value;
+      if (field.type === "file") {
+        if (!attachment) throw new Error("Choose a reviewed resume session first.");
+        if (element.multiple) throw new Error("Multiple-file upload requires manual selection in this prototype.");
+        if (!["resume", "cv", "resume cv", "upload resume", "upload cv", "attach resume", "attach cv"].includes(normalize(field.label))) throw new Error("This upload is not an explicitly identified resume field. Choose the file manually.");
+        const bytes = Uint8Array.from(atob(attachment.base64), char => char.charCodeAt(0));
+        const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map(v => v.toString(16).padStart(2, "0")).join("");
+        if (hash !== attachment.sha256) throw new Error("Resume checksum does not match.");
+        const transfer = new DataTransfer();
+        transfer.items.add(new File([bytes], attachment.name, {type: attachment.mime}));
+        checkCollateral();
+        checkCurrent(control);
+        element.files = transfer.files;
+        element.dispatchEvent(new Event("change", {bubbles: true}));
+        expected = attachment.name;
+      } else if (field.type === "radio" || element.tagName === "SELECT") {
+        const option = optionMatch(field.options, expected);
+        if (!option) throw new Error("No unique exact option matches the answer. Choose an available option.");
+        expected = option.value;
+        if (field.type === "radio") {
+          if (members.filter(item => item.value === option.value).length !== 1) throw new Error("The radio option value is ambiguous. Choose this answer manually.");
+          const target = members.find(item => item.value === option.value);
+          if (element.form !== control.nativeForm || !radioMembers(element).includes(target)) throw new Error("The radio group changed. Rescan before filling.");
+          if (members.some(protectedControl)) throw new Error("This radio group is manual only.");
+          if (!target?.isConnected || !visible(target) || unavailable(target)) throw new Error("The selected radio option is unavailable. Rescan before filling.");
+          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "checked").set.call(target, true);
+          target.dispatchEvent(new Event("input", {bubbles: true}));
+          target.dispatchEvent(new Event("change", {bubbles: true}));
+        } else {
+          if ([...element.options].filter(item => item.value === option.value).length !== 1) throw new Error("The native option value is ambiguous. Choose this answer manually.");
+          const target = [...element.options].find(item => item.value === option.value && item.textContent.trim() === option.label);
+          if (!target || optionDisabled(target)) throw new Error("The selected option is unavailable. Rescan before filling.");
+          setNative(element, option.value);
+        }
+      } else if (field.type === "combobox") {
+        if (!field.adapter || !dropdown(element)) throw new Error(field.manual_reason || "This custom dropdown requires manual review.");
+        expected = await dropdown(element).choose(element, expected, () => {
+          checkCollateral();
+          checkCurrent(control);
+          if (controlIdentity(element) !== control.identity) throw new Error("The dropdown question changed while opening. Rescan before filling.");
+        });
+      } else if (field.type === "checkbox") {
+        throw new Error("Checkboxes require manual review in this prototype.");
+      } else {
+        expected = String(expected ?? "");
+        if (!expected.trim()) throw new Error("Provide an answer before selecting this field.");
+        if (element.maxLength > 0 && expected.length > element.maxLength) throw new Error("Answer exceeds the portal's length limit.");
+        setNative(element, expected);
+      }
+      await new Promise(resolve => setTimeout(resolve, 500));
+      checkCollateral();
+      checkCurrent(control);
+      const check = guard.verify(control, expected);
+      if (!check.ok) throw new Error(check.reason);
+      return {id: field.id, status: "filled", message: field.type === "file" ? "File input verified. Check the portal's upload completion indicator." : "Value verified."};
+    } catch (error) {
+      const outcome = {id: selection.id, status: "failed", message: error.message};
+      try { checkCollateral(); } catch (change) {outcome.message = change.message;}
+      return outcome;
+    }
+  }
+
   async function fillSelected(selections, {overwrite = false, attachment = null} = {}) {
+    const adapter = route();
+    const gate = adapter?.humanGate(document);
+    if (gate) {
+      const reason = `A ${gate.kind} step needs you. Nothing was written. Complete it yourself, then rescan.`;
+      return selections.map(selection => ({id: selection.id, ok: false, status: "blocked_by_human_gate", actual: null, reason, message: reason}));
+    }
     const results = [];
     const selectedIds = new Set(selections.map(selection => selection.id));
     const baseline = new Map([...controls].map(([id, control]) => [id, read(control)]));
-    let aborted = false;
+    const state = {aborted: false};
     const liveProtected = control => control.field.blocked || control.members.some(protectedControl);
     const checkCollateral = () => {
       const surface = visibleControls();
       const changedMembership = [...controls.values()].some(control => control.field.type === "radio" &&
         (radioMembers(control.element).length !== control.members.length || radioMembers(control.element).some(item => !control.members.includes(item))));
       if (surface.length !== registeredSurface.length || surface.some(element => !registeredSurface.includes(element)) || changedMembership) {
-        aborted = true;
+        state.aborted = true;
         throw new Error("The visible form structure changed. Stop and rescan before filling more fields.");
       }
       const collateral = [...baseline].filter(([id, value]) => (!selectedIds.has(id) || liveProtected(controls.get(id))) && read(controls.get(id)) !== value);
       if (collateral.length) {
-        aborted = true;
+        state.aborted = true;
         const labels = collateral.map(([id]) => liveProtected(controls.get(id)) ? "a protected field" : controls.get(id).field.label);
         throw new Error("An unselected field changed: " + labels.join(", ") + ". Review the form manually.");
       }
@@ -344,85 +446,12 @@
       const changed = field.type === "combobox" ? controlIdentity(element) !== control.identity : fingerprint(element) !== control.fingerprint;
       if (changed) throw new Error("Question or control identity changed. Rescan before filling.");
     };
+    const verify = (control, expected) => (adapter ? adapter.verify(control, expected) : verifyCore(control, expected));
     for (const selection of selections) {
       const control = controls.get(selection.id);
-      let outcome;
-      try {
-        if (!control) throw new Error("Field changed. Scan the page again.");
-        if (aborted) throw new Error("Filling stopped after an unexpected form change. Rescan and review.");
-        const {element, members, field} = control;
-        checkCollateral();
-        checkCurrent(control);
-        if (fingerprint(element) !== control.fingerprint) throw new Error("Question or control identity changed. Rescan before filling.");
-        if (field.record?.index === null) throw new Error(field.record.error || "Choose a profile record or manual answers for this row before filling.");
-        const current = field.type === "combobox" ? read(control) : field.type === "radio" ? members.find(item => item.checked)?.value || ""
-          : field.type === "checkbox" ? element.checked : field.type === "file" ? element.files.length : element.value;
-        if (!(selection.overwrite === true || overwrite) && current !== "" && current !== false && current !== 0) {
-          results.push({id: field.id, status: "preserved", message: "Existing portal value preserved."});
-          continue;
-        }
-        let expected = selection.value;
-        if (field.type === "file") {
-          if (!attachment) throw new Error("Choose a reviewed resume session first.");
-          if (element.multiple) throw new Error("Multiple-file upload requires manual selection in this prototype.");
-          if (!["resume", "cv", "resume cv", "upload resume", "upload cv", "attach resume", "attach cv"].includes(normalize(field.label))) throw new Error("This upload is not an explicitly identified resume field. Choose the file manually.");
-          const bytes = Uint8Array.from(atob(attachment.base64), char => char.charCodeAt(0));
-          const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map(v => v.toString(16).padStart(2, "0")).join("");
-          if (hash !== attachment.sha256) throw new Error("Resume checksum does not match.");
-          const transfer = new DataTransfer();
-          transfer.items.add(new File([bytes], attachment.name, {type: attachment.mime}));
-          checkCollateral();
-          checkCurrent(control);
-          element.files = transfer.files;
-          element.dispatchEvent(new Event("change", {bubbles: true}));
-          expected = attachment.name;
-        } else if (field.type === "radio" || element.tagName === "SELECT") {
-          const option = optionMatch(field.options, expected);
-          if (!option) throw new Error("No unique exact option matches the answer. Choose an available option.");
-          expected = option.value;
-          if (field.type === "radio") {
-            if (members.filter(item => item.value === option.value).length !== 1) throw new Error("The radio option value is ambiguous. Choose this answer manually.");
-            const target = members.find(item => item.value === option.value);
-            if (element.form !== control.nativeForm || !radioMembers(element).includes(target)) throw new Error("The radio group changed. Rescan before filling.");
-            if (members.some(protectedControl)) throw new Error("This radio group is manual only.");
-            if (!target?.isConnected || !visible(target) || unavailable(target)) throw new Error("The selected radio option is unavailable. Rescan before filling.");
-            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "checked").set.call(target, true);
-            target.dispatchEvent(new Event("input", {bubbles: true}));
-            target.dispatchEvent(new Event("change", {bubbles: true}));
-          } else {
-            if ([...element.options].filter(item => item.value === option.value).length !== 1) throw new Error("The native option value is ambiguous. Choose this answer manually.");
-            const target = [...element.options].find(item => item.value === option.value && item.textContent.trim() === option.label);
-            if (!target || optionDisabled(target)) throw new Error("The selected option is unavailable. Rescan before filling.");
-            setNative(element, option.value);
-          }
-        } else if (field.type === "combobox") {
-          if (!field.adapter || !dropdown(element)) throw new Error(field.manual_reason || "This custom dropdown requires manual review.");
-          expected = await dropdown(element).choose(element, expected, () => {
-            checkCollateral();
-            checkCurrent(control);
-            if (controlIdentity(element) !== control.identity) throw new Error("The dropdown question changed while opening. Rescan before filling.");
-          });
-        } else if (field.type === "checkbox") {
-          throw new Error("Checkboxes require manual review in this prototype.");
-        } else {
-          expected = String(expected ?? "");
-          if (!expected.trim()) throw new Error("Provide an answer before selecting this field.");
-          if (element.maxLength > 0 && expected.length > element.maxLength) throw new Error("Answer exceeds the portal's length limit.");
-          setNative(element, expected);
-        }
-        await new Promise(resolve => setTimeout(resolve, 500));
-        checkCollateral();
-        checkCurrent(control);
-        const actual = field.type === "combobox" ? read(control) : field.type === "file" ? element.files[0]?.name : field.type === "radio" ? members.find(item => item.checked)?.value : element.value;
-        if (actual !== expected) throw new Error("Portal did not retain the value. Review this field manually.");
-        if (!element.isConnected) throw new Error("Portal replaced the field after filling. Scan again to verify.");
-        if (element.validity && !element.validity.valid) throw new Error("Portal validation rejected the value.");
-        outcome = {id: field.id, status: "filled", message: field.type === "file" ? "File input verified. Check the portal's upload completion indicator." : "Value verified."};
-      } catch (error) {
-        outcome = {id: selection.id, status: "failed", message: error.message};
-        try { checkCollateral(); } catch (change) {outcome.message = change.message;}
-      }
-      results.push(outcome);
+      const guard = {selection, overwrite, attachment, state, checkCollateral, checkCurrent, verify};
+      results.push(!adapter ? await fillField(control, selection, guard)
+        : control?.field.type === "file" ? await adapter.upload(control, attachment, guard) : await adapter.fill(control, selection, guard));
     }
     return results;
   }
@@ -434,5 +463,12 @@
     finally { filling = false; }
   }
 
-  globalThis.PortalEngine = {scan, fill, optionMatch, inspect, profileRecords};
+  function scan(profile, options = {}) {
+    const adapter = route();
+    return adapter ? adapter.scan(profile, options) : scanCore(profile, options);
+  }
+
+  // Adapters delegate to these legacy bodies, which stay otherwise private to the engine closure.
+  const core = {scan: scanCore, propose: proposeCore, fill: fillField, verify: verifyCore};
+  globalThis.PortalEngine = {scan, fill, optionMatch, inspect, profileRecords, core};
 })();

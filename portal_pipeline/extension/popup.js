@@ -12,7 +12,7 @@
       if (!/^https?:/.test(tab?.url || "")) throw new Error("Open a normal application webpage first.");
       const {server: pairedServer} = await chrome.storage.local.get("server");
       PortalHostPolicy.assertSupported(tab.url, pairedServer);
-      await chrome.scripting.executeScript({target: {tabId: tab.id}, files: ["adapters/aria-listbox.js", "adapters/greenhouse.js", "adapters/greenhouse-select.js", "engine.js", "page-bridge.js"]});
+      await chrome.scripting.executeScript({target: {tabId: tab.id}, files: ["adapters/registry.js", "adapters/generic.js", "adapters/aria-listbox.js", "adapters/greenhouse.js", "adapters/greenhouse-select.js", "engine.js", "page-bridge.js"]});
       await chrome.sidePanel.setOptions({tabId: tab.id, path: `review.html?tab=${tab.id}${inspectionOnly ? "&mode=inspect" : ""}`, enabled: true});
       await chrome.sidePanel.open({tabId: tab.id});
       window.close();

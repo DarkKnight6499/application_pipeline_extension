@@ -49,7 +49,7 @@ Also found:
 
 ## Way ahead
 
-Phase order now lives in D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md. PRs 4 and 5 landed on main on 2026-10-04. Next phase: P1 (adapter interface and registry).
+Phase order now lives in D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md. PRs 4 and 5 landed on main on 2026-10-04. P1 (adapter interface and registry) is done. Next phase: TF then P3.
 
 The earlier ordered list is kept in Git history. Items still open from it: Phenom adapter, post-login Workday and Oracle exports, the en-dash autofill check, Eightfold, iframe support for iCIMS and Lever, a liveness check before filling, and the Lever question-label resolver. They map to phases PF1 to PF14 in the plan.
 
