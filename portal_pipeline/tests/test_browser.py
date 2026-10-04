@@ -495,7 +495,7 @@ class BrowserTests(unittest.TestCase):
         self.page.evaluate("document.getElementById('custom-relocation').addEventListener('click', () => {document.getElementById('custom-relocation-label').textContent = 'A different question';})")
         result = self.custom_fill()
         self.assertEqual(result[0]["status"], "failed")
-        self.assertIn("question changed while opening", result[0]["message"])
+        self.assertIn("identity changed", result[0]["message"])
         self.assertEqual(self.page.locator("#custom-relocation").get_attribute("aria-valuetext"), "")
 
     def test_custom_dropdown_option_inside_submit_button_is_not_clicked(self):
@@ -567,8 +567,18 @@ class BrowserTests(unittest.TestCase):
         fields = self.scan()
         report = self.page.evaluate("PortalEngine.inspect()")
         raw = json.dumps(report)
-        for excluded in ["Private existing answer", "Private-password-value", "private-query", "proposal", "current", "Password", "Gender"]:
+        for excluded in ["Private existing answer", "Private-password-value", "private-query", "Password", "Gender"]:
             self.assertNotIn(excluded, raw)
+        # proposal and current are scan() property names, so match exact keys, not substrings of constant values
+        def json_keys(node):
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    yield key
+                    yield from json_keys(value)
+            elif isinstance(node, list):
+                for item in node:
+                    yield from json_keys(item)
+        self.assertFalse({"proposal", "current"} & set(json_keys(report)))
         self.assertGreaterEqual(report["protected_fields_omitted"], 2)
         field = next(field for field in fields if field["key"] == "last_name")
         result = self.page.evaluate("async selection => PortalEngine.fill([selection])", {"id": field["id"], "value": field["proposal"]})
