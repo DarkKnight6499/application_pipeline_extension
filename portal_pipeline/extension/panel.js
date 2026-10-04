@@ -81,7 +81,10 @@
           intent: globalThis.PortalClassifier?.workAuthIntent(item.label) ?? null, options: item.options.map(option => option.label)}))});
       } catch (error) { preflightError = error.message; }
       const forcedManual = new Set(preflight?.manual_field_ids || []);
-      fields.forEach(item => { if (forcedManual.has(item.id)) { item.blocked = true; item.manual_reason = "Preflight: answer this yourself."; } });
+      fields.forEach(item => { if (forcedManual.has(item.id)) { item.blocked = true; item.forced_manual = true; item.manual_reason = "Preflight: answer this yourself."; } });
+      // Pending questions feed the local corpus; the server drops protected ones too.
+      const pendingQuestions = fields.filter(item => item.status === "pending" && !item.blocked).map(item => ({label: item.label, portal: target.hostname, type: item.type, options: item.options.map(option => option.label), classified_as: item.key}));
+      if (pendingQuestions.length) api("/api/corpus", {questions: pendingQuestions}).catch(() => {});
       status.textContent = `${session.company}: ${session.role}. ${fields.length} fields found. Review each selected answer. Submission stays manual.`;
       const posting = element("p", "", {class: "source"});
       posting.textContent = `Selected posting: ${session.url || "No posting URL set"}. Current page: ${targetUrl}`;
@@ -110,6 +113,13 @@
       const clear = element("button", "Clear selection", {type: "button"});
       groups.append(groupSelect, select, clear);
       panel.append(groups);
+      const listable = fields.filter(item => !item.blocked);
+      const summary = element("div", "", {class: "note"});
+      summary.append(element("p", `Required fields: ${listable.filter(item => item.required).map(item => item.label).join("; ") || "none"}.`));
+      summary.append(element("p", `Pending, no proposed value: ${listable.filter(item => item.status === "pending").map(item => item.label).join("; ") || "none"}.`));
+      panel.append(summary);
+      const exportSheet = element("button", "Export answer sheet", {type: "button"});
+      panel.append(exportSheet);
       const rows = new Map();
       const recordBoxes = new Set();
       const mappingChoosers = [];
@@ -160,15 +170,27 @@
         } else answer.value = previous?.value ?? (field.type === "file" ? "Yazad_Madan.docx" : field.proposal);
         answer.disabled = checkbox.disabled;
         card.append(answer);
+        const result = element("div", "", {class: "result", role: "status"});
         card.append(element("div", field.blocked ? "Manual only. This control is excluded." : field.manual_reason || field.source, {class: "source"}));
         card.append(element("div", `Current: ${field.current || "empty"}`, {class: "current"}));
+        if (field.key && !field.blocked && !field.options.length && field.type !== "file") {
+          const saveEdit = element("button", "Save edit to profile", {type: "button", "aria-label": `Save edit to profile for ${field.label}`});
+          const sync = () => { saveEdit.disabled = !answer.value.trim() || answer.value === field.proposal; };
+          sync(); answer.addEventListener("input", sync); answer.addEventListener("change", sync);
+          saveEdit.onclick = async () => {
+            try {
+              await api(`/api/sessions/${session.id}/override`, {key: field.key, value: answer.value, reason: "Edited in review panel"});
+              field.proposal = answer.value; sync(); result.textContent = "Saved to this application's profile overrides.";
+            } catch (error) { result.textContent = error.message; }
+          };
+          card.append(saveEdit);
+        }
         const overwrite = element("input", "", {type: "checkbox", "aria-label": `Replace existing ${field.label}`});
         overwrite.checked = !checkbox.disabled && previous?.overwrite === true;
         overwrite.disabled = checkbox.disabled;
         const replaceLabel = element("label", "", {class: "source"});
         replaceLabel.append(overwrite, document.createTextNode(" Replace this field's existing value"));
         card.append(replaceLabel);
-        const result = element("div", "", {class: "result", role: "status"});
         card.append(result);
         panel.append(card);
         rows.set(field.id, {checkbox, answer, overwrite, result, field});
@@ -181,6 +203,21 @@
           if (!row.checkbox.disabled && row.field.proposal !== "" && row.field.type !== "file" && row.answer.value && (groupSelect.value === "all" || row.field.section === groupSelect.value)) row.checkbox.checked = true;
         });
         save();
+      };
+      exportSheet.onclick = async () => {
+        try {
+          const payload = fields.filter(item => !item.blocked || item.forced_manual).map(item => {
+            const row = rows.get(item.id), chosen = row ? (row.answer.tagName === "SELECT" ? row.answer.selectedOptions[0]?.textContent || "" : row.answer.value) : item.proposal;
+            const edited = !item.blocked && item.type !== "file" && chosen !== "" && chosen !== item.proposal;
+            return {label: item.label, required: item.required, type: item.type, options: item.options.map(option => option.label), blocked: item.blocked, forced_manual: item.forced_manual === true,
+              proposal: item.blocked ? "" : chosen, source: edited ? "Edited in review panel" : item.source, status: edited ? "draft_needs_review" : item.status, structure: {maxlength: item.structure?.maxlength ?? null}};
+          });
+          const sheet = await api(`/api/sessions/${session.id}/answer-sheet`, {fields: payload, url: targetUrl, heading: options.heading ?? (options.extensionPage ? "" : document.querySelector("h1,h2")?.textContent || "")});
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(new Blob([sheet.html], {type: "text/html"})); link.download = "answer-sheet.html"; link.click();
+          setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+          status.textContent = `Answer sheet exported. Saved to ${sheet.html_path || "the session folder"}. Nothing was filled.`;
+        } catch (error) { status.textContent = error.message; }
       };
       clear.onclick = () => { rows.forEach(row => {row.checkbox.checked = false;}); save(); };
       const footer = element("div", "", {class: "sticky"});

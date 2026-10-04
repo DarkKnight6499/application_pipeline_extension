@@ -17,6 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import answer_sheet
 import question_corpus
 from portal_profile import hard_fact_errors, resolve_for_application, resolve_profile, save_override
 from audited_import import check_source, inspect_application, posting_url
@@ -337,6 +338,14 @@ def make_server(pipeline, port=8766, token=None):
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/override", path)
                     if match:
                         return self.send(200, save_override(pipeline.folder(match[1]), body.get("key"), body.get("value"), body.get("reason")))
+                    match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/answer-sheet", path)
+                    if match:
+                        session = pipeline.read(match[1])
+                        folder = pipeline.folder(match[1])
+                        session["resume_path"] = str(folder / "Yazad_Madan.docx")
+                        sheet = answer_sheet.build_answer_sheet(session, body.get("fields"), body.get("url", ""), body.get("heading", ""))
+                        json_path, html_path, markup = answer_sheet.save_sheet(folder, sheet, pipeline.atomic.write)
+                        return self.send(200, {"sheet": sheet, "html": markup, "json_path": str(json_path), "html_path": str(html_path)})
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/preflight", path)
                     if match:
                         fields = body.get("fields")

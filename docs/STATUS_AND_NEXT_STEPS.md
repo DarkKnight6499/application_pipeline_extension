@@ -1,7 +1,7 @@
 ---
 author: Yazad Madan
 updated: 2026-10-04
-status: P4 landed: preflight gates disable Fill until acknowledged; TE question corpus log and P3 classifier before it
+status: P5 landed: read-only answer sheet export per page; P4 preflight gates, TE question corpus and P3 classifier before it
 ---
 
 # Status and next steps
@@ -23,6 +23,7 @@ A Manifest V3 extension and a local Python helper that review and fill only the 
    - Blocks bot-trap inputs found on Oracle and Workday sign-in screens, and protects survey options by their container, because Lever lists choices such as "White" and "Asian" whose own labels carry no demographic word.
 4. **Suite status.** 178 tests pass against the real source checkout, with 2 skipped for lack of symlink privilege.
 5. **Preflight gates (P4, synthetic only).** `portal_pipeline/preflight.py` reads the tracker read-only and the JD document, and the panel lists the results before any fill. Duplicate postings, a Blocked, Skipped or Expired tracker status, and a no-sponsorship JD block until acknowledged; knock-out questions need acknowledgement; status and sensitive questions are forced manual. A gate that cannot run is shown as a warning, and a failed preflight request keeps Fill disabled.
+6. **Answer sheet (P5, synthetic only).** `portal_pipeline/answer_sheet.py` and `POST /api/sessions/<id>/answer-sheet` turn a read-only scan into a per-page JSON and offline HTML sheet under the session folder, with sources, required flags, UTF-16 character counts and limits (`maxlength` is now in the scan structure). Protected fields never appear, pending and manual rows carry no value. The panel also lists required and pending fields, saves an edited answer through the override route, and logs pending questions to the corpus.
 
 ## What the probes established
 

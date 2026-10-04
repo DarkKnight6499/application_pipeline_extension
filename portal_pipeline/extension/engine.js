@@ -216,7 +216,8 @@
                      adapter: customInfo?.supported ? (dropdown(element) === globalThis.PortalGreenhouseSelect ? "greenhouse-select" : "aria-listbox") : null, manual_reason: customInfo?.reason || "",
                      dropdown_state: customInfo?.dropdown_state || null,
                      structure: {tag: element.tagName.toLowerCase(), name: element.name || "", automation_id: element.getAttribute("data-automation-id") || "",
-                       dom_id: element.id, role: element.getAttribute("role") || "", controls: element.getAttribute("aria-controls") || "", popup: element.getAttribute("aria-haspopup") || ""},
+                       dom_id: element.id, role: element.getAttribute("role") || "", controls: element.getAttribute("aria-controls") || "", popup: element.getAttribute("aria-haspopup") || "",
+                       maxlength: element.maxLength > 0 ? element.maxLength : null},
                      proposal: proposal.value, source: record?.error || (record?.index === null ? "Choose a profile record for this row first." : proposal.source),
                      status: proposal.status};
       fields.push(field);
