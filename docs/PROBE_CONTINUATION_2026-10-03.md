@@ -42,6 +42,8 @@ Statuses describe demonstrated mechanisms, not comprehensive security or live ac
 
 Final instruction audit also reproduced acceptance of unrelated output paths containing `_Reference`, `Applications`, and `Applications.xlsx`. Three failing subcases preceded a case-insensitive reserved-component refusal before directory creation. Nine path tests pass with two privilege skips; four HTTP tests pass. This closes the named-directory portion of L2-01 while preserving ordinary independent sandbox outputs.
 
+Post-audit final suite: **168 tests, 85 passed, 83 skipped, zero failures/errors**, 75.249 seconds. Review confirmed six case variants refused and four valid destinations supported create/current operations, including `_Reference-copy` and `Applications-backup`. Published as [PR 3](https://github.com/DarkKnight6499/application_pipeline_extension/pull/3), stacked on PR 2; all three PRs remain open and unmerged.
+
 ## Remaining limits
 
 No private candidate facts, trackers, resumes, credentials, live employer accounts, or submissions were used. Main and previous PRs remain unmerged. Workday and Greenhouse remain the only portal tracks; permissions are unchanged.
