@@ -47,7 +47,7 @@ DOM readback does not prove remote saving. A file input's filename does not prov
 
 ## Independent synthetic probe, October 3, 2026
 
-Baseline: `de2e51b5e424634d2be66a32bcfa5627f5e1fbef`. Full evidence, reproductions, earlier-review status, and ranked proposed fixes are in [PROBE_REPORT_2026-10-03.md](PROBE_REPORT_2026-10-03.md). No production fix has been applied at this checkpoint.
+Baseline: `de2e51b5e424634d2be66a32bcfa5627f5e1fbef`. Full evidence, reproductions, earlier-review status, and ranked proposed fixes are in PROBE_REPORT_2026-10-03.md (original kept in Git history). No production fix has been applied at this checkpoint.
 
 | Failure | Evidence | Fix and validation status | Remaining limit |
 | --- | --- | --- | --- |
@@ -92,7 +92,7 @@ Profile regressions produced 14 failed subcases and three errors before repairs.
 
 Native and coverage regressions initially produced five failed subcases and two missing-metadata errors. Effective disabled state, actual radio target availability, and optgroup availability now govern proposals and writes. Independent review caught duplicate select values selecting the opposite label while readback falsely passed; root also reproduced duplicate radio values. Both are now refused before writing. All nine native/inspection tests pass. Structural coverage warnings expose omitted surfaces without their contents or protected labels. Hidden/future pages and closed shadows remain uninspected.
 
-Root corrected two test assertions: panel text resides in its shadow root; the omitted-protection count is three because it includes the password and both boundary controls. Final result: 61 passed, 81 environment skips, 142 total, zero failures/errors in 46.816 seconds. Both visible Edge trials passed in 15.173 seconds; submission counters remained zero. Screenshots were inspected and remain local. Syntax/diff checks passed. See [follow-up evidence and deferred findings](PROBE_FOLLOWUP_2026-10-03.md).
+Root corrected two test assertions: panel text resides in its shadow root; the omitted-protection count is three because it includes the password and both boundary controls. Final result: 61 passed, 81 environment skips, 142 total, zero failures/errors in 46.816 seconds. Both visible Edge trials passed in 15.173 seconds; submission counters remained zero. Screenshots were inspected and remain local. Syntax/diff checks passed. See follow-up evidence and deferred findings (original kept in Git history).
 
 Follow-up is published as [open PR 2](https://github.com/DarkKnight6499/application_pipeline_extension/pull/2), stacked on PR 1. Neither is merged; main and employer applications remain unchanged.
 
@@ -108,7 +108,7 @@ Duplicate required tracker headers overwrote company/role/link context and allow
 
 L2-01 was reproduced by writing a fabricated JD/session into a source Projects descendant. L2-02 is now verified rather than probable: a temporary Windows junction redirected actual session reads, resume bytes, and approval writes outside the sandbox. The junction itself was removed nonrecursively and its target survived. Six initial regression failures preceded path guards. Review reproduced a source nested under sandbox overlap; both ancestor directions are now rejected. Eight tests pass and two physical file-symlink tests skip for missing privilege. Portable resolve mocks verify per-artifact guard branches. Existing HTTP tests pass. Normal create/import/build tests use explicit fabricated workflow stubs; they do not validate genuine audits or builders. Hardlinks and concurrent local filesystem replacement remain outside this guarantee.
 
-Final continued discovery passed 84 tests and skipped 83, 167 total, no failures/errors in 75.783 seconds. Two skips require file-symlink privilege; the other 81 require external workflow. Visible Edge trial passed both tests in 16.963 seconds with no submissions. Syntax/diff checks passed. [Continued report](PROBE_CONTINUATION_2026-10-03.md) maps original findings to current repairs and preserves live/filesystem limits.
+Final continued discovery passed 84 tests and skipped 83, 167 total, no failures/errors in 75.783 seconds. Two skips require file-symlink privilege; the other 81 require external workflow. Visible Edge trial passed both tests in 16.963 seconds with no submissions. Syntax/diff checks passed. Continued report (original kept in Git history) maps original findings to current repairs and preserves live/filesystem limits.
 
 Final instruction audit found that unrelated reference/tracker-looking paths still passed the overlap policy. Three fabricated `_Reference`, `Applications`, and `Applications.xlsx` destination cases failed before reserved path components were refused case-insensitively before mkdir. Nine path tests pass, two physical symlink tests skip, and four HTTP tests pass. This completes the named-directory portion of L2-01; ordinary external sandboxes remain supported.
 

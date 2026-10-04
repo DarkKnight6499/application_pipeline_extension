@@ -3,7 +3,7 @@
 Author: Yazad Madan.
 
 - Keep the functioning Resume workflow independent. Treat its source checkout as read-only from this repository. Never copy its Git history, trackers, candidate profiles, application inputs, resumes, or browser credentials into this public repository.
-- Read `README.md`, `portal_pipeline/HANDOFF.md`, `docs/TRIAL_ERRORS.md`, and `docs/Codex_Review_Portal_Projects.md` (review of both prototypes with a prioritized problem list) before development. External Resume instructions apply when preparing actual resumes.
+- Read `README.md`, `portal_pipeline/HANDOFF.md`, `docs/TRIAL_ERRORS.md`, and `docs/STATUS_AND_NEXT_STEPS.md` (consolidated progress and the ordered plan) before development. External Resume instructions apply when preparing actual resumes.
 - Use confirmed profile facts only. Keep sponsorship now and sponsorship in the future separate. Unknown answers remain pending.
 - Fill only selected fields. Preserve existing values unless the user explicitly selects overwrite. Do not sign, attest, submit, allocate real Application IDs, or change tracker status.
 - Keep chat concise. Use the caveman skill at full level when available. Use normal prose in persisted artifacts. Never use em dashes or double-hyphen punctuation in prose or comments.
