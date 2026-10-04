@@ -1,7 +1,7 @@
 ---
 author: Yazad Madan
 updated: 2026-10-04
-status: Approved CSP repair and safety integration validated: FULL 346 and PUBLIC 264 OK with 2 skips each; session-profile and PF4 work under review
+status: Version 0.8.0 validated: session-profile repair and PF4 synthetic coverage complete; FULL 368 and PUBLIC 286 OK with 2 skips each
 ---
 
 # Status and next steps
@@ -13,6 +13,8 @@ This replaces the earlier probe reports and the two-prototype review. Their find
 A Manifest V3 extension and a local Python helper that review and fill only the fields the user selects. The human logs in, navigates and submits. The tool never submits, signs, attests, or handles passwords or CAPTCHAs. Sponsorship now and sponsorship in the future stay separate answers, and unknown answers stay pending.
 
 ## Done so far
+
+**Version 0.8.0 reviewed integration (October 4, 2026).** Application review now requires a structurally valid session profile, rejects malformed fact values, keeps unknown empty profiles reviewable, and invalidates cached edits, selection, and overwrite when their sourced proposal or draft changes. Unchanged snapshots preserve human edits. Tailored employment drafts appear separately without automatic insertion or selection. Thirteen new session-profile tests and nine PF4 Greenhouse tests are integrated. Greenhouse control replacements fail closed until an explicit rescan; country and city typeahead stay manual without a verified popup contract. Only the five approved mock setup files changed, without altering inherited assertions. FULL 368 tests in 226.742 seconds and PUBLIC 286 tests in 170.509 seconds pass, each with two Windows symlink-privilege skips. Four replay tests pass in 7.749 seconds; JSCHECK, PYCHECK, and diff checks pass. Manifest version is 0.8.0 with unchanged permissions. Synthetic only; no live employer application was filled or submitted.
 
 **Session-profile review fix (synthetic only, October 4, 2026).** The review panel requires a valid per-session profile before scan or Fill. It rejects malformed facts and keeps an empty values object pending. Per-row snapshots clear stale selected answers after proposal, source, status, sponsorship, or tailored draft changes. Matching employment description drafts show source and review status without filling. Eleven focused regressions and 23 approved mock-dependent tests pass; syntax, compilation, and diff checks pass. No live portal action occurred.
 
@@ -69,9 +71,9 @@ Also found:
 
 ## Way ahead
 
-Phase order lives in D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md. Yazad authorized parallel lower-tier agents and reviewed non-force pushes to main. The safety batch now passes FULL and PUBLIC after the approved CSP test-only repair. Existing assertion conditions and production CSP remain intact.
+Phase order lives in D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md. The approved safety, CSP harness, session-profile, and PF4 Greenhouse phases are validated and integrated. Their earlier pending-approval and held-validation entries are historical.
 
-Next: integrate the approved session-profile repair and its cache/draft regressions, then PF4 Greenhouse synthetic coverage. Both are being reviewed in isolated worktrees. Workday and Oracle remain synthetic-only without post-login Inspect-only exports. P9 remains blocked until PF1/PF2 and its approved pending-question corpus prerequisite are complete. No live trial is authorized by the current handoff.
+Next: Workday PF1 and Oracle PF2 may continue against synthetic fixtures, but real post-login compatibility requires Yazad's Inspect-only exports. Neither portal's export directory exists in the primary checkout as of October 4, 2026. Keep login, MFA, CAPTCHA, signatures, and submission manual. Country/city typeahead and remote upload completion remain unverified. P9 stays blocked until PF1/PF2 are merged and the corpus includes at least 50 Yazad-approved real pending wordings. No real model calls or live portal probes are authorized by this handoff.
 
 ## Rules to keep when working here
 

@@ -11,7 +11,7 @@ The approved setup changes and production repair were applied on `feat/session-p
 
 The panel loads the current session, then requires its session profile. Invalid or failed profile loading stops before scan and Fill controls. A valid empty `values` object keeps unknown answers pending. Each cached row records its proposal, source, status, sponsorship truth and mode, and matching tailored draft. Changed or legacy snapshots clear cached review choices; unchanged snapshots preserve human edits. A tailored employment description draft appears with its source and status for separate review. It is never inserted or selected automatically.
 
-The original six cases showed two passes and four red test methods before repair. Eleven session-profile tests now pass, including added cache, draft, and missing-profile checks. The five approved inherited mock files pass 23 targeted tests. JavaScript syntax, Python compilation, and diff checks pass. All evidence is synthetic. No live portal action occurred.
+The original six cases showed two passes and four red test methods before repair. Thirteen session-profile tests now pass, including added cache, draft, and missing-profile checks. The five approved inherited mock files pass 23 targeted tests. The integrated release passes FULL 368 and PUBLIC 286 with two expected symlink skips each. JavaScript syntax, Python compilation, and diff checks pass. All evidence is synthetic. No live portal action occurred.
 
 Follow-up review found object and array fact values were still accepted. A separate synthetic regression first failed for both shapes, then passed after limiting fact values to strings, booleans, and finite numbers. Another new test confirms a changed proposal clears the edited answer, selection, and overwrite choice together. Both follow-up tests pass, with syntax, compilation, and diff checks clean.
 
@@ -26,7 +26,7 @@ Branch `fix/session-profile-review` starts at `996a674`. Targeted tests use fabr
 - A cached review value is cleared when a newer backend proposal arrives: fails. The scoped profile contains the new override, but the panel restores its old cached value and selection.
 - Tailored `description_draft` is visible with review status and source while unselected: errors because the panel does not render the draft.
 
-No broad suite was run.
+No broad suite was run during the original preparation. The implementation subsequently passed coordinator FULL and PUBLIC validation.
 
 ## Proposed production scope
 
