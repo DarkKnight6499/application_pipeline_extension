@@ -1,8 +1,5 @@
 (async () => {
   const server = document.getElementById("server"), token = document.getElementById("token"), status = document.getElementById("status");
-  const saved = await chrome.storage.local.get(["server", "token"]);
-  if (saved.server) server.value = saved.server;
-  if (saved.token) token.value = saved.token;
   document.getElementById("pair").onclick = async () => {
     if (!/^http:\/\/127\.0\.0\.1:\d{1,5}$/.test(server.value)) { status.textContent = "Use the exact loopback URL shown at startup."; return; }
     await chrome.storage.local.set({server: server.value, token: token.value});
@@ -23,4 +20,9 @@
   }
   document.getElementById("scan").onclick = () => openPage(false);
   document.getElementById("inspect").onclick = () => openPage(true);
+  // Handlers attach first so an early click is never dropped; restore saved values only into untouched fields.
+  server.oninput = token.oninput = event => { event.target.dataset.edited = "1"; };
+  const saved = await chrome.storage.local.get(["server", "token"]);
+  if (saved.server && !server.dataset.edited) server.value = saved.server;
+  if (saved.token && !token.dataset.edited) token.value = saved.token;
 })();
