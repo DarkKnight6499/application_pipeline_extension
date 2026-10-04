@@ -21,7 +21,7 @@ from urllib.parse import urlsplit
 import answer_sheet
 import portal_record
 import question_corpus
-from portal_profile import hard_fact_errors, resolve_for_application, resolve_profile, save_override
+from portal_profile import hard_fact_errors, load_sponsorship_mode, resolve_for_application, resolve_profile, save_override, save_sponsorship_mode
 from audited_import import check_source, inspect_application, posting_url
 from preflight import run_preflight
 
@@ -305,6 +305,9 @@ def make_server(pipeline, port=8766, token=None):
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/record", path)
                     if match:
                         return self.send(200, {"record": pipeline.record_for(match[1])[1]})
+                    match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/sponsorship-mode", path)
+                    if match:
+                        return self.send(200, {"mode": load_sponsorship_mode(pipeline.folder(match[1]))})
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/(download|attachment)", path)
                     if match:
                         data = pipeline.resume(match[1], for_upload=match[2] == "attachment")
@@ -375,6 +378,9 @@ def make_server(pipeline, port=8766, token=None):
                         application_id, _ = pipeline.record_for(match[1])
                         record = portal_record.mark_reported_submitted(pipeline.data, application_id, body.get("employer_reference_id"), pipeline.atomic.write)
                         return self.send(200, {"record": record, "command": portal_record.tracker_command(record, date.today().isoformat())})
+                    match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/sponsorship-mode", path)
+                    if match:
+                        return self.send(200, save_sponsorship_mode(pipeline.folder(match[1]), body.get("mode")))
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/preflight", path)
                     if match:
                         fields = body.get("fields")

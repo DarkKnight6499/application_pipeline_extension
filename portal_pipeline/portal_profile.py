@@ -35,6 +35,14 @@ OVERRIDE_KEY_PATTERN = re.compile(r"[a-z][a-z_]*(?:\.\d+\.[a-z][a-z_]*)?")
 MAX_OVERRIDE_CHARS = 4000
 OVERRIDE_TIER, IDENTITY_TIER, HISTORY_TIER, DESCRIPTION_TIER, DRAFT_TIER = 1, 2, 3, 4, 5
 DRAFT_STATUS = "draft_needs_review"
+# Per-application sponsorship answer toggle (separate from eligibility overrides)
+SPONSORSHIP_MODE_FILENAME = "sponsorship_mode.json"
+MODE_TRUTHFUL, MODE_SCREENING_NO = "truthful", "screening_no"
+SPONSORSHIP_MODES = (MODE_TRUTHFUL, MODE_SCREENING_NO)
+SCREENING_NO_KEYS = ("sponsorship_future", "sponsorship_now_or_future")
+SCREENING_NO_VALUE = "No"
+SCREENING_NO_BASIS = "override"
+SCREENING_NO_STATUS = "prepared"
 ALWAYS_PENDING_KEYS = ("street_address", "postal_code")
 
 
@@ -256,6 +264,49 @@ def save_override(session_folder: Path, key: str, value: str, reason: str) -> di
     return record
 
 
+def load_sponsorship_mode(session_folder: Path) -> str:
+    path = Path(session_folder) / SPONSORSHIP_MODE_FILENAME
+    if not path.is_file():
+        return MODE_TRUTHFUL
+    mode = json.loads(path.read_text(encoding="utf-8")).get("mode")
+    return mode if mode in SPONSORSHIP_MODES else MODE_TRUTHFUL
+
+
+def save_sponsorship_mode(session_folder: Path, mode: str) -> dict:
+    session_folder = Path(session_folder)
+    if mode not in SPONSORSHIP_MODES:
+        raise ValueError("Sponsorship answer mode must be truthful or screening_no.")
+    payload = {"mode": mode, "application_id": _session_application_id(session_folder),
+               "set_at": datetime.datetime.now(datetime.timezone.utc).isoformat()}
+    descriptor, temporary = tempfile.mkstemp(dir=session_folder, suffix=".tmp")
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
+        os.replace(temporary, session_folder / SPONSORSHIP_MODE_FILENAME)
+    except BaseException:
+        Path(temporary).unlink(missing_ok=True)
+        raise
+    return {"mode": mode}
+
+
+def _session_label(session_folder: Path) -> str:
+    path = session_folder / SESSION_FILENAME
+    found = json.loads(path.read_text(encoding="utf-8")).get("id") if path.is_file() else None
+    return found or session_folder.name
+
+
+def _apply_screening_no(values: dict, precedence: dict, session_folder: Path) -> None:
+    # Explicit path, deliberately not save_override, so the ELIGIBILITY_KEYS refusal stays intact.
+    source = f"candidate toggle (career services practice), session {_session_label(session_folder)}"
+    for key in SCREENING_NO_KEYS:
+        truth = values.get(key)
+        if not truth:
+            continue
+        values[key] = {"value": SCREENING_NO_VALUE, "source": source, "basis": SCREENING_NO_BASIS, "status": SCREENING_NO_STATUS,
+                       "truth": {"value": truth["value"], "source": truth["source"]}}
+        precedence[key] = OVERRIDE_TIER
+
+
 def _tier(key: str) -> int:
     if key.endswith(".description_draft"):
         return DRAFT_TIER
@@ -288,5 +339,8 @@ def resolve_for_application(root: Path, session_folder: Path) -> dict:
         values[key] = {"value": entry["value"], "source": source_ref(OVERRIDES_FILENAME, key), "reason": entry.get("reason", ""),
                        "edited_at": entry.get("edited_at", "")}
         precedence[key] = OVERRIDE_TIER
+    if load_sponsorship_mode(session_folder) == MODE_SCREENING_NO:
+        _apply_screening_no(values, precedence, session_folder)
     pending = list(ALWAYS_PENDING_KEYS) + [f"education.{index}.start_date" for index in range(len(profile["education"]))]
-    return {**profile, "values": values, "precedence": precedence, "pending": [key for key in pending if key not in values]}
+    return {**profile, "values": values, "precedence": precedence,
+            "sponsorship_answer_mode": load_sponsorship_mode(session_folder), "pending": [key for key in pending if key not in values]}
