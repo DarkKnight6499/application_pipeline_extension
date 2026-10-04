@@ -1,6 +1,7 @@
 /* Review panel shared by the extension and the local synthetic fixture. */
 (() => {
   if (globalThis.PortalPanel) return;
+  const sponsorshipToggleKeys = new Set(["sponsorship_future", "sponsorship_now_or_future"]);
   function element(tag, text, attributes = {}) {
     const node = document.createElement(tag);
     if (text) node.textContent = text;
@@ -97,9 +98,26 @@
       sponsorBox.checked = profile.sponsorship_answer_mode === "screening_no";
       const sponsorLabel = element("label", "", {class: "source"});
       sponsorLabel.append(sponsorBox, document.createTextNode(" Answer No to sponsorship questions for this application. This is a statement on the application. Your boilerplate answer is shown beside each proposal."));
+      let sponsorshipSaving = false;
       sponsorBox.onchange = async () => {
-        try { await api(`/api/sessions/${session.id}/sponsorship-mode`, {mode: sponsorBox.checked ? "screening_no" : "truthful"}); document.getElementById("rescan")?.click(); }
-        catch (error) { sponsorBox.checked = !sponsorBox.checked; status.textContent = error.message; }
+        sponsorshipSaving = true;
+        sponsorBox.disabled = true;
+        refreshFill();
+        let modeSaved = false;
+        try {
+          await api(`/api/sessions/${session.id}/sponsorship-mode`, {mode: sponsorBox.checked ? "screening_no" : "truthful"});
+          modeSaved = true;
+          const reviewState = capture();
+          rows.forEach((row, id) => {
+            if (sponsorshipToggleKeys.has(row.field.key)) delete reviewState[id];
+          });
+          await storage.save(cacheKey, reviewState);
+          await open(api, storage, {...options, bindings, reviewState});
+        } catch (error) {
+          if (!modeSaved) sponsorBox.checked = profile.sponsorship_answer_mode === "screening_no";
+          else preflightError = "Sponsorship mode changed. Rescan before filling.";
+          status.textContent = error.message;
+        } finally { sponsorshipSaving = false; sponsorBox.disabled = false; refreshFill(); }
       };
       panel.append(sponsorLabel);
       const acknowledgements = [];
@@ -135,7 +153,8 @@
       const rows = new Map();
       const recordBoxes = new Set();
       const mappingChoosers = [];
-      const capture = () => Object.fromEntries([...rows].map(([id, row]) => [id, {selected: row.checkbox.checked, value: row.answer.value, overwrite: row.overwrite.checked}]));
+      const capture = () => Object.fromEntries([...rows].map(([id, row]) => [id, {selected: row.checkbox.checked, value: row.answer.value, overwrite: row.overwrite.checked,
+        ...(sponsorshipToggleKeys.has(row.field.key) ? {sponsorship_answer_mode: profile.sponsorship_answer_mode || "truthful"} : {})}]));
       const save = async () => {
         await storage.save(cacheKey, capture());
       };
@@ -164,7 +183,10 @@
         const card = element("div", "", {class: `field ${field.blocked ? "manual" : field.status === "pending" ? "pending" : ""}`});
         const title = element("label");
         const checkbox = element("input", "", {type: "checkbox", "aria-label": `Select ${field.label}`});
-        const previous = field.record?.index === null ? null : saved[field.id];
+        const cached = saved[field.id];
+        const staleSponsorship = sponsorshipToggleKeys.has(field.key)
+          && (cached?.sponsorship_answer_mode || "truthful") !== (profile.sponsorship_answer_mode || "truthful");
+        const previous = field.record?.index === null || staleSponsorship ? null : cached;
         checkbox.disabled = field.blocked || field.disabled || field.record?.index === null;
         checkbox.checked = !checkbox.disabled && previous?.selected === true;
         title.append(checkbox, document.createTextNode(` ${field.label}${field.required ? " *" : ""}`));
@@ -267,13 +289,13 @@
       };
       copyCommand.onclick = () => navigator.clipboard?.writeText(command.textContent);
       const acknowledged = () => !preflightError && acknowledgements.every(box => box.checked);
-      const refreshFill = () => { fill.disabled = !acknowledged(); };
+      const refreshFill = () => { fill.disabled = sponsorshipSaving || !acknowledged(); };
       acknowledgements.forEach(box => { box.onchange = refreshFill; });
       refreshFill();
       fill.onclick = async () => {
         if (!acknowledged()) return;
         fill.disabled = true;
-        const locked = [...rows.values()].flatMap(row => [row.checkbox, row.answer, row.overwrite]).concat(mappingChoosers, select, clear, groupSelect, close);
+        const locked = [...rows.values()].flatMap(row => [row.checkbox, row.answer, row.overwrite]).concat(mappingChoosers, select, clear, groupSelect, close, sponsorBox);
         const initialDisabled = locked.map(node => node.disabled);
         try {
           if (!matchPage.checked) throw new Error("Confirm the page belongs to this posting before filling.");

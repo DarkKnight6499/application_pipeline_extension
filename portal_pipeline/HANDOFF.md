@@ -1,5 +1,15 @@
 # Portal development handoff
 
+## October 4, 2026: sponsorship toggle landing
+
+Author: Yazad Madan.
+
+Worktree `D:\Code\application_pipeline_extension_spon`, branch `feat/sponsorship-toggle`, rebased onto main `2904ded`. Both sponsorship routes and P8 record routes are preserved. The mode defaults to truthful, affects only future and combined sponsorship proposals, carries the true answer beside the proposal, and never auto-selects a field. The eligibility override refusal remains unchanged.
+
+Five new synthetic browser tests cover default state and truth display, selective review reset, cached reviews from another mode, a toggle locked during filling, and failed mode-save preservation. The new regression cases failed before their corresponding fixes. Existing tests were not changed. FULL 284 tests and PUBLIC 203 tests end OK with two known symlink skips each. JavaScript syntax, Python compilation, and diff checks pass. Validation did not change the Resume working-tree status.
+
+No live portal work occurred. The next task is P7 landing from `feat/p7-progression`; retain these toggle locks and mode-aware review resets when resolving panel conflicts. PF5 and the remaining review items were not started.
+
 Date: October 3, 2026.
 
 Current repository: `D:\Code\application_pipeline_extension`, remote `https://github.com/DarkKnight6499/application_pipeline_extension.git`, branch `docs/p0-contracts` (docs only, cut from `origin/main` at `765e17b`; PRs 4 and 5 not yet merged). The user requested publication to this repository and commits after each completed phase. The initial export contains only portal code, research, and trial reports. It does not contain the private Resume Git history or candidate data.

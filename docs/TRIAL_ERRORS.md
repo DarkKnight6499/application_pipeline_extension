@@ -1,11 +1,21 @@
 ---
 author: Yazad Madan
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
 # Trial failures and remaining work
 
 This log distinguishes observed failures from untested compatibility. Keep historical findings even after a fix so future sessions do not repeat the same experiments.
+
+## Sponsorship toggle landing, October 4, 2026
+
+Rebase conflicts in server routes, the background allowlist, and the status line were resolved by retaining both P8 record functionality and sponsorship functionality. No permission or host expansion occurred.
+
+New browser tests first exposed stale selected sponsorship answers after a mode change and an enabled toggle during a pending fill. A further test exposed stale sponsorship reviews when reopening a page after changing the mode elsewhere. Mode changes now reset only future and combined sponsorship review entries. Cached entries carry their mode and are ignored when it differs from the session mode. The toggle is locked during filling, and Fill waits for mode saving. A failed mode save preserves the prior review.
+
+Final validation: FULL 284 tests in 159.378 seconds, OK with two skips; PUBLIC 203 tests in 105.618 seconds, OK with two skips. Both skips require Windows file-symlink privileges. Five new browser cases and the original nine mode cases pass. Existing tests were not edited. Syntax, compilation, and diff checks pass. Resume working-tree status remained unchanged by validation.
+
+The existing loaded-extension test stub lacks `folder` for the newly allowed session-profile request. Its helper prints an AttributeError and the panel uses its existing global-profile fallback; the test passes. This does not verify session-profile failure handling, which remains part of the queued profile-route review. Synthetic results do not establish live filling or remote persistence.
 
 ## Earlier Greenhouse CLI trial
 

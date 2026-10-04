@@ -1,7 +1,7 @@
 ---
 author: Yazad Madan
 updated: 2026-10-04
-status: sponsorship toggle rebased for validation (truthful default); P8 landed: per-application portal record and printed tracker command; P6 fill read-back failures; P5 answer sheet export; P4 preflight gates, TE question corpus and P3 classifier before it
+status: sponsorship toggle rebased and validated, truthful by default, FULL 284 and PUBLIC 203 OK with 2 skips each; next is P7 landing
 ---
 
 # Status and next steps
@@ -13,6 +13,8 @@ This replaces the earlier probe reports and the two-prototype review. Their find
 A Manifest V3 extension and a local Python helper that review and fill only the fields the user selects. The human logs in, navigates and submits. The tool never submits, signs, attests, or handles passwords or CAPTCHAs. Sponsorship now and sponsorship in the future stay separate answers, and unknown answers stay pending.
 
 ## Done so far
+
+**Sponsorship toggle landing (synthetic only, October 4, 2026).** Rebased over main `2904ded`, preserving P8 record routes and the session-profile allowlist. The per-application toggle defaults to truthful, changes only future and combined sponsorship proposals, displays the boilerplate answer beside the proposal, and never selects fields automatically. Mode changes clear affected answers, selections, and overwrite choices while preserving unrelated edits. Cached sponsorship reviews from another mode are discarded. The toggle is disabled during filling, and Fill is disabled during mode saving. The original nine backend tests and five new browser tests pass; FULL 284 tests and PUBLIC 203 tests both end OK with two symlink-privilege skips. JavaScript syntax, Python compilation, and diff checks pass. Existing tests were not edited. No live portal validation occurred.
 
 **P6 selective fill hardening (synthetic only).** Each fill is read back after the blur and settle wait. A value that reverts is reported failed with reason "reverted after blur" (failure_kind reverted); an aria-invalid flag or error text inside the field's own container is captured in validation_error (failure_kind validation_error). The trusted_keystrokes strategy throws "not enabled" before any write. Overwrite semantics unchanged and now tested per control type. Manifest version 0.6.0, no new permissions. Never verified on a live portal.
 
@@ -54,7 +56,7 @@ Also found:
 
 ## Way ahead
 
-Phase order now lives in D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md. PRs 4 and 5 landed on main on 2026-10-04. P1 (adapter interface and registry) is done. Next phase: TF then P3.
+Phase order now lives in D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md. The current handoff queue is sponsorship toggle landing, P7 landing, PF5 Phenom, and the remaining review fixes. The sponsorship task is complete; landing details are recorded in section 9 of the plan. Next task: rebase `feat/p7-progression`, preserve the sponsorship review guards, rerun the required checks, and push to main. One task per session.
 
 The earlier ordered list is kept in Git history. Items still open from it: Phenom adapter, post-login Workday and Oracle exports, the en-dash autofill check, Eightfold, iframe support for iCIMS and Lever, a liveness check before filling, and the Lever question-label resolver. They map to phases PF1 to PF14 in the plan.
 
