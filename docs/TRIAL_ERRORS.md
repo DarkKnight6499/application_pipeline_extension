@@ -85,3 +85,5 @@ The selected batch is published as [open PR 1](https://github.com/DarkKnight6499
 Author: Yazad Madan. User authorization covers extending this extension and additional subagent probes, within Workday and Greenhouse.
 
 C5-01 remained reproducible: ARIA-hidden options and hidden ancestors overridden by CSS were clicked. Six new regressions failed before repair. Semantic visibility and final target checks now reject these cases; all 12 listbox tests pass in isolated Edge. Lazy creation and closed-popup inventory remain passing. Structural description does not click or expose answer values. Remote ATS behavior remains unverified.
+
+B-01 was reproduced with an unchanged loaded extension inspecting unpaired localhost. The old review failed the new rejection regression because inspection succeeded. Shared host validation now precedes injection on initialization and every Rescan. Both tests pass, including 18 URL cases and navigation refusal. A test harness argument error was corrected before meaningful red evidence. Actual browser-action permission acquisition remains unverified.
