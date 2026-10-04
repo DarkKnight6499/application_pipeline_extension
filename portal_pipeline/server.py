@@ -13,11 +13,13 @@ import subprocess
 import sys
 import threading
 import uuid
+from datetime import date
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
 import answer_sheet
+import portal_record
 import question_corpus
 from portal_profile import hard_fact_errors, resolve_for_application, resolve_profile, save_override
 from audited_import import check_source, inspect_application, posting_url
@@ -209,6 +211,14 @@ class Pipeline:
         self.atomic.write(self._artifact(folder, "session.json"), session)
         return self.read(session_id)
 
+    def record_for(self, session_id):
+        session = self.read(session_id)
+        application_id = session.get("application_id")
+        if isinstance(application_id, bool) or not isinstance(application_id, int):
+            raise ValueError("Only an audited tracker application has a portal record.")
+        record = portal_record.load_record(self.data, application_id, session, self.atomic.write)
+        return application_id, record
+
     def approve_upload(self, session_id, body):
         folder = self.folder(session_id)
         session = self.read(session_id)
@@ -292,6 +302,9 @@ def make_server(pipeline, port=8766, token=None):
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/profile", path)
                     if match:
                         return self.send(200, resolve_for_application(pipeline.source, pipeline.folder(match[1])))
+                    match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/record", path)
+                    if match:
+                        return self.send(200, {"record": pipeline.record_for(match[1])[1]})
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/(download|attachment)", path)
                     if match:
                         data = pipeline.resume(match[1], for_upload=match[2] == "attachment")
@@ -346,6 +359,22 @@ def make_server(pipeline, port=8766, token=None):
                         sheet = answer_sheet.build_answer_sheet(session, body.get("fields"), body.get("url", ""), body.get("heading", ""))
                         json_path, html_path, markup = answer_sheet.save_sheet(folder, sheet, pipeline.atomic.write)
                         return self.send(200, {"sheet": sheet, "html": markup, "json_path": str(json_path), "html_path": str(html_path)})
+                    match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/record", path)
+                    if match:
+                        application_id, _ = pipeline.record_for(match[1])
+                        if isinstance(body.get("page"), dict):
+                            record = portal_record.record_page(pipeline.data, application_id, body["page"], pipeline.atomic.write)
+                        elif body.get("event"):
+                            event = body["event"] if isinstance(body["event"], dict) else {}
+                            record = portal_record.append_event(pipeline.data, application_id, event.get("kind", ""), event.get("detail", ""), pipeline.atomic.write)
+                        else:
+                            raise ValueError("Send a page or an event to record.")
+                        return self.send(200, {"record": record})
+                    match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/reported-submitted", path)
+                    if match:
+                        application_id, _ = pipeline.record_for(match[1])
+                        record = portal_record.mark_reported_submitted(pipeline.data, application_id, body.get("employer_reference_id"), pipeline.atomic.write)
+                        return self.send(200, {"record": record, "command": portal_record.tracker_command(record, date.today().isoformat())})
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/preflight", path)
                     if match:
                         fields = body.get("fields")

@@ -1,7 +1,7 @@
 ---
 author: Yazad Madan
 updated: 2026-10-04
-status: P6 landed: fill reports reverted and validation_error failures with read-back; P5 answer sheet export; P4 preflight gates, TE question corpus and P3 classifier before it
+status: P8 landed: per-application portal record and printed tracker command; P6 fill read-back failures; P5 answer sheet export; P4 preflight gates, TE question corpus and P3 classifier before it
 ---
 
 # Status and next steps
@@ -26,6 +26,7 @@ A Manifest V3 extension and a local Python helper that review and fill only the 
 4. **Suite status.** 178 tests pass against the real source checkout, with 2 skipped for lack of symlink privilege.
 5. **Preflight gates (P4, synthetic only).** `portal_pipeline/preflight.py` reads the tracker read-only and the JD document, and the panel lists the results before any fill. Duplicate postings, a Blocked, Skipped or Expired tracker status, and a no-sponsorship JD block until acknowledged; knock-out questions need acknowledgement; status and sensitive questions are forced manual. A gate that cannot run is shown as a warning, and a failed preflight request keeps Fill disabled.
 6. **Answer sheet (P5, synthetic only).** `portal_pipeline/answer_sheet.py` and `POST /api/sessions/<id>/answer-sheet` turn a read-only scan into a per-page JSON and offline HTML sheet under the session folder, with sources, required flags, UTF-16 character counts and limits (`maxlength` is now in the scan structure). Protected fields never appear, pending and manual rows carry no value. The panel also lists required and pending fields, saves an edited answer through the override route, and logs pending questions to the corpus.
+7. **Portal record (P8, synthetic only).** `portal_pipeline/portal_record.py` keeps one record per tracker Application ID under ignored `portal_pipeline/data/records/`, with each page's proposed, selected, filled and read-back answers, the resume hash and an optional `sponsorship_answer_mode` (defaults to truthful). Routes: `GET/POST /api/sessions/<id>/record` and `POST /api/sessions/<id>/reported-submitted`. The helper never writes the tracker: after the user reports a submission it only prints the `mark_application_status.py` command, with the employer reference kept separate from the Application ID.
 
 ## What the probes established
 

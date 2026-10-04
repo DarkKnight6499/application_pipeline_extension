@@ -227,6 +227,32 @@
       const fill = element("button", "Fill selected fields", {type: "button", class: "primary"});
       footer.append(matchLabel, element("p"), fill);
       panel.append(footer);
+      const portalPage = state => ({page_key: `${new URL(targetUrl).hostname}${new URL(targetUrl).pathname}`, portal_state: state,
+        fields: [...rows.values()].filter(row => !row.field.blocked).map(row => ({field_id: row.field.id, label: row.field.label, key: row.field.key || "", type: row.field.type,
+          proposal: row.field.proposal, final_value: row.answer.tagName === "SELECT" ? row.answer.selectedOptions[0]?.textContent || "" : row.answer.value, source: row.field.source || "",
+          selected: row.checkbox.checked, overwrite: row.overwrite.checked, result: row.lastResult?.status || "", readback: row.lastResult?.message || ""})),
+        unanswered_required: listable.filter(item => item.required && item.status === "pending").map(item => item.label)});
+      const recordBox = element("div", "", {class: "field"});
+      const saveRecord = element("button", "Save record", {type: "button"});
+      const reference = element("input", "", {class: "answer", "aria-label": "Employer reference (optional)", placeholder: "Employer reference, if shown"});
+      const submitted = element("button", "I submitted this myself", {type: "button"});
+      const command = element("pre", "", {class: "source", "aria-label": "Tracker command"});
+      const copyCommand = element("button", "Copy command", {type: "button"});
+      const commandNote = element("p", "Run this only after you submitted.", {class: "note"});
+      copyCommand.hidden = commandNote.hidden = true;
+      recordBox.append(element("h3", "Application record"), saveRecord, reference, submitted, command, commandNote, copyCommand);
+      panel.append(recordBox);
+      saveRecord.onclick = async () => {
+        try { await api(`/api/sessions/${session.id}/record`, {page: portalPage("awaiting_review")}); status.textContent = "Record saved locally."; } catch (error) { status.textContent = error.message; }
+      };
+      submitted.onclick = async () => {
+        try {
+          const done = await api(`/api/sessions/${session.id}/reported-submitted`, {employer_reference_id: reference.value.trim() || null});
+          command.textContent = done.command; copyCommand.hidden = commandNote.hidden = false;
+          status.textContent = "Recorded as submitted by you. The tracker was not changed.";
+        } catch (error) { status.textContent = error.message; }
+      };
+      copyCommand.onclick = () => navigator.clipboard?.writeText(command.textContent);
       const acknowledged = () => !preflightError && acknowledgements.every(box => box.checked);
       const refreshFill = () => { fill.disabled = !acknowledged(); };
       acknowledgements.forEach(box => { box.onchange = refreshFill; });
@@ -250,9 +276,11 @@
             const row = rows.get(result.id);
             row.result.className = `result ${result.status}`;
             row.result.textContent = `${result.status}: ${result.message}`;
+            row.lastResult = result;
           });
           status.textContent = `${results.filter(item => item.status === "filled").length} filled, ${results.filter(item => item.status === "preserved").length} preserved, ${results.filter(item => item.status === "failed").length} need attention. Continue and submit manually.`;
           await save();
+          api(`/api/sessions/${session.id}/record`, {page: portalPage("partially_filled")}).catch(() => {});
         } catch (error) { status.textContent = error.message; }
         finally { locked.forEach((node, index) => {node.disabled = initialDisabled[index];}); refreshFill(); options.onFillState?.(false); }
       };
