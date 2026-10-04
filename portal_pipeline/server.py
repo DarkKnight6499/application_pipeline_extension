@@ -19,7 +19,7 @@ from urllib.parse import urlsplit
 
 import answer_sheet
 import question_corpus
-from portal_profile import hard_fact_errors, resolve_for_application, resolve_profile, save_override
+from portal_profile import hard_fact_errors, load_sponsorship_mode, resolve_for_application, resolve_profile, save_override, save_sponsorship_mode
 from audited_import import check_source, inspect_application, posting_url
 from preflight import run_preflight
 
@@ -292,6 +292,9 @@ def make_server(pipeline, port=8766, token=None):
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/profile", path)
                     if match:
                         return self.send(200, resolve_for_application(pipeline.source, pipeline.folder(match[1])))
+                    match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/sponsorship-mode", path)
+                    if match:
+                        return self.send(200, {"mode": load_sponsorship_mode(pipeline.folder(match[1]))})
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/(download|attachment)", path)
                     if match:
                         data = pipeline.resume(match[1], for_upload=match[2] == "attachment")
@@ -346,6 +349,9 @@ def make_server(pipeline, port=8766, token=None):
                         sheet = answer_sheet.build_answer_sheet(session, body.get("fields"), body.get("url", ""), body.get("heading", ""))
                         json_path, html_path, markup = answer_sheet.save_sheet(folder, sheet, pipeline.atomic.write)
                         return self.send(200, {"sheet": sheet, "html": markup, "json_path": str(json_path), "html_path": str(html_path)})
+                    match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/sponsorship-mode", path)
+                    if match:
+                        return self.send(200, save_sponsorship_mode(pipeline.folder(match[1]), body.get("mode")))
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/preflight", path)
                     if match:
                         fields = body.get("fields")
