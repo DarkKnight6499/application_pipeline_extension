@@ -10,6 +10,6 @@ Author: Yazad Madan.
 - Set file author metadata to Yazad Madan wherever supported.
 - Record failures, their evidence, fixes, validation, and remaining limits. Do not call synthetic success live compatibility.
 - The user requested commits at the end of each completed phase. Validate the phase, update the handoff and error notes, then commit only its owned paths. Do not leave completed phases uncommitted or combine unrelated work. Push when requested or when covered by an active push instruction.
-- Workday and Greenhouse are the current development scope. The user explicitly requested the second portal; do not expand to further portal families without direction.
+- Workday, Greenhouse, and synthetic-only Phenom are within the authorized development scope. Further portal work must follow the active handoff and phased plan; synthetic coverage is not live compatibility.
 - Do not spawn sub-agents unless explicitly requested.
 - Phase order lives in D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md. Follow it instead of any other next-step list.

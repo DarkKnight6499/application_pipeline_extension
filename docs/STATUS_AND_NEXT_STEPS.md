@@ -1,7 +1,7 @@
 ---
 author: Yazad Madan
 updated: 2026-10-04
-status: PF5 Phenom synthetic only, FULL 322 and PUBLIC 241 OK with 2 symlink skips each; live apply hosts and page structure UNVERIFIED
+status: Main 2c981b8 includes PF5 and placeholder fixes; safety branch PUBLIC 264 OK with 2 skips, FULL 345 has 1 CSP harness error and 2 skips; test edits await approval
 ---
 
 # Status and next steps
@@ -13,6 +13,8 @@ This replaces the earlier probe reports and the two-prototype review. Their find
 A Manifest V3 extension and a local Python helper that review and fill only the fields the user selects. The human logs in, navigates and submits. The tool never submits, signs, attests, or handles passwords or CAPTCHAs. Sponsorship now and sponsorship in the future stay separate answers, and unknown answers stay pending.
 
 ## Done so far
+
+**Parallel safety integration held for harness approval (October 4, 2026).** Final validation at code commit dd92b4b: FULL 345 tests in 198.366 seconds has one inherited CSP harness error and two symlink skips. The isolated case failed again after an earlier isolated pass. PUBLIC 264 tests in 148.794 seconds passes with two skips. JSCHECK, PYCHECK and diff checks pass. No production safety rule was weakened, no inherited test was edited, and no live portal actions occurred. The completed code and failure evidence are saved on integration/validated-portal-phases, held off main until the inherited test wait can be repaired with approval and FULL rerun successfully.
 
 **Pending select answer sheet export fix (synthetic only, October 4, 2026).** The panel now exports an unanswered select as an empty proposal, preserving its pending status instead of exporting the placeholder label as an edited draft. `answer_sheet.py` already clears empty proposals and normalizes them to pending, so no backend change was needed. Two new synthetic browser regression tests pass. The second fills only the selected native select, preserves other controls, and observes zero submit clicks or events. FULL 306 and PUBLIC 225 pass with two symlink-privilege skips each. JSCHECK, PYCHECK, and diff checks pass. Rebased onto P7 commit `996a674`; no live portal interaction occurred.
 
@@ -61,13 +63,13 @@ Also found:
 
 ## Way ahead
 
-Phase order now lives in D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md. The current handoff queue is sponsorship toggle landing, P7 landing, PF5 Phenom, and the remaining review fixes. The sponsorship task is complete; landing details are recorded in section 9 of the plan. Next task: rebase `feat/p7-progression`, preserve the sponsorship review guards, rerun the required checks, and push to main. One task per session.
+Phase order lives in D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md. The user authorized parallel lower-tier agents on October 4, 2026 and direct pushes to main after validation. Sponsorship and P7 are landed. PF5 and placeholder fixes are landed at main 2c981b8. Manual-field, attestation, and upload hardening are saved separately because final FULL validation has an inherited CSP harness error. Session-profile review preparation is isolated pending explicit approval for existing synthetic mock setup edits. No live trial is authorized by the current handoff.
 
-The earlier ordered list is kept in Git history. Items still open from it: Phenom adapter, post-login Workday and Oracle exports, the en-dash autofill check, Eightfold, iframe support for iCIMS and Lever, a liveness check before filling, and the Lever question-label resolver. They map to phases PF1 to PF14 in the plan.
+The next action is approval and repair of the inherited CSP wait so the safety integration can receive a passing FULL validation and land. Session-profile review also needs its listed mock setup approval, then PF4 Greenhouse completion follows. P9 cannot begin until PF1 and PF2 are merged and its approved pending-question corpus requirement is satisfied. Workday and Oracle live compatibility remain blocked on Inspect-only exports; synthetic success does not replace those exports.
 
 ## Rules to keep when working here
 
 - Run tests with the real source checkout configured, since the synthetic-only run hid the regression in item 2.
 - Give subagents narrow, measurable jobs. A summarizing probe fabricated field counts and time savings, while scanner-only runs returned usable data.
 - Never write real candidate data into this public repository.
-- Commit each phase on its own branch and open a pull request instead of pushing to main.
+- Commit each completed phase separately. The active user instruction authorizes reviewed, validated, non-force pushes directly to main.
