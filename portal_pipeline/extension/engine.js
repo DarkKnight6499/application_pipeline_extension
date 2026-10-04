@@ -311,12 +311,15 @@
       const current = field.type === "combobox" ? read(control) : field.type === "radio" ? members.find(item => item.checked)?.value || ""
         : field.type === "checkbox" ? element.checked : field.type === "file" ? element.files.length : element.value;
       if (field.type === "file" && attachment && [...element.files].some(file => file.name === attachment.name)) {
+        if (element.multiple) throw new Error("Multiple-file upload requires manual selection in this prototype.");
+        if (!["resume", "cv", "resume cv", "upload resume", "upload cv", "attach resume", "attach cv"].includes(normalize(field.label))) throw new Error("This upload is not an explicitly identified resume field. Choose the file manually.");
         const bytes = Uint8Array.from(atob(attachment.base64), char => char.charCodeAt(0));
         const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map(v => v.toString(16).padStart(2, "0")).join("");
         if (hash !== attachment.sha256) throw new Error("Resume checksum does not match.");
         const existing = [...element.files].find(file => file.name === attachment.name);
         const existingBytes = await existing.arrayBuffer();
         const existingHash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", existingBytes))].map(v => v.toString(16).padStart(2, "0")).join("");
+        if (element.files.length !== 1 || element.files[0] !== existing) throw new Error("Resume file changed during verification. Rescan before filling.");
         checkCollateral();
         checkCurrent(control);
         if (existingHash === attachment.sha256) {
