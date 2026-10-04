@@ -258,13 +258,34 @@
     element.dispatchEvent(new Event("blur", {bubbles: true}));
   }
 
+  // Error text the portal shows for this field, searched only inside its own field container.
+  const errorScope = 'fieldset,[role=group],[role=radiogroup],.field,[class*="form-group"],[class*="form-field"]';
+  function validationText(control) {
+    const {element, members} = control, found = [];
+    if (members.some(item => item.getAttribute("aria-invalid") === "true")) found.push("Field marked invalid by the portal.");
+    let base = element.parentElement;
+    if (base?.tagName === "LABEL") base = base.parentElement;
+    const container = base?.closest(errorScope) || base;
+    const grouped = container?.matches("fieldset,[role=group],[role=radiogroup]");
+    if (container && !container.matches("body,form,html") && (grouped || container.querySelectorAll("input,select,textarea,[role=combobox]").length <= 1)) {
+      container.querySelectorAll('[role=alert],[id$="-error"]').forEach(node => {
+        const text = node.textContent.trim();
+        if (text && visible(node)) found.push(text);
+      });
+    }
+    return found.join(" ");
+  }
+
   function verifyCore(control, expected) {
     const {element, members, field} = control;
     const actual = field.type === "combobox" ? read(control) : field.type === "file" ? element.files[0]?.name : field.type === "radio" ? members.find(item => item.checked)?.value : element.value;
-    if (actual !== expected) return {ok: false, actual, reason: "Portal did not retain the value. Review this field manually."};
-    if (!element.isConnected) return {ok: false, actual, reason: "Portal replaced the field after filling. Scan again to verify."};
-    if (element.validity && !element.validity.valid) return {ok: false, actual, reason: "Portal validation rejected the value."};
-    return {ok: true, actual, reason: ""};
+    const flagged = element.isConnected ? validationText(control) : "";
+    if (actual !== expected) return {ok: false, actual, reason: "reverted after blur", failure_kind: "reverted", validation_error: flagged,
+      message: "Portal did not retain the value (reverted after blur). Review this field manually."};
+    if (!element.isConnected) return {ok: false, actual, reason: "Portal replaced the field after filling. Scan again to verify.", failure_kind: "error", validation_error: ""};
+    if (element.validity && !element.validity.valid) return {ok: false, actual, reason: "Portal validation rejected the value.", failure_kind: "validation_error", validation_error: element.validationMessage || "Portal validation rejected the value."};
+    if (flagged) return {ok: false, actual, reason: "Portal flagged a validation error: " + flagged, failure_kind: "validation_error", validation_error: flagged};
+    return {ok: true, actual, reason: "", failure_kind: "", validation_error: ""};
   }
 
   // One selected field, written only through the guard's live-structure checks; selection is the proposal.
@@ -336,17 +357,24 @@
       checkCollateral();
       checkCurrent(control);
       const check = guard.verify(control, expected);
-      if (!check.ok) throw new Error(check.reason);
-      return {id: field.id, status: "filled", message: field.type === "file" ? "File input verified. Check the portal's upload completion indicator." : "Value verified."};
+      if (!check.ok) {
+        const failed = {id: field.id, status: "failed", message: check.message || check.reason, reason: check.reason,
+          failure_kind: check.failure_kind || "error", validation_error: check.validation_error || ""};
+        try { checkCollateral(); } catch (change) {failed.message = change.message;}
+        return failed;
+      }
+      return {id: field.id, status: "filled", message: field.type === "file" ? "File input verified. Check the portal's upload completion indicator." : "Value verified.",
+        reason: "", failure_kind: "", validation_error: ""};
     } catch (error) {
-      const outcome = {id: selection.id, status: "failed", message: error.message};
-      try { checkCollateral(); } catch (change) {outcome.message = change.message;}
+      const outcome = {id: selection.id, status: "failed", message: error.message, reason: error.message, failure_kind: "error", validation_error: ""};
+      try { checkCollateral(); } catch (change) {outcome.message = change.message; outcome.reason = change.message;}
       return outcome;
     }
   }
 
   async function fillSelected(selections, {overwrite = false, attachment = null} = {}) {
     const adapter = route();
+    if (adapter && adapter.fillStrategy !== "native_setter") throw new Error(`Fill strategy ${adapter.fillStrategy} is not enabled.`);
     const gate = adapter?.humanGate(document);
     if (gate) {
       const reason = `A ${gate.kind} step needs you. Nothing was written. Complete it yourself, then rescan.`;

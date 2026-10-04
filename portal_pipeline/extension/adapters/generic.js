@@ -17,7 +17,10 @@
     },
     scan: (profile, options) => core().scan(profile, options),
     propose: (field, profile, context) => core().propose(field, profile, context),
-    fill: (control, proposal, guard) => core().fill(control, proposal, guard),
+    fill(control, proposal, guard) {
+      if (this.fillStrategy !== "native_setter") throw new Error(`Fill strategy ${this.fillStrategy} is not enabled.`);
+      return core().fill(control, proposal, guard);
+    },
     upload: (control, attachment, guard) => core().fill(control, guard.selection, {...guard, attachment}),
     verify: (control, expected) => core().verify(control, expected),
     nextStep: () => ({kind: "none", label: "", ref: null}),

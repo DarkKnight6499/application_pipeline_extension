@@ -1,7 +1,7 @@
 ---
 author: Yazad Madan
 updated: 2026-10-04
-status: P5 landed: read-only answer sheet export per page; P4 preflight gates, TE question corpus and P3 classifier before it
+status: P6 landed: fill reports reverted and validation_error failures with read-back; P5 answer sheet export; P4 preflight gates, TE question corpus and P3 classifier before it
 ---
 
 # Status and next steps
@@ -13,6 +13,8 @@ This replaces the earlier probe reports and the two-prototype review. Their find
 A Manifest V3 extension and a local Python helper that review and fill only the fields the user selects. The human logs in, navigates and submits. The tool never submits, signs, attests, or handles passwords or CAPTCHAs. Sponsorship now and sponsorship in the future stay separate answers, and unknown answers stay pending.
 
 ## Done so far
+
+**P6 selective fill hardening (synthetic only).** Each fill is read back after the blur and settle wait. A value that reverts is reported failed with reason "reverted after blur" (failure_kind reverted); an aria-invalid flag or error text inside the field's own container is captured in validation_error (failure_kind validation_error). The trusted_keystrokes strategy throws "not enabled" before any write. Overwrite semantics unchanged and now tested per control type. Manifest version 0.6.0, no new permissions. Never verified on a live portal.
 
 1. **Safety work from the external contributor, merged to main (commit 765e17b).** Radio groups are bound to their own form, protected collateral changes stop a fill, upload targets are revalidated, unconfirmed profile answers stay pending, helper session paths are contained, and inspection coverage is reported with host checks on every rescan.
 2. **Real-source compatibility (pull request 4, open).** The merged suite failed 5 tests and errored 1 when run against the real workflow checkout, although it had passed with synthetic fixtures. The strict profile parser dropped answers such as "No (on F-1 OPT)", two tests were stale, and a popup handler could be attached too late under load. All fixed.
