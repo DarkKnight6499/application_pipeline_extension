@@ -260,7 +260,24 @@
       const matchLabel = element("label");
       matchLabel.append(matchPage, document.createTextNode(" This page belongs to the selected posting"));
       const fill = element("button", "Fill selected fields", {type: "button", class: "primary"});
-      footer.append(matchLabel, element("p"), fill);
+      const progressNote = element("p", "", {class: "note", role: "status"});
+      const check = element("button", "Check page before Next", {type: "button"});
+      const runProgress = action => options.transport?.progress ? options.transport.progress(action) : action === "next" ? PortalProgress.guardedNext(PortalAdapters.forLocation(location.href)) : PortalProgress.pageCheck(PortalAdapters.forLocation(location.href));
+      check.onclick = async () => {
+        try {
+          const report = await runProgress("check");
+          const missing = report.missing.map(item => `${item.label} (${item.reason})`).join("; ");
+          progressNote.textContent = report.final_review.final ? "Final review. Submit it yourself."
+            : `${report.missing.length ? "Missing: " + missing + "." : "No required control is empty."}${report.stall.stalled ? " The same set repeats. Fix it by hand." : ""} Next button: ${report.next.kind}. Click Next yourself.`;
+          next.hidden = !(report.allow_guarded_next && !report.final_review.final);
+        } catch (error) { progressNote.textContent = error.message; }
+      };
+      const next = element("button", "Click Next", {type: "button"});
+      next.hidden = true;
+      next.onclick = async () => {
+        try { progressNote.textContent = (await runProgress("next")).message; } catch (error) { progressNote.textContent = error.message; }
+      };
+      footer.append(matchLabel, element("p"), fill, check, next, progressNote);
       panel.append(footer);
       const portalPage = state => ({page_key: `${new URL(targetUrl).hostname}${new URL(targetUrl).pathname}`, portal_state: state,
         fields: [...rows.values()].filter(row => !row.field.blocked).map(row => ({field_id: row.field.id, label: row.field.label, key: row.field.key || "", type: row.field.type,
@@ -311,9 +328,10 @@
             const row = rows.get(result.id);
             row.result.className = `result ${result.status}`;
             row.result.textContent = `${result.status}: ${result.message}`;
+            if (result.validation_error) row.result.append(element("div", `Portal validation error: ${result.validation_error}`, {class: "validation-error"}));
             row.lastResult = result;
           });
-          status.textContent = `${results.filter(item => item.status === "filled").length} filled, ${results.filter(item => item.status === "preserved").length} preserved, ${results.filter(item => item.status === "failed").length} need attention. Continue and submit manually.`;
+          status.textContent = `${results.filter(item => item.status === "filled").length} filled, ${results.filter(item => item.status === "preserved").length} preserved, ${results.filter(item => item.status === "failed").length} need attention. Continue and submit manually.${results.some(item => item.status === "skipped_existing") ? " Resume already attached, skipped." : ""}`;
           await save();
           api(`/api/sessions/${session.id}/record`, {page: portalPage("partially_filled")}).catch(() => {});
         } catch (error) { status.textContent = error.message; }

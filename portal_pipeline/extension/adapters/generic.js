@@ -35,8 +35,9 @@
     },
     upload: (control, attachment, guard) => core().fill(control, guard.selection, {...guard, attachment}),
     verify: (control, expected) => core().verify(control, expected),
-    nextStep: () => ({kind: "none", label: "", ref: null}),
-    detectFinalReview: () => ({final: false, reasons: []})
+    // Real classification needs progress.js; without it the safe constants stay.
+    nextStep: () => globalThis.PortalProgress ? PortalProgress.nextStep(document) : {kind: "none", label: "", ref: null},
+    detectFinalReview: doc => globalThis.PortalProgress ? PortalProgress.detectFinalReview(doc || document) : {final: false, reasons: []}
   };
   PortalAdapters.register(generic);
   PortalAdapters.register({...generic, id: "workday", hosts: [/(^|\.)myworkdayjobs\.com$/]});

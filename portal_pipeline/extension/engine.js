@@ -301,6 +301,20 @@
       if (field.record?.index === null) throw new Error(field.record.error || "Choose a profile record or manual answers for this row before filling.");
       const current = field.type === "combobox" ? read(control) : field.type === "radio" ? members.find(item => item.checked)?.value || ""
         : field.type === "checkbox" ? element.checked : field.type === "file" ? element.files.length : element.value;
+      if (field.type === "file" && attachment && [...element.files].some(file => file.name === attachment.name)) {
+        const bytes = Uint8Array.from(atob(attachment.base64), char => char.charCodeAt(0));
+        const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map(v => v.toString(16).padStart(2, "0")).join("");
+        if (hash !== attachment.sha256) throw new Error("Resume checksum does not match.");
+        const existing = [...element.files].find(file => file.name === attachment.name);
+        const existingBytes = await existing.arrayBuffer();
+        const existingHash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", existingBytes))].map(v => v.toString(16).padStart(2, "0")).join("");
+        checkCollateral();
+        checkCurrent(control);
+        if (existingHash === attachment.sha256) {
+          return {id: field.id, status: "skipped_existing", message: "Reviewed resume already attached.", reason: "", failure_kind: "", validation_error: ""};
+        }
+        if (!(selection.overwrite === true || overwrite)) throw new Error("Existing file with the same name does not match the reviewed resume.");
+      }
       if (!(selection.overwrite === true || overwrite) && current !== "" && current !== false && current !== 0) {
         return {id: field.id, status: "preserved", message: "Existing portal value preserved."};
       }

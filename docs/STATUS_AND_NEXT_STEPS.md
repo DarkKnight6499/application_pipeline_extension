@@ -1,7 +1,7 @@
 ---
 author: Yazad Madan
 updated: 2026-10-04
-status: sponsorship toggle rebased and validated, truthful by default, FULL 284 and PUBLIC 203 OK with 2 skips each; next is P7 landing
+status: P7 validated in feat/p7-progression, guarded Next remains off, FULL 304 and PUBLIC 223 OK with 2 skips each
 ---
 
 # Status and next steps
@@ -15,6 +15,8 @@ A Manifest V3 extension and a local Python helper that review and fill only the 
 ## Done so far
 
 **Sponsorship toggle landing (synthetic only, October 4, 2026).** Rebased over main `2904ded`, preserving P8 record routes and the session-profile allowlist. The per-application toggle defaults to truthful, changes only future and combined sponsorship proposals, displays the boilerplate answer beside the proposal, and never selects fields automatically. Mode changes clear affected answers, selections, and overwrite choices while preserving unrelated edits. Cached sponsorship reviews from another mode are discarded. The toggle is disabled during filling, and Fill is disabled during mode saving. The original nine backend tests and five new browser tests pass; FULL 284 tests and PUBLIC 203 tests both end OK with two symlink-privilege skips. JavaScript syntax, Python compilation, and diff checks pass. Existing tests were not edited. No live portal validation occurred.
+
+**P7 progression guards (synthetic only, October 4, 2026).** Rebased onto `80490bf`, preserving sponsorship-mode locks and invalidation, the per-session profile allowlist, and P8 record routes. The page check sweeps required fields, detects repeated missing sets, classifies one safe Next control, stops at final review or a human gate, and keeps guarded Next disabled by default. Native submit controls remain ineligible even when labelled Next. A second resume upload is skipped only after both incoming and attached bytes match the reviewed checksum; changed or detached controls fail. Six new regressions passed without editing existing tests. FULL 304 and PUBLIC 223 passed, each with two symlink-privilege skips. JSCHECK, PYCHECK, and diff checks pass. The `rg submit` acceptance output includes the denylist and explicit native-submit guards required by the safety review. Synthetic only; no live portal interaction occurred. Next queued phase: PF5 Phenom.
 
 **P6 selective fill hardening (synthetic only).** Each fill is read back after the blur and settle wait. A value that reverts is reported failed with reason "reverted after blur" (failure_kind reverted); an aria-invalid flag or error text inside the field's own container is captured in validation_error (failure_kind validation_error). The trusted_keystrokes strategy throws "not enabled" before any write. Overwrite semantics unchanged and now tested per control type. Manifest version 0.6.0, no new permissions. Never verified on a live portal.
 
