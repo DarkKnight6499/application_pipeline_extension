@@ -95,6 +95,21 @@
     });
   }
 
+  // Negation-safe work authorization and sponsorship intents; anything place-dependent or negated stays pending.
+  function eligibilityIntent(text) {
+    const sponsor = /\b(sponsor|sponsorship|visa|immigration support|work permit)\b/.test(text);
+    const needs = /\b(require|requires|need|needs|needing)\b/.test(text);
+    if (/\b(without|no need|do not need|don t need)\b/.test(text)) return null;
+    if (/\b(location s|stated location|selected|country where|country in which|in which you are applying|where this (role|job|position)|position is located|current location)\b/.test(text)) return null;
+    if (sponsor && needs) {
+      const now = /\b(now|currently|at present)\b/.test(text), future = /\b(future|ever|any point|going forward)\b/.test(text);
+      return now && future ? "sponsorship_now_or_future" : future ? "sponsorship_future" : now ? "sponsorship_now" : null;
+    }
+    const inUS = /\b(us|usa|u s|united states)\b/.test(text);
+    if (!sponsor && !needs && inUS && /\b(authori[sz]ed to (lawfully |legally )?work|eligible to work|work authori[sz]ed to work)\b/.test(text)) return "authorized_us";
+    return null;
+  }
+
   function classify(label, identity, section) {
     const aliases = {
       first_name: ["first name", "legal first name", "given name"],
@@ -132,7 +147,7 @@
     for (const [key, labels] of Object.entries(scoped)) {
       if (labels.includes(text)) return key;
     }
-    return null;
+    return scoped === aliases ? eligibilityIntent(text) : null;
   }
 
   function controlIdentity(element) {
@@ -140,9 +155,12 @@
       element.getAttribute("data-automation-id"), element.closest("fieldset")?.querySelector("legend")?.textContent || ""].join("|");
   }
 
+  // Bot traps that real forms hide from people; never fill or export them.
+  const honeypotTerms = /(honey.?pot|bee.?catcher|robots? only|do not enter if you are human|do not enter if you.?re human|leave (this )?(field )?(blank|empty))/i;
+
   function protectedControl(element) {
     const text = `${labelFor(element)} ${element.name || ""} ${element.id || ""} ${element.getAttribute("data-automation-id") || ""} ${element.closest("fieldset")?.querySelector("legend")?.textContent || ""}`;
-    return element.type === "password" || protectedTerms.test(text) || demographicTerms.test(text) || !!globalThis.PortalGreenhouse?.protectedField(element);
+    return element.type === "password" || honeypotTerms.test(text) || protectedTerms.test(text) || demographicTerms.test(text) || !!globalThis.PortalGreenhouse?.protectedField(element);
   }
 
   function radioMembers(element) {
@@ -157,19 +175,21 @@
     return unavailable(option) || !!option.closest("optgroup:disabled");
   }
 
+  const dropdown = element => globalThis.PortalGreenhouseSelect?.matches(element) ? PortalGreenhouseSelect : globalThis.PortalListbox;
+
   function fingerprint(element) {
     const custom = element.getAttribute("role") === "combobox" && element.tagName !== "SELECT";
-    const choices = custom ? globalThis.PortalListbox?.describe(element).options || []
+    const choices = custom ? dropdown(element)?.describe(element).options || []
       : element.tagName === "SELECT" ? [...element.options].map(option => [option.value, option.textContent.trim(), optionDisabled(option)])
       : element.type === "radio" ? radioMembers(element).map(item => [item.value, controlIdentity(item), unavailable(item)]) : [];
     return [controlIdentity(element), JSON.stringify(choices),
-      custom ? globalThis.PortalListbox?.identity(element) : ""].join("|");
+      custom ? dropdown(element)?.identity(element) : ""].join("|");
   }
 
   function read(control) {
     const {element, members, field} = control;
     if (!element.isConnected) return "[detached]";
-    return field.type === "combobox" ? globalThis.PortalListbox?.read(element) ?? element.value ?? ""
+    return field.type === "combobox" ? dropdown(element)?.read(element) ?? element.value ?? ""
       : field.type === "radio" ? members.find(item => item.checked)?.value || ""
       : field.type === "checkbox" ? element.checked : field.type === "file" ? [...element.files].map(file => file.name).join(",") : element.value || "";
   }
@@ -223,8 +243,8 @@
       const ordinal = counts.get(ordinalKey) || 0;
       counts.set(ordinalKey, ordinal + 1);
       const id = `${ordinalKey}|${ordinal}`;
-      const customInfo = custom ? globalThis.PortalListbox?.describe(element) || {supported: false, reason: "No custom dropdown adapter is installed.", options: []} : null;
-      const current = blocked ? "" : custom ? globalThis.PortalListbox?.read(element) ?? element.value ?? "" : type === "radio" ? members.find(item => item.checked)?.value || ""
+      const customInfo = custom ? dropdown(element)?.describe(element) || {supported: false, reason: "No custom dropdown adapter is installed.", options: []} : null;
+      const current = blocked ? "" : custom ? dropdown(element)?.read(element) ?? element.value ?? "" : type === "radio" ? members.find(item => item.checked)?.value || ""
         : type === "checkbox" ? element.checked : type === "file" ? [...element.files].map(file => file.name).join(", ") : element.value || "";
       const options = custom ? customInfo.options : element.tagName === "SELECT" ? [...element.options].map(option => ({value: option.value, label: option.textContent.trim(), disabled: optionDisabled(option)}))
         : type === "radio" ? members.map(item => ({value: item.value, label: labelFor(item), disabled: unavailable(item) || !visible(item)})) : [];
@@ -232,7 +252,7 @@
       const field = {id, label, key, section: key?.split(".")[0] || section, type, current, options, record,
                      required: element.required || element.getAttribute("aria-required") === "true" || globalThis.PortalGreenhouse?.uploadGroup(element)?.getAttribute("aria-required") === "true",
                      blocked, disabled: unavailable(element),
-                     adapter: customInfo?.supported ? "aria-listbox" : null, manual_reason: customInfo?.reason || "",
+                     adapter: customInfo?.supported ? (dropdown(element) === globalThis.PortalGreenhouseSelect ? "greenhouse-select" : "aria-listbox") : null, manual_reason: customInfo?.reason || "",
                      dropdown_state: customInfo?.dropdown_state || null,
                      structure: {tag: element.tagName.toLowerCase(), name: element.name || "", automation_id: element.getAttribute("data-automation-id") || "",
                        dom_id: element.id, role: element.getAttribute("role") || "", controls: element.getAttribute("aria-controls") || "", popup: element.getAttribute("aria-haspopup") || ""},
@@ -374,8 +394,8 @@
             setNative(element, option.value);
           }
         } else if (field.type === "combobox") {
-          if (!field.adapter || !globalThis.PortalListbox) throw new Error(field.manual_reason || "This custom dropdown requires manual review.");
-          expected = await PortalListbox.choose(element, expected, () => {
+          if (!field.adapter || !dropdown(element)) throw new Error(field.manual_reason || "This custom dropdown requires manual review.");
+          expected = await dropdown(element).choose(element, expected, () => {
             checkCollateral();
             checkCurrent(control);
             if (controlIdentity(element) !== control.identity) throw new Error("The dropdown question changed while opening. Rescan before filling.");
