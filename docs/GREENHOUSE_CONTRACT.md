@@ -31,6 +31,8 @@ The loaded-extension test uses temporary test-only host permissions because a po
 
 The full suite passed 81 tests in 50.944 seconds on October 3, 2026. No remote saving, upload completion, reactive dropdown selection, browser-rendered validation, or final-review persistence has been demonstrated on Justworks. Workday and Greenhouse therefore remain separately unvalidated end-to-end integrations. Do not copy the candidate's resume into the public fixture or repository.
 
+PF4 synthetic completion coverage adds nine new cases. Seven cover Greenhouse routing, read-only scanning, selected-only fill, overwrite-off preservation, CAPTCHA gating, final-review detection, and zero submission events. One verifies a stale react-select field reference fails closed after a synthetic rerender, then succeeds after an explicit rescan. One confirms country and city typeahead stay manual without an observed popup contract. The focused suite passes in Edge. These cases use fabricated values and do not expand the public contract or establish live compatibility.
+
 ## Next demonstrated gap
 
-Connect a real browser and inspect one editable dropdown after the user opens it. Record its stable popup ownership, exact option labels, current selection representation, event behavior, and asynchronous validation. Implement that contract in a dedicated fixture before enabling automatic choice. Separately observe the real resume upload completion indicator. Keep signatures, attestations, and submission manual.
+Connect a real browser and inspect one editable country or city dropdown after the user opens it. Record its stable popup ownership, exact option labels, current selection representation, event behavior, and asynchronous validation before enabling automatic choice. Separately observe the real resume upload completion indicator. Keep signatures, attestations, and submission manual.

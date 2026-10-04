@@ -56,6 +56,10 @@ Latest completed validation before Greenhouse development: 76 tests passed in 46
 
 The panel previously fell back to a global profile when session loading failed, accepted malformed response shapes, and reused stale cached answers after a new application proposal. Synthetic regressions reproduced these failures. The panel now requires a valid session profile before scanning, invalidates cached rows when their sourced proposal or matching draft changes, and displays tailored employment drafts for human review without selecting them. Eleven focused regressions and 23 approved inherited mock cases pass. Live portal behavior remains unverified.
 
+## PF4 Greenhouse completion, October 4, 2026
+
+Nine new synthetic Edge browser tests pass. A control replaced after scanning is refused as stale. An explicit rescan registers the replacement and permits selected filling. Country and city role=combobox controls without verified popup ownership stay manual. The remaining seven cases check routing, read-only scan, selected-only fill, overwrite-off preservation, CAPTCHA gating, final-review detection, and zero submit events. No production code, inherited test, live portal, or Resume workflow file changed. Live typeahead behavior, react-select popup behavior, remote persistence, and upload completion remain unverified.
+
 ## Acceptance still pending
 
 DOM readback does not prove remote saving. A file input's filename does not prove remote upload completion. Neither Workday nor Greenhouse has a real employer application validated through final review. Final submission stays manual.
