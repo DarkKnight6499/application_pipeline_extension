@@ -34,3 +34,36 @@ class PlaceholderExportTests(SyntheticBrowserTest):
         self.assertEqual(exported["proposal"], "")
         self.assertEqual(exported["status"], "pending")
         self.assertNotEqual(exported["source"], "Edited in review panel")
+
+    def test_selected_native_select_fills_only_selection_without_submit(self):
+        self.open_markup(MARKUP + '''
+<label>Favorite synthetic beverage<select id="beverage"><option value="">Choose an option</option><option value="tea">Tea</option></select></label>
+''')
+        self.page.add_script_tag(path=str(HERE / "extension/panel.js"))
+        self.page.evaluate("""async () => {
+          globalThis.calls = [];
+          const session = {id: 'a'.repeat(32), mode: 'audited_import', company: 'Synthetic Co', role: 'Synthetic Role', url: location.href};
+          const api = async (path, body) => {
+            calls.push({path, body});
+            if (path === '/api/profile' || path.endsWith('/profile')) return {values: {}};
+            if (path === '/api/current') return session;
+            if (path.endsWith('/preflight')) return {items: [], manual_field_ids: [], ack_required: false};
+            if (path.endsWith('/record')) return {record: {}};
+            return {};
+          };
+          await PortalPanel.open(api, {load: async () => null, save: async () => {}}, {targetUrl: location.href});
+        }""")
+        host = self.page.locator("#portal-panel-host")
+        select = host.get_by_role("combobox", name="Answer Favorite synthetic beverage", exact=True)
+        select.wait_for()
+        select.select_option("tea")
+        host.get_by_role("checkbox", name="Select Favorite synthetic beverage", exact=True).check()
+        host.get_by_role("checkbox", name="This page belongs to the selected posting", exact=True).check()
+        host.get_by_role("button", name="Fill selected fields", exact=True).click()
+        self.page.wait_for_function("document.querySelector('#portal-panel-host').shadowRoot.textContent.includes('1 filled')")
+        self.assertEqual(self.page.locator("#beverage").input_value(), "tea")
+        self.assertEqual(self.page.locator("#first").input_value(), "")
+        self.assertEqual(self.page.locator("#mail").input_value(), "")
+        self.assertEqual(self.page.locator("#color").input_value(), "")
+        self.assertEqual(self.page.evaluate("syntheticSubmitClicks"), 0)
+        self.assertEqual(self.page.evaluate("syntheticSubmitEvents"), 0)
