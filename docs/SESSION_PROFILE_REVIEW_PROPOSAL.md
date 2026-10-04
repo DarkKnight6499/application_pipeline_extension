@@ -13,6 +13,8 @@ The panel loads the current session, then requires its session profile. Invalid 
 
 The original six cases showed two passes and four red test methods before repair. Eleven session-profile tests now pass, including added cache, draft, and missing-profile checks. The five approved inherited mock files pass 23 targeted tests. JavaScript syntax, Python compilation, and diff checks pass. All evidence is synthetic. No live portal action occurred.
 
+Follow-up review found object and array fact values were still accepted. A separate synthetic regression first failed for both shapes, then passed after limiting fact values to strings, booleans, and finite numbers. Another new test confirms a changed proposal clears the edited answer, selection, and overwrite choice together. Both follow-up tests pass, with syntax, compilation, and diff checks clean.
+
 ## Evidence
 
 Branch `fix/session-profile-review` starts at `996a674`. Targeted tests use fabricated profiles and a synthetic page. Six new tests were run against the current implementation. Two pass and four remain red:
