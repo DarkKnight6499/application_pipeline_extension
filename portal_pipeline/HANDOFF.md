@@ -69,3 +69,13 @@ JavaScript syntax and Python compilation checks passed. Desktop and mobile scree
 The version `0.3.0` row chooser was inspected visually using synthetic profile facts. Its preview screenshot is `portal_pipeline/test-results/history-review-v03.png`. The running preview serves the new JavaScript and fixtures without altering the source checkout or the user's session data.
 
 The existing `_Reference` scripts have not been modified. Only this worktree's research Markdown was updated to reflect progress. Any later change to those scripts must run the existing workflow smoke suite as required by `CLAUDE.md`. Unrelated concurrent files and changes in other worktrees were preserved.
+
+## Independent probe checkpoint, October 3, 2026
+
+Author: Yazad Madan.
+
+Six read-only lanes inspected baseline `de2e51b5e424634d2be66a32bcfa5627f5e1fbef` using synthetic data only. The coordinator personally reproduced four high findings: cross-form radio writes into protected attestation, omitted protected collateral monitoring, uncertainty stripped from profile answers, and stale upload protection after checksum await. Medium and low findings and all 14 earlier-review statuses are consolidated in [PROBE_REPORT_2026-10-03.md](../docs/PROBE_REPORT_2026-10-03.md).
+
+Current public-checkout discovery produced three import errors and zero actual tests executed. All 81 test methods are blocked by the missing external workflow, recorded as SKIPPED-BY-ENVIRONMENT rather than passing. Default Playwright Chromium is missing; independent synthetic probes used fresh headless Edge contexts. Existing historical 81-pass results are retained and were not reproduced here. Real source data was not read or copied.
+
+Only probe documentation changed on `probe/2026-10-03`. Production code remains unchanged and every finding remains open. The next task is user selection from the report's ranked fix list. The supplied Phase B checkpoint requires that selection before production edits. After selection, write failing synthetic regressions first, make separate serial engine fixes, run available tests with honest integration skips, update these notes, and open an unmerged pull request. No live employer forms, accounts, submissions, or automatic push are authorized by this checkpoint.

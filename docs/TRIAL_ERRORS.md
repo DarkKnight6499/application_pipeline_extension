@@ -44,3 +44,20 @@ Latest completed validation before Greenhouse development: 76 tests passed in 46
 ## Acceptance still pending
 
 DOM readback does not prove remote saving. A file input's filename does not prove remote upload completion. Neither Workday nor Greenhouse has a real employer application validated through final review. Final submission stays manual.
+
+## Independent synthetic probe, October 3, 2026
+
+Baseline: `de2e51b5e424634d2be66a32bcfa5627f5e1fbef`. Full evidence, reproductions, earlier-review status, and ranked proposed fixes are in [PROBE_REPORT_2026-10-03.md](PROBE_REPORT_2026-10-03.md). No production fix has been applied at this checkpoint.
+
+| Failure | Evidence | Fix and validation status | Remaining limit |
+| --- | --- | --- | --- |
+| Cross-form radio writes protected attestation | Synthetic same-name radios in separate forms; ordinary selected Yes checked protected second-form radio and reported filled. | Open, personally reproduced by coordinator. Proposed form/member binding regression and fix. | Selected-only and protected-field invariant violated. |
+| Protected collateral missed | Selected text input side effect checked unselected agreement; next selected write continued. | Open, personally reproduced. Proposed protected-state monitoring without disclosure. | No automatic rollback assumed safe. |
+| Unconfirmed answer promoted | Synthetic `Yes [CONFIRM]` became Yes and filled authorization select. | Open, personally reproduced. Proposed uncertainty-preserving parser and regression. | Unknown facts must remain pending. |
+| Upload guard stale across checksum await | Queued synthetic label change to protected question was observed at file assignment; result still filled. | Open, personally reproduced. Proposed immediate post-await guard revalidation. | A checksum validates bytes, not current question identity. |
+| ARIA-state and dropdown visibility gaps | Stale ARIA read-only input filled; ARIA-hidden option clicked. | Open, lane reproductions recorded. | Current native/ARIA availability needs consistent checks. |
+| Parsing fragility | Blank boilerplate consumed next line; contact length/reordering caused crash or wrong mapping. | Open, synthetic reproductions recorded. | Private actual source parsing was deliberately not checked. |
+| Public suite unavailable | Three module import errors, zero actual tests executed; inventory is 81 methods. | SKIPPED-BY-ENVIRONMENT, not passing. Proposed independent synthetic test setup. | External real audit/build and default Chromium unavailable. |
+| Unsupported surfaces omitted | Synthetic iframe, shadow-root, and spinbutton controls absent from inspection with no incomplete-surface reason. | Open, synthetic reproduction recorded. | Does not authorize new portal families or live probes. |
+
+Low findings cover Rescan host-policy inconsistency, caller-supplied sandbox placement, probable session reparse-point containment, and weak test cardinality assertions. No critical issue or employer-page-readable extension PII channel was established. Historical live limits and validation records above remain unchanged. Await the user's ranked-item selection before production fixes.
