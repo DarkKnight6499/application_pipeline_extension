@@ -51,3 +51,10 @@ The extension's persistent host permission covers only the local helper. Real ap
 - [Original Greenhouse trial report](docs/trials/LEGACY_GREENHOUSE_TRIAL.md)
 
 The legacy report records a separate earlier prototype. Its test counts and safety stop are historical evidence, not current extension results.
+
+## Credits
+
+Ideas, not code, are adapted from two MIT-licensed projects.
+
+- [career-ops-hq/career-ops](https://github.com/career-ops-hq/career-ops) (MIT): source precedence, preflight gates, never inventing legal or demographic answers, character-limit counting, the pre-action field sweep, and a table of ATS quirks.
+- [GodsScion/Auto_job_applier_linkedIn](https://github.com/GodsScion/Auto_job_applier_linkedIn) (MIT): keyword label classification, whole-word matching, work-authorization question ordering, Yes or No option matching that refuses to guess, and stall detection. Random answering, auto-submit, stealth drivers and bulk applying are not adopted.

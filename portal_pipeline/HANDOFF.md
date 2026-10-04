@@ -2,7 +2,7 @@
 
 Date: October 3, 2026.
 
-Current repository: `D:\Code\application_pipeline_extension`, remote `https://github.com/DarkKnight6499/application_pipeline_extension.git`, branch `main`. The user requested publication to this repository and commits after each completed phase. The initial export contains only portal code, research, and trial reports. It does not contain the private Resume Git history or candidate data.
+Current repository: `D:\Code\application_pipeline_extension`, remote `https://github.com/DarkKnight6499/application_pipeline_extension.git`, branch `docs/p0-contracts` (docs only, cut from `origin/main` at `765e17b`; PRs 4 and 5 not yet merged). The user requested publication to this repository and commits after each completed phase. The initial export contains only portal code, research, and trial reports. It does not contain the private Resume Git history or candidate data.
 
 Provenance: the original prototype worktree is `D:\Code\Resume_portal_pipeline`, branch `feat/portal-pipeline`, baseline `1b7827d`. Leave that worktree, the independent `Resume_portal_trial` worktree, and unrelated files intact. Use `D:\Code\Resume` as an explicitly configured, read-only workflow source.
 
@@ -31,6 +31,8 @@ The prototype proves the local profile, review, selected-fill, and audited-resum
 The initial portal priority remains unconfirmed. Workday is the development assumption because the synthetic fixture exercises its likely field categories. No account login, live employer form filling, or application submission occurred.
 
 ## Next exact task
+
+Phase order lives in `D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md`. Next task: finish P0 (merge PRs 4 and 5, rerun the full suite on `main`, merge `docs/p0-contracts`), then P1 (adapter interface and registry). The walkthrough guidance below remains valid input for contracts under `docs/contracts/`.
 
 Connect a real browser and continue one employer-specific walkthrough at a time. Workday still needs a selected employer URL and real form inspection. Greenhouse has the public Justworks structural reference, but its editable dropdown and upload completion contracts need rendered browser observations. Use **Export field structure** and follow [INSPECTION.md](INSPECTION.md). Record real page behavior and final-review persistence without submitting. See [GREENHOUSE_CONTRACT.md](../docs/GREENHOUSE_CONTRACT.md) for that track's next exact control.
 
