@@ -765,7 +765,7 @@ class BrowserTests(unittest.TestCase):
         url = "https://job-boards.greenhouse.io/synthetic/jobs/123"
         self.page.route(url, lambda route: route.fulfill(content_type="text/html", body=(HERE / "fixtures/greenhouse.html").read_text(encoding="utf-8")))
         self.page.goto(url)
-        for name in ["adapters/aria-listbox.js", "adapters/greenhouse.js", "engine.js"]:
+        for name in ["adapters/aria-listbox.js", "adapters/greenhouse.js", "adapters/greenhouse-select.js", "engine.js"]:
             self.page.add_script_tag(path=str(HERE / "extension" / name))
 
     def test_greenhouse_scopes_application_and_excludes_internal_and_survey_controls(self):
@@ -811,8 +811,9 @@ class BrowserTests(unittest.TestCase):
         self.assertIsNone(country["adapter"])
         self.assertTrue(country["manual_reason"])
         compound = next(field for field in fields if field["structure"]["dom_id"] == "compound")
-        self.assertIsNone(compound["key"])
-        self.assertEqual(compound["proposal"], "")
+        # The combined question now classifies, but this unwrapped combobox has no adapter so it still cannot be filled.
+        self.assertEqual(compound["key"], "sponsorship_now_or_future")
+        self.assertIsNone(compound["adapter"])
         result = self.page.evaluate("async selection => PortalEngine.fill([selection])", {"id": country["id"], "value": "United States"})
         self.assertEqual(result[0]["status"], "failed")
         self.assertEqual(self.page.locator("#country").input_value(), "")

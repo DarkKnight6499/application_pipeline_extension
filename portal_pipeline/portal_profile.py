@@ -110,6 +110,11 @@ def resolve_profile(root: Path) -> dict:
                 value = lead.group(1).title()
             add(key, value, f"Application_Boilerplate.md: {label}")
 
+    now, future = values.get("sponsorship_now"), values.get("sponsorship_future")
+    if now and future or (now or future) and "Yes" in (now or future)["value"]:
+        needs = "Yes" if "Yes" in [item["value"] for item in (now, future) if item] else "No"
+        add("sponsorship_now_or_future", needs, "Derived from the separate sponsorship now and in the future answers")
+
     descriptions = re.findall(r"^### (.+)\n(.+?)(?=\n---|\n##|\Z)", boiler, re.M | re.S)
     employment = []
     for employer in master["experience"]:

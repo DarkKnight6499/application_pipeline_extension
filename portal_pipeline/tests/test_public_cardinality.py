@@ -41,7 +41,7 @@ class PublicCardinalityTests(SyntheticBrowserTest):
         markup = re.sub(r'<script\b[^>]*>.*?</script>', '', FIXTURE_HTML.read_text(encoding="utf-8"), flags=re.DOTALL)
         self.context.route(SYNTHETIC_URL, lambda route: route.fulfill(content_type="text/html", body=markup))
         self.page.goto(SYNTHETIC_URL)
-        for script in ("adapters/aria-listbox.js", "adapters/greenhouse.js", "engine.js"):
+        for script in ("adapters/aria-listbox.js", "adapters/greenhouse.js", "adapters/greenhouse-select.js", "engine.js"):
             self.page.add_script_tag(path=str(HERE / "extension" / script))
         self.page.add_script_tag(path=str(FIXTURE_SCRIPT))
         self.profile = {"values": SYNTHETIC_VALUES}
