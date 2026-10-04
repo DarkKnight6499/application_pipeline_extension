@@ -56,7 +56,8 @@ class ManualBoundaryTests(SyntheticBrowserTest):
           const profile = {values: {first_name: {value: 'Synthetic', source: 'Fabricated fixture'}}};
           const api = async path => {
             if (path === '/api/current') return {id: 'a'.repeat(32), mode: 'audited_import', url: location.href};
-            if (path === '/api/profile' || path.endsWith('/profile')) return profile;
+            if (path === `/api/sessions/${'a'.repeat(32)}/profile`) return profile;
+            if (path === '/api/profile') throw new Error('Global profile must not load');
             if (path.endsWith('/preflight')) return {items: [], manual_field_ids: [manualId]};
             return {};
           };

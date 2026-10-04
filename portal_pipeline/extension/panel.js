@@ -2,6 +2,21 @@
 (() => {
   if (globalThis.PortalPanel) return;
   const sponsorshipToggleKeys = new Set(["sponsorship_future", "sponsorship_now_or_future"]);
+  function validProfile(profile) {
+    return profile && typeof profile === "object" && !Array.isArray(profile)
+      && profile.values && typeof profile.values === "object" && !Array.isArray(profile.values)
+      && Object.values(profile.values).every(fact => fact && typeof fact === "object" && !Array.isArray(fact)
+        && Object.hasOwn(fact, "value") && fact.value !== undefined && fact.value !== null
+        && typeof fact.source === "string" && fact.source.trim() !== ""
+        && (fact.status === undefined || typeof fact.status === "string"));
+  }
+  function reviewSnapshot(field, profile) {
+    const draft = /^employment\.\d+\.description$/.test(field.key || "")
+      ? profile.values[`${field.key}_draft`] : null;
+    return JSON.stringify({proposal: field.proposal, source: field.source, status: field.status,
+      truth: field.truth || null, sponsorship_answer_mode: sponsorshipToggleKeys.has(field.key) ? profile.sponsorship_answer_mode || "truthful" : null,
+      draft: draft ? {value: draft.value, source: draft.source, status: draft.status} : null});
+  }
   function element(tag, text, attributes = {}) {
     const node = document.createElement(tag);
     if (text) node.textContent = text;
@@ -65,11 +80,10 @@
       return host;
     }
     try {
-      const [baseProfile, session] = await Promise.all([api("/api/profile"), api("/api/current")]);
-      let profile = baseProfile;
+      const session = await api("/api/current");
       if (!session) throw new Error("Import an audited application or create a sandbox application in the dashboard first.");
-      // Session profile carries the per-application sponsorship toggle; fall back to the global profile.
-      try { const scoped = await api(`/api/sessions/${session.id}/profile`); if (scoped?.values) profile = scoped; } catch (error) { /* global profile stays */ }
+      const profile = await api(`/api/sessions/${session.id}/profile`);
+      if (!validProfile(profile)) throw new Error("Invalid session profile. Review cannot scan or fill fields.");
       const targetUrl = options.targetUrl || location.href;
       const target = new URL(targetUrl);
       if (session.mode !== "audited_import" && !(target.hostname === "127.0.0.1" && target.pathname === "/fixture")) throw new Error("Sandbox sessions are only for the local fixture. Import an audited application for an employer portal.");
@@ -154,6 +168,7 @@
       const recordBoxes = new Set();
       const mappingChoosers = [];
       const capture = () => Object.fromEntries([...rows].map(([id, row]) => [id, {selected: row.checkbox.checked, value: row.answer.value, overwrite: row.overwrite.checked,
+        profile_snapshot: reviewSnapshot(row.field, profile),
         ...(sponsorshipToggleKeys.has(row.field.key) ? {sponsorship_answer_mode: profile.sponsorship_answer_mode || "truthful"} : {})}]));
       const save = async () => {
         await storage.save(cacheKey, capture());
@@ -184,9 +199,10 @@
         const title = element("label");
         const checkbox = element("input", "", {type: "checkbox", "aria-label": `Select ${field.label}`});
         const cached = saved[field.id];
+        const snapshot = reviewSnapshot(field, profile);
         const staleSponsorship = sponsorshipToggleKeys.has(field.key)
           && (cached?.sponsorship_answer_mode || "truthful") !== (profile.sponsorship_answer_mode || "truthful");
-        const previous = field.record?.index === null || staleSponsorship ? null : cached;
+        const previous = field.record?.index === null || staleSponsorship || cached?.profile_snapshot !== snapshot ? null : cached;
         checkbox.disabled = field.blocked || field.disabled || field.record?.index === null;
         checkbox.checked = !checkbox.disabled && previous?.selected === true;
         title.append(checkbox, document.createTextNode(` ${field.label}${field.required ? " *" : ""}`));
@@ -206,6 +222,15 @@
         card.append(answer);
         const result = element("div", "", {class: "result", role: "status"});
         card.append(element("div", field.blocked ? "Manual only. This control is excluded." : field.manual_reason || field.source, {class: "source"}));
+        const draft = /^employment\.\d+\.description$/.test(field.key || "") ? profile.values[`${field.key}_draft`] : null;
+        if (draft && !field.blocked) {
+          const draftBox = element("div", "", {class: "note"});
+          draftBox.append(element("strong", "Tailored description draft for review"));
+          draftBox.append(element("p", String(draft.value)));
+          draftBox.append(element("div", draft.source, {class: "source"}));
+          draftBox.append(element("div", draft.status, {class: "source"}));
+          card.append(draftBox);
+        }
         if (field.truth && !field.blocked) card.append(element("div", `Proposing ${field.proposal} by your toggle; boilerplate says ${field.truth.value} (${field.truth.source}).`, {class: "source"}));
         card.append(element("div", `Current: ${field.current || "empty"}`, {class: "current"}));
         if (field.key && !field.blocked && !field.options.length && field.type !== "file") {

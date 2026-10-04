@@ -50,8 +50,17 @@ class PublicExtensionTrial(unittest.TestCase):
             shutil.copytree(PROFILE_FIXTURE, root / "_Reference")
             current = {"id": SESSION_ID, "company": "Synthetic Employer", "role": "Synthetic Analyst",
                        "mode": "sandbox", "state": "built", "upload_reviewed": True}
+            session_folder = root / "sandbox" / SESSION_ID
+            session_folder.mkdir(parents=True)
+            (session_folder / "session.json").write_text(json.dumps({"id": SESSION_ID}), encoding="utf-8")
+
+            def folder(session_id):
+                if session_id != SESSION_ID:
+                    raise ValueError("Session not found.")
+                return session_folder
+
             pipeline = SimpleNamespace(source=root, lock=threading.RLock(), templates=lambda: [],
-                                       current=lambda: current,
+                                       current=lambda: current, folder=folder,
                                        resume=lambda session_id, for_upload=False: ATTACHMENT_BYTES)
             server = make_server(pipeline, 0, PAIRING_TOKEN)
             url = f"http://127.0.0.1:{server.server_port}"

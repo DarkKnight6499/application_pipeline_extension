@@ -3,9 +3,15 @@ author: Yazad Madan
 updated: 2026-10-04
 ---
 
-# Session profile review proposal
+# Session profile review implementation
 
-Preparation only. This proposal records synthetic regressions and all inherited mock setup edits needed for strict per-session profile loading. No production fix or existing-test edit is applied.
+The approved setup changes and production repair were applied on `feat/session-profile-review-fix`. This document retains the original red-case evidence and exact approved mock scope below.
+
+## Result
+
+The panel loads the current session, then requires its session profile. Invalid or failed profile loading stops before scan and Fill controls. A valid empty `values` object keeps unknown answers pending. Each cached row records its proposal, source, status, sponsorship truth and mode, and matching tailored draft. Changed or legacy snapshots clear cached review choices; unchanged snapshots preserve human edits. A tailored employment description draft appears with its source and status for separate review. It is never inserted or selected automatically.
+
+The original six cases showed two passes and four red test methods before repair. Eleven session-profile tests now pass, including added cache, draft, and missing-profile checks. The five approved inherited mock files pass 23 targeted tests. JavaScript syntax, Python compilation, and diff checks pass. All evidence is synthetic. No live portal action occurred.
 
 ## Evidence
 

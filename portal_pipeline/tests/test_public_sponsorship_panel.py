@@ -26,7 +26,8 @@ class SponsorshipPanelTests(SyntheticBrowserTest):
           const api = async (path, body) => {
             calls.push({path, body});
             if (path === '/api/current') return session;
-            if (path === '/api/profile' || path.endsWith('/profile')) return profile();
+            if (path === `/api/sessions/${session.id}/profile`) return profile();
+            if (path === '/api/profile') throw new Error('Global profile must not load');
             if (path.endsWith('/preflight')) return {items: [], manual_field_ids: []};
             if (path.endsWith('/sponsorship-mode')) {
               if (failMode) throw Error('Synthetic mode save failed');

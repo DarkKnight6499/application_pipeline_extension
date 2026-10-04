@@ -15,15 +15,19 @@ class SessionProfilePanelTests(SyntheticBrowserTest):
         self.page.add_script_tag(path=str(HERE / "extension/panel.js"))
         self.page.evaluate("""({failScoped, scopedShape, withDraft}) => {
           globalThis.activeDescription = "Session profile description";
+          globalThis.activeSource = "Application_Boilerplate.md#Role Descriptions";
+          globalThis.activeStatus = "prepared";
+          globalThis.activeDraft = "Tailored synthetic bullets, needing review.";
           globalThis.failScoped = failScoped;
           globalThis.calls = [];
           globalThis.observedProfiles = [];
+          globalThis.fillCalls = [];
           globalThis.saved = {};
           const session = {id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", mode: "audited_import", company: "Synthetic Employer",
             role: "Synthetic Role", url: location.href};
           const makeProfile = (description, scoped) => ({sponsorship_answer_mode: "truthful", values: {
-            "employment.0.description": {value: description, source: scoped ? "Application_Boilerplate.md#Role Descriptions" : "Global profile source", status: "prepared"},
-            ...(withDraft ? {"employment.0.description_draft": {value: "Tailored synthetic bullets, needing review.",
+            "employment.0.description": {value: description, source: scoped ? activeSource : "Global profile source", status: scoped ? activeStatus : "prepared"},
+            ...(withDraft ? {"employment.0.description_draft": {value: activeDraft,
               source: "resume_content.json#experience", status: "draft_needs_review"}} : {})
           }});
           const baseProfile = makeProfile("Global profile description", false);
@@ -38,6 +42,8 @@ class SessionProfilePanelTests(SyntheticBrowserTest):
               if (scopedShape === "null") return {values: null};
               if (scopedShape === "array") return {values: []};
               if (scopedShape === "malformed") return {values: {"employment.0.description": "not a fact object"}};
+              if (scopedShape === "missing_source") return {values: {"employment.0.description": {value: "Unsupported"}}};
+              if (scopedShape === "null_value") return {values: {"employment.0.description": {value: null, source: "Synthetic source"}}};
               return makeProfile(activeDescription, true);
             }
             if (path.endsWith("/preflight")) return {items: [], manual_field_ids: []};
@@ -52,7 +58,7 @@ class SessionProfilePanelTests(SyntheticBrowserTest):
                 type: "textarea", current: "", options: [], record: null, required: false, blocked: false, disabled: false,
                 proposal: fact.value || "", source: fact.source || "Manual answer required", status: fact.status || "pending", truth: null, structure: {}}];
             },
-            fill: async selections => selections.map(item => ({id: item.id, status: "filled", message: "Synthetic completion"})),
+            fill: async selections => {fillCalls.push(structuredClone(selections)); return selections.map(item => ({id: item.id, status: "filled", message: "Synthetic completion"}));},
             inspect: () => ({host: location.host, fields: [], coverage: {reason_codes: []}})
           }};
           globalThis.reopenSessionPanel = () => PortalPanel.open(api, storage, options);
@@ -79,13 +85,15 @@ class SessionProfilePanelTests(SyntheticBrowserTest):
         self.assertEqual(host.get_by_role("checkbox", name="Select Job description", exact=True).count(), 1)
 
     def test_malformed_scoped_profile_shapes_are_rejected(self):
-        for shape in ("missing", "null", "array", "malformed"):
+        for shape in ("missing", "null", "array", "malformed", "missing_source", "null_value"):
             with self.subTest(shape=shape):
-                self.setUp()
+                if shape != "missing":
+                    self.setUp()
                 host = self.open_panel(scoped_shape=shape)
                 self.assertGreater(host.get_by_text("Invalid session profile", exact=False).count(), 0)
                 self.assertEqual(self.page.evaluate("observedProfiles.length"), 0)
-                self.tearDown()
+                if shape != "null_value":
+                    self.tearDown()
 
     def test_cached_review_is_cleared_when_backend_proposal_changes(self):
         host = self.open_panel()
@@ -105,3 +113,51 @@ class SessionProfilePanelTests(SyntheticBrowserTest):
         self.assertTrue(host.get_by_text("draft_needs_review", exact=True).is_visible())
         self.assertFalse(host.get_by_role("checkbox", name="Select Job description", exact=True).is_checked())
         self.assertEqual(host.get_by_role("textbox", name="Answer Job description", exact=True).input_value(), SESSION_VALUE)
+
+    def test_unchanged_snapshot_preserves_human_edit_and_selection(self):
+        host = self.open_panel()
+        answer = host.get_by_role("textbox", name="Answer Job description", exact=True)
+        answer.fill("Human reviewed answer")
+        answer.dispatch_event("change")
+        host.get_by_role("checkbox", name="Select Job description", exact=True).check()
+        host.get_by_role("checkbox", name="Replace existing Job description", exact=True).check()
+        self.page.evaluate("reopenSessionPanel()")
+        host = self.page.locator("#portal-panel-host")
+        self.assertEqual(host.get_by_role("textbox", name="Answer Job description", exact=True).input_value(), "Human reviewed answer")
+        self.assertTrue(host.get_by_role("checkbox", name="Select Job description", exact=True).is_checked())
+        self.assertTrue(host.get_by_role("checkbox", name="Replace existing Job description", exact=True).is_checked())
+
+    def test_source_and_status_changes_invalidate_cached_review(self):
+        for change in ("activeSource = 'New synthetic source'", "activeStatus = 'pending'"):
+            with self.subTest(change=change):
+                host = self.open_panel()
+                host.get_by_role("checkbox", name="Select Job description", exact=True).check()
+                self.page.evaluate(change)
+                self.page.evaluate("reopenSessionPanel()")
+                host = self.page.locator("#portal-panel-host")
+                self.assertFalse(host.get_by_role("checkbox", name="Select Job description", exact=True).is_checked())
+                self.assertEqual(host.get_by_role("textbox", name="Answer Job description", exact=True).input_value(), SESSION_VALUE)
+
+    def test_draft_change_invalidates_cache_without_inserting_draft(self):
+        host = self.open_panel(with_draft=True)
+        host.get_by_role("checkbox", name="Select Job description", exact=True).check()
+        self.page.evaluate("activeDraft = 'Changed tailored draft'; reopenSessionPanel()")
+        host = self.page.locator("#portal-panel-host")
+        self.assertTrue(host.get_by_text("Changed tailored draft", exact=True).is_visible())
+        self.assertFalse(host.get_by_role("checkbox", name="Select Job description", exact=True).is_checked())
+        self.assertEqual(host.get_by_role("textbox", name="Answer Job description", exact=True).input_value(), SESSION_VALUE)
+        self.assertEqual(self.page.evaluate("fillCalls.length"), 0)
+
+    def test_legacy_cache_without_snapshot_is_cleared(self):
+        host = self.open_panel()
+        self.page.evaluate("saved = {'employment-description': {selected: true, value: 'Old edit', overwrite: true}}; reopenSessionPanel()")
+        host = self.page.locator("#portal-panel-host")
+        self.assertEqual(host.get_by_role("textbox", name="Answer Job description", exact=True).input_value(), SESSION_VALUE)
+        self.assertFalse(host.get_by_role("checkbox", name="Select Job description", exact=True).is_checked())
+
+    def test_missing_profile_prevents_scan_and_fill(self):
+        host = self.open_panel(scoped_shape="missing")
+        self.assertGreater(host.get_by_text("Invalid session profile", exact=False).count(), 0)
+        self.assertEqual(self.page.evaluate("observedProfiles.length"), 0)
+        self.assertEqual(self.page.evaluate("fillCalls.length"), 0)
+        self.assertEqual(host.get_by_role("button", name="Fill selected fields", exact=True).count(), 0)
