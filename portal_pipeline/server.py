@@ -20,6 +20,7 @@ from urllib.parse import urlsplit
 import question_corpus
 from portal_profile import hard_fact_errors, resolve_for_application, resolve_profile, save_override
 from audited_import import check_source, inspect_application, posting_url
+from preflight import run_preflight
 
 sys.dont_write_bytecode = True
 
@@ -336,6 +337,15 @@ def make_server(pipeline, port=8766, token=None):
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/override", path)
                     if match:
                         return self.send(200, save_override(pipeline.folder(match[1]), body.get("key"), body.get("value"), body.get("reason")))
+                    match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/preflight", path)
+                    if match:
+                        fields = body.get("fields")
+                        if fields is not None and (not isinstance(fields, list) or len(fields) > 500 or any(not isinstance(f, dict) for f in fields)):
+                            raise ValueError("Fields must be a list of at most 500 objects.")
+                        session = pipeline.current()
+                        if not session or session.get("id") != match[1]:
+                            raise ValueError("Preflight applies to the current session only.")
+                        return self.send(200, run_preflight(pipeline.source, {key: value for key, value in session.items() if key != "content"}, fields))
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/(build|approve-upload)", path)
                     if match:
                         method = pipeline.build if match[2] == "build" else pipeline.approve_upload

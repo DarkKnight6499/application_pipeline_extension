@@ -74,11 +74,35 @@
       const saved = options.reviewState || await storage.load(cacheKey) || {};
       const bindings = options.bindings || {};
       const fields = await (options.transport ? options.transport.scan(profile, bindings) : PortalEngine.scan(profile, {bindings}));
+      // Fail closed: a preflight error leaves Fill disabled rather than skipping the gates.
+      let preflight = null, preflightError = "";
+      try {
+        preflight = await api(`/api/sessions/${session.id}/preflight`, {fields: fields.map(item => ({id: item.id, label: item.label, type: item.type, section: item.section,
+          intent: globalThis.PortalClassifier?.workAuthIntent(item.label) ?? null, options: item.options.map(option => option.label)}))});
+      } catch (error) { preflightError = error.message; }
+      const forcedManual = new Set(preflight?.manual_field_ids || []);
+      fields.forEach(item => { if (forcedManual.has(item.id)) { item.blocked = true; item.manual_reason = "Preflight: answer this yourself."; } });
       status.textContent = `${session.company}: ${session.role}. ${fields.length} fields found. Review each selected answer. Submission stays manual.`;
       const posting = element("p", "", {class: "source"});
       posting.textContent = `Selected posting: ${session.url || "No posting URL set"}. Current page: ${targetUrl}`;
       if (session.tracker_url && session.tracker_url !== session.url) posting.textContent += ` Tracker link: ${session.tracker_url}. Portal URL override was set during import.`;
       panel.append(posting);
+      const acknowledgements = [];
+      const gates = element("div", "", {class: "preflight"});
+      if (preflightError) gates.append(element("p", `Preflight failed: ${preflightError} Fill stays disabled.`, {class: "note failed"}));
+      for (const entry of preflight?.items || []) {
+        const row = element("div", "", {class: `field ${entry.severity === "block" ? "pending" : ""}`});
+        row.append(element("strong", `${entry.severity === "block" ? "Blocking" : "Warning"}: ${entry.message}`));
+        if (entry.evidence) row.append(element("div", entry.evidence, {class: "source"}));
+        if (entry.ack_required) {
+          const box = element("input", "", {type: "checkbox", "aria-label": `Acknowledge preflight item: ${entry.message}`});
+          const boxLabel = element("label", "", {class: "source"});
+          boxLabel.append(box, document.createTextNode(" I have read this and still want to fill"));
+          row.append(boxLabel); acknowledgements.push(box);
+        }
+        gates.append(row);
+      }
+      panel.append(gates);
       const groups = element("div", "", {class: "row"});
       const groupSelect = element("select", "", {"aria-label": "Select section"});
       ["contact", "employment", "education", "all"].forEach(group => groupSelect.append(element("option", group, {value: group})));
@@ -166,7 +190,12 @@
       const fill = element("button", "Fill selected fields", {type: "button", class: "primary"});
       footer.append(matchLabel, element("p"), fill);
       panel.append(footer);
+      const acknowledged = () => !preflightError && acknowledgements.every(box => box.checked);
+      const refreshFill = () => { fill.disabled = !acknowledged(); };
+      acknowledgements.forEach(box => { box.onchange = refreshFill; });
+      refreshFill();
       fill.onclick = async () => {
+        if (!acknowledged()) return;
         fill.disabled = true;
         const locked = [...rows.values()].flatMap(row => [row.checkbox, row.answer, row.overwrite]).concat(mappingChoosers, select, clear, groupSelect, close);
         const initialDisabled = locked.map(node => node.disabled);
@@ -188,7 +217,7 @@
           status.textContent = `${results.filter(item => item.status === "filled").length} filled, ${results.filter(item => item.status === "preserved").length} preserved, ${results.filter(item => item.status === "failed").length} need attention. Continue and submit manually.`;
           await save();
         } catch (error) { status.textContent = error.message; }
-        finally { locked.forEach((node, index) => {node.disabled = initialDisabled[index];}); fill.disabled = false; options.onFillState?.(false); }
+        finally { locked.forEach((node, index) => {node.disabled = initialDisabled[index];}); refreshFill(); options.onFillState?.(false); }
       };
     } catch (error) { status.textContent = error.message; }
     return host;

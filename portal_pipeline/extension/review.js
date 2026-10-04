@@ -1,7 +1,7 @@
 const tabId = Number(new URL(location.href).searchParams.get("tab"));
 const inspectionOnly = new URL(location.href).searchParams.get("mode") === "inspect";
-const api = async path => {
-  const result = await chrome.runtime.sendMessage({type: "portal-api", path});
+const api = async (path, body) => {
+  const result = await chrome.runtime.sendMessage({type: "portal-api", path, body});
   if (!result.ok) throw new Error(result.error);
   return result.value;
 };

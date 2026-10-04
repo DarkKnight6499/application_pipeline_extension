@@ -1,5 +1,6 @@
-const api = async path => {
-  const response = await fetch(path, {headers: {"X-Portal-Token": document.querySelector("meta[name=portal-token]").content}});
+const api = async (path, body) => {
+  const headers = {"X-Portal-Token": document.querySelector("meta[name=portal-token]").content};
+  const response = await fetch(path, body ? {method: "POST", headers: {...headers, "Content-Type": "application/json"}, body: JSON.stringify(body)} : {headers});
   const value = await response.json();
   if (!response.ok) throw new Error(value.error);
   return value;
