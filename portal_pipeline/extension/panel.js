@@ -323,7 +323,8 @@
           let attachment = null;
           if (selected.some(row => row.field.type === "file")) attachment = await api(`/api/sessions/${session.id}/attachment`);
           const selections = selected.map(row => ({id: row.field.id, value: row.answer.value, overwrite: row.overwrite.checked}));
-          const results = await (options.transport ? options.transport.fill(selections, {attachment}) : PortalEngine.fill(selections, {attachment}));
+          const fillOptions = {attachment, manualIds: [...forcedManual]};
+          const results = await (options.transport ? options.transport.fill(selections, fillOptions) : PortalEngine.fill(selections, fillOptions));
           results.forEach(result => {
             const row = rows.get(result.id);
             row.result.className = `result ${result.status}`;
