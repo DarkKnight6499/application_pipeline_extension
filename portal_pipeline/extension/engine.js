@@ -90,7 +90,8 @@
     return [...document.querySelectorAll("input,select,textarea,[role=combobox]")].filter(element => {
       if (element.closest("#portal-panel-host") || !controlVisible(element)) return false;
       if (globalThis.PortalGreenhouse?.active() && !PortalGreenhouse.formFor(element)) return false;
-      return !["hidden", "submit", "button", "reset", "image"].includes(element.type);
+      const type = element.getAttribute("role") === "combobox" && element.tagName !== "SELECT" ? "combobox" : element.type;
+      return !["hidden", "submit", "button", "reset", "image"].includes(type);
     });
   }
 

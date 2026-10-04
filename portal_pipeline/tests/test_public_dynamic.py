@@ -3,6 +3,18 @@ from browser_test_support import SyntheticBrowserTest
 
 
 class PublicDynamicTests(SyntheticBrowserTest):
+    def test_select_only_button_dropdown_still_scans_and_fills(self):
+        self.open_markup('''<button type="button" id="combo" role="combobox" aria-label="Are you willing to relocate?"
+          aria-controls="choices" aria-expanded="false" aria-valuetext="">Choose</button>
+          <div id="choices" role="listbox" hidden><div id="option" role="option">Yes</div></div>
+          <script>document.getElementById('combo').onclick=()=>{
+            document.getElementById('choices').hidden=false;combo.setAttribute('aria-expanded','true');};
+            document.getElementById('option').onclick=()=>{combo.setAttribute('aria-valuetext','Yes');
+              combo.setAttribute('aria-expanded','false');document.getElementById('choices').hidden=true;};</script>''')
+        fields = [field for field in self.scan() if field["type"] == "combobox"]
+        self.assertEqual(len(fields), 1)
+        self.assertEqual(self.fill([{"id": fields[0]["id"], "value": "Yes"}])[0]["status"], "filled")
+
     def selected_names(self):
         fields = {field["key"]: field for field in self.scan() if field["key"]}
         return [{"id": fields[key]["id"], "value": "Synthetic"} for key in ("first_name", "last_name")]
