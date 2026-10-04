@@ -119,7 +119,7 @@ class SheetPlainTests(unittest.TestCase):
         self.assertNotIn("<script", html)
         self.assertIn("&lt;script&gt;", html)
         self.assertIsNone(re.search(r"(src|href)\s*=|url\(|@import|https?://", html))
-        self.assertFalse(set(html) & {"—", "–"})
+        self.assertFalse(set(html) & {chr(0x2014), chr(0x2013)})
         self.assertNotIn("--", re.sub(r"<!--.*?-->", "", html, flags=re.S))
 
     def test_sheet_written_only_under_data_dir(self):
