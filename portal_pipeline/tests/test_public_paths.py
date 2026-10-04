@@ -94,6 +94,14 @@ class PublicPathTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             Pipeline(self.source, self.root)
 
+    def test_reference_and_tracker_looking_destinations_rejected(self):
+        for component in ("_Reference", "Applications", "Applications.xlsx"):
+            with self.subTest(component=component):
+                destination = self.root / "other-fabricated-workflow" / component / "output"
+                with self.assertRaises(ValueError):
+                    Pipeline(self.source, destination)
+                self.assertFalse(destination.exists())
+
     def test_session_directory_junction_cannot_escape(self):
         self.populate(self.external)
         self.redirect(self.data / SESSION_ID, self.external, directory=True)

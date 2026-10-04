@@ -24,6 +24,7 @@ sys.dont_write_bytecode = True
 
 HERE = Path(__file__).resolve().parent
 MAX_BODY = 2_000_000
+RESERVED_OUTPUT_COMPONENTS = {"_reference", "applications", "applications.xlsx"}
 
 
 class Pipeline:
@@ -35,6 +36,8 @@ class Pipeline:
         self.data = data.resolve()
         if self.data.is_relative_to(self.source) or self.source.is_relative_to(self.data):
             raise ValueError("Sandbox output and source workflow directories must not overlap.")
+        if any(component.casefold() in RESERVED_OUTPUT_COMPONENTS for component in self.data.parts):
+            raise ValueError("Sandbox output must not use reference or application tracker paths.")
         self.data.mkdir(parents=True, exist_ok=True)
         sys.path.insert(0, str(self.reference))
         import atomic_json

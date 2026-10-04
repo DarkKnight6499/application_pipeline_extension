@@ -40,6 +40,8 @@ Final discovery: **167 tests, 84 passed, 83 skipped, zero failures/errors**, 75.
 
 Statuses describe demonstrated mechanisms, not comprehensive security or live acceptance. Baseline reports remain historical evidence.
 
+Final instruction audit also reproduced acceptance of unrelated output paths containing `_Reference`, `Applications`, and `Applications.xlsx`. Three failing subcases preceded a case-insensitive reserved-component refusal before directory creation. Nine path tests pass with two privilege skips; four HTTP tests pass. This closes the named-directory portion of L2-01 while preserving ordinary independent sandbox outputs.
+
 ## Remaining limits
 
 No private candidate facts, trackers, resumes, credentials, live employer accounts, or submissions were used. Main and previous PRs remain unmerged. Workday and Greenhouse remain the only portal tracks; permissions are unchanged.
