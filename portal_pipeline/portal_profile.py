@@ -14,6 +14,8 @@ BOOLEAN_ANSWER_KEYS = {"authorized_us", "sponsorship_now", "sponsorship_future",
 EMAIL_PATTERN = re.compile(r"[^\s@|]+@[^\s@|]+\.[^\s@|]+")
 PHONE_PATTERN = re.compile(r"\+?[\d().\s-]+(?:\s*(?:ext\.?|x)\s*\d+)?", re.I)
 MIN_PHONE_DIGITS = 7
+# Leading yes or no, optionally followed by a bracketed or dashed qualifier such as "No (on F-1 OPT)".
+BOOLEAN_LEAD = re.compile(r"(yes|no)(?:\s*[(,:;–-].*)?", re.I | re.S)
 CONTACT_FIELD_NAMES = ("email", "phone", "location")
 
 
@@ -102,9 +104,10 @@ def resolve_profile(root: Path) -> dict:
             if not value or UNRESOLVED_ANSWER.search(value):
                 continue
             if key in BOOLEAN_ANSWER_KEYS:
-                if value.lower() not in {"yes", "no"}:
+                lead = BOOLEAN_LEAD.fullmatch(value)
+                if not lead:
                     continue
-                value = value.title()
+                value = lead.group(1).title()
             add(key, value, f"Application_Boilerplate.md: {label}")
 
     descriptions = re.findall(r"^### (.+)\n(.+?)(?=\n---|\n##|\Z)", boiler, re.M | re.S)
