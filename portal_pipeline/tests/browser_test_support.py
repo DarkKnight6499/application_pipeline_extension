@@ -11,13 +11,14 @@ except ImportError:
 # Test configuration
 HERE = Path(__file__).resolve().parents[1]
 BROWSER_CHANNEL = os.environ.get("PORTAL_TEST_BROWSER", "")
+HEADFUL = os.environ.get("PORTAL_TEST_HEADFUL") == "1"
 SYNTHETIC_URL = "https://safety-fixture.myworkdayjobs.com/application"
 ENGINE_SCRIPTS = ["adapters/aria-listbox.js", "adapters/greenhouse.js", "engine.js"]
 BOUNDARY_MARKUP = """
-<label>Untouched field<input id="untouched" value="Keep untouched"></label>
-<label>Signature<input id="signature"></label>
-<label>I certify this application<input id="certification" type="checkbox"></label>
-<button id="submit" type="submit">Submit application</button>
+<label>Untouched field<input id="guard-untouched" value="Keep untouched"></label>
+<label>Boundary signature<input id="guard-signature"></label>
+<label>I certify this boundary<input id="guard-certification" type="checkbox"></label>
+<button id="guard-submit" type="submit">Submit boundary</button>
 """
 
 
@@ -28,7 +29,7 @@ class SyntheticBrowserTest(unittest.TestCase):
             raise unittest.SkipTest("Install requirements-dev.txt for synthetic browser tests.")
         cls.playwright = sync_playwright().start()
         try:
-            cls.browser = cls.playwright.chromium.launch(headless=True, channel=BROWSER_CHANNEL or None)
+            cls.browser = cls.playwright.chromium.launch(headless=not HEADFUL, channel=BROWSER_CHANNEL or None)
         except Exception:
             cls.playwright.stop()
             raise
@@ -68,10 +69,10 @@ class SyntheticBrowserTest(unittest.TestCase):
 
     def tearDown(self):
         try:
-            if self.page.locator("#untouched").count():
-                self.assertEqual(self.page.locator("#untouched").input_value(), "Keep untouched")
-                self.assertEqual(self.page.locator("#signature").input_value(), "")
-                self.assertFalse(self.page.locator("#certification").is_checked())
+            if self.page.locator("#guard-untouched").count():
+                self.assertEqual(self.page.locator("#guard-untouched").input_value(), "Keep untouched")
+                self.assertEqual(self.page.locator("#guard-signature").input_value(), "")
+                self.assertFalse(self.page.locator("#guard-certification").is_checked())
                 self.assertEqual(self.page.evaluate("syntheticSubmitClicks"), 0)
                 self.assertEqual(self.page.evaluate("syntheticSubmitEvents"), 0)
             self.assertEqual(self.errors, [])

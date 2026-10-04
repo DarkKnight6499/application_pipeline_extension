@@ -22,6 +22,31 @@ from portal_profile import resolve_profile
 
 
 class PublicEngineTests(SyntheticBrowserTest):
+    def test_existing_values_require_individual_overwrite(self):
+        self.open_markup('<label>First name<input id="first" value="Old first"></label><label>Last name<input id="last" value="Old last"></label>')
+        fields = {field["key"]: field for field in self.scan() if field["key"]}
+        result = self.fill([{"id": fields["first_name"]["id"], "value": "New first", "overwrite": True},
+                            {"id": fields["last_name"]["id"], "value": "New last"}])
+        self.assertEqual([item["status"] for item in result], ["filled", "preserved"])
+        self.assertEqual(self.page.locator("#first").input_value(), "New first")
+        self.assertEqual(self.page.locator("#last").input_value(), "Old last")
+
+    def test_lazy_owned_dropdown_still_fills_with_live_guards(self):
+        self.open_markup('''
+          <div id="combo" role="combobox" aria-label="Are you willing to relocate?"
+            aria-controls="choices" aria-haspopup="listbox" aria-expanded="false" aria-valuetext="">Choose</div>
+          <script>document.getElementById('combo').onclick=()=>setTimeout(()=>{
+            const popup=document.createElement('div');popup.id='choices';popup.setAttribute('role','listbox');
+            const option=document.createElement('div');option.setAttribute('role','option');option.textContent='Yes';
+            option.onclick=()=>{combo.setAttribute('aria-valuetext','Yes');combo.setAttribute('aria-expanded','false');popup.hidden=true;};
+            popup.append(option);document.body.append(popup);combo.setAttribute('aria-expanded','true');
+          },50);</script>
+        ''')
+        combo = next(field for field in self.scan() if field["type"] == "combobox")
+        result = self.fill([{"id": combo["id"], "value": "Yes"}])
+        self.assertEqual(result[0]["status"], "filled")
+        self.assertEqual(self.page.locator("#combo").get_attribute("aria-valuetext"), "Yes")
+
     def test_unconfirmed_source_stays_pending_in_browser(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

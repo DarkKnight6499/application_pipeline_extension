@@ -14,10 +14,11 @@ from portal_profile import resolve_profile
 from server import Pipeline, make_server
 from playwright.sync_api import sync_playwright
 
-from test_support import audited_fixture, workflow_source
+from test_support import INTEGRATION_SKIP_REASON, audited_fixture, workflow_source
 SOURCE = workflow_source()
 
 
+@unittest.skipIf(SOURCE is None, INTEGRATION_SKIP_REASON)
 class BrowserTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

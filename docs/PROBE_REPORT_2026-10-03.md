@@ -1,7 +1,7 @@
 ---
 author: Yazad Madan
 date: 2026-10-03
-status: Probe complete, production fixes awaiting user selection
+status: Selected fixes 1-5 complete, live acceptance pending
 ---
 
 # Local safety and portability probe
@@ -177,3 +177,13 @@ Effort estimates are approximate focused implementation and regression time, exc
 | 10 | L6-02, L6-03, doc drift | Require nonempty scans and exact result coverage; qualify historical/environment-bound claims. | 1-2 hours |
 
 Proposed first batch is orders 1-5, with the minimal regression harness needed to prove each fix built before its production change. All findings remain open at this checkpoint. Await user selection before production edits, fixes, pushing, or opening the Phase C pull request.
+
+## Selected-fix follow-up
+
+The user selected recommended items 1-5 and requested a browser trial. On `fix/probe-safety-1-5`, E-01, E-02, E-04, C3-01, and L6-01 are repaired with synthetic regressions. Each production fix was preceded by observed failing regression cases and committed separately. The E-04 shared live guard also addresses the E-03 native ARIA editability mechanism. Remaining findings are deliberately deferred outside the selected batch. The baseline tables and earlier status analysis above are retained as historical evidence.
+
+Final combined suite: **27 passed, 0 failed, 0 errors, 81 SKIPPED-BY-ENVIRONMENT**, 108 total in 25.677 seconds. The former discovery import errors are now explicit external-integration skips. Source resolution requires explicit configuration and rejects invalid configured paths. Python/JavaScript syntax and diff checks passed. Public tests contain a labelled fabricated profile, not copied private candidate facts.
+
+A separate visible Edge browser run passed two trials in 13.962 seconds. The loaded MV3 extension exercised pairing, extension-owned review, selected native and custom dropdown filling, preserved existing values, separate sponsorship, synthetic attachment, final protected review, and inspection-mode scan/fill rejection. The Greenhouse trial exercised selected native fields, exact hidden resume recognition, checksum attachment, protected survey exclusion, and editable-dropdown refusal. Zero submission events/clicks occurred. Screenshots were inspected and have explicit Yazad Madan author metadata; they remain ignored local artifacts.
+
+The trial helper's session and attachment are fabricated stubs and do not validate production audit/build/review gates. The localhost fixture's page-owned engine/panel scripts were removed in the test response to verify extension isolation. The production manifest was unchanged; actual browser-action activeTab permission remains unverified because review opens as an extension test tab. Private workflow integration, real employer saving/upload completion, live final review, and measured time saving remain unverified. HANDOFF and TRIAL_ERRORS preserve the regression failures and corrected harness errors.
