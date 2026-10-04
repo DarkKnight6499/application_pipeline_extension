@@ -47,16 +47,11 @@ Also found:
 - The open-source extension offeros (Apache-2.0) has reusable logic for Workday listbox buttons, repeated sections and option matching. Its automatic "Save and Continue" click must be left out. Date pickers have no permissively licensed reference.
 - One unverified risk: a framework README reports a real Workday resume import dropping dates joined by an en dash. The master resume uses en dashes in its date ranges. Untested here.
 
-## Way ahead, in order
+## Way ahead
 
-1. **Review and merge pull requests 4 and 5.** Rerun the suite against the real source first. Delete the stale `review/stacked-pr-trial` worktree only after checking whether the other session still needs it.
-2. **Phenom adapter.** Highest volume that is reachable without login. Allow the host, handle the LinkedIn iframe, handle the multi-step wizard, and expect plain native selects with predictable `cntryFields.*` and `phoneWidget.*` ids.
-3. **Real post-login structure for Workday and Oracle.** Use **Inspect page only**, then **Export field structure**, on each step of a logged-in Workday application and a JPMorgan Oracle application, saved without entering answers. This replaces guessing. Then build, per system, a dropdown adapter, repeated-section handling and a date handler. Reuse offeros logic with its license header and a NOTICE entry.
-4. **Settle the en-dash question.** Try "Autofill with Resume" on one Workday tenant with a throwaway account. If dates drop, change the master resume date ranges to a plain hyphen, after asking before touching any built resume.
-5. **Eightfold form for New York Life.** Same dropdown technique as Greenhouse, with the cookie banner dismissed first.
-6. **Frame support for iCIMS and Lever, and host allow-list additions.** Only if the volume justifies it.
-7. **Liveness check before filling.** Skip postings whose Apply control is missing.
-8. **Add the Lever question-label resolver**, so authorization and sponsorship wording is read from the question block and not the radio labels.
+Phase order now lives in D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md. PRs 4 and 5 landed on main on 2026-10-04. Next phase: P1 (adapter interface and registry).
+
+The earlier ordered list is kept in Git history. Items still open from it: Phenom adapter, post-login Workday and Oracle exports, the en-dash autofill check, Eightfold, iframe support for iCIMS and Lever, a liveness check before filling, and the Lever question-label resolver. They map to phases PF1 to PF14 in the plan.
 
 ## Rules to keep when working here
 
