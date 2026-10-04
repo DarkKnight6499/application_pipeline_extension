@@ -123,9 +123,10 @@
   }
 
   function protectedControl(element) {
-    const text = `${labelFor(element)} ${element.name || ""} ${element.id || ""} ${element.getAttribute("data-automation-id") || ""} ${element.closest("fieldset")?.querySelector("legend")?.textContent || ""} ${protectionHeading(element)}`;
+    const text = `${labelFor(element)} ${element.name || ""} ${element.id || ""} ${element.getAttribute("data-automation-id") || ""} ${element.closest("fieldset")?.querySelector("legend")?.textContent || ""}`;
+    const attestationContext = `${text} ${protectionHeading(element)}`;
     return element.type === "password" || honeypotTerms.test(text) || !!element.closest(demographicContainers) || protectedTerms.test(text)
-      || !!globalThis.PortalClassifier?.hasAttestationText(text) || demographicTerms.test(text) || !!globalThis.PortalGreenhouse?.protectedField(element);
+      || !!globalThis.PortalClassifier?.hasAttestationText(attestationContext) || demographicTerms.test(text) || !!globalThis.PortalGreenhouse?.protectedField(element);
   }
 
   function radioMembers(element) {

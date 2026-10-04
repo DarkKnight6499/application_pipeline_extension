@@ -53,3 +53,17 @@ class AttestationHeadingAncestryTests(SyntheticBrowserTest):
         result = self.fill([{"id": field["id"], "value": "Synthetic Person"}])
         self.assertNotEqual(result[0]["status"], "filled")
         self.assertEqual(self.page.locator("#legal-name").input_value(), "")
+
+    def test_captcha_heading_does_not_block_first_name_but_visible_challenge_stops_fill(self):
+        self.open_markup("""
+          <h1>Synthetic captcha page</h1>
+          <label>First name<input id="first"></label>
+          <iframe src="https://captcha.example.invalid/hcaptcha/challenge" style="width:300px;height:200px"></iframe>
+        """)
+        field = next(field for field in self.scan({"first_name": {"value": "Synthetic Person", "source": "Fabricated fixture"}})
+                     if field["structure"]["dom_id"] == "first")
+        self.assertFalse(field["blocked"])
+        self.assertEqual((field["key"], field["status"], field["proposal"]), ("first_name", "prepared", "Synthetic Person"))
+        result = self.fill([{"id": field["id"], "value": field["proposal"]}])
+        self.assertEqual(result[0]["status"], "blocked_by_human_gate")
+        self.assertEqual(self.page.locator("#first").input_value(), "")
