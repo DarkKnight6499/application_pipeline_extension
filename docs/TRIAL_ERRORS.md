@@ -79,3 +79,9 @@ The requested visible Edge browser trial passed two tests in 13.962 seconds: loa
 New trial harness failures and corrections are preserved here: Playwright string waiting violated extension CSP, fixed with a locator wait; its network filter accidentally blocked extension scripts, narrowed to allow only the test's localhost and extension origins; appended boundary controls duplicated fixture IDs, fixed with distinct guard IDs; and an isolation assertion initially saw the local fixture's own engine, fixed by removing page-owned engine/panel scripts from the routed test response. Production guards and manifest permissions were unchanged for these harness corrections. Screenshots remain local and ignored.
 
 The selected batch is published as [open PR 1](https://github.com/DarkKnight6499/application_pipeline_extension/pull/1). It is not merged. All four selected high findings are repaired; remaining probe findings and unverified external/live acceptance limits are retained above.
+
+## Follow-up extension validation, October 3, 2026
+
+Author: Yazad Madan. User authorization covers extending this extension and additional subagent probes, within Workday and Greenhouse.
+
+C5-01 remained reproducible: ARIA-hidden options and hidden ancestors overridden by CSS were clicked. Six new regressions failed before repair. Semantic visibility and final target checks now reject these cases; all 12 listbox tests pass in isolated Edge. Lazy creation and closed-popup inventory remain passing. Structural description does not click or expose answer values. Remote ATS behavior remains unverified.

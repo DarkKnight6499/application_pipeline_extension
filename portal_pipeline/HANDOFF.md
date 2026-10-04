@@ -101,3 +101,9 @@ The loaded-extension trial uses an explicitly fabricated helper session and atta
 Trial harness failures were corrected without weakening production guards: string-based Playwright waiting hit extension CSP, an overbroad network filter blocked extension scripts, appended fixture controls duplicated IDs, and a page-world assertion initially observed the fixture's deliberately loaded engine. Earlier failure screenshots are retained locally. Remaining probe items are deferred outside selected items 1-5. Real external audit/build and live employer compatibility remain unverified. Publish the reviewed branch as an unmerged PR; do not merge or submit an application.
 
 Publication complete: [PR 1](https://github.com/DarkKnight6499/application_pipeline_extension/pull/1) is open from `fix/probe-safety-1-5` to `main`. Only the fix branch was pushed; main remains at inspected baseline `de2e51b5e424634d2be66a32bcfa5627f5e1fbef`. The next task is human PR review. No merge, employer action, or application submission occurred.
+
+## Follow-up extension phases, October 3, 2026
+
+Author: Yazad Madan. The user requested further probes with subagents and confirmed extension of the existing application-filling extension. Three independent lanes reproduced gaps on `a35cc5e14e3025c2770fecddab7beda76ff0aa37`. Work continues on stacked branch `feat/followup-inspection-safety`, preserving the unmerged first PR.
+
+C5-01 is repaired: listbox visibility respects semantic hidden ancestors, and the actual chosen node is revalidated immediately before clicking. Closed-popup inventory and lazy creation remain supported. Twelve synthetic Edge listbox tests pass, after six failing regressions. Inspection description now includes popup presence, expanded state, and whether choices were observed, without opening a popup. Existing 16 engine tests also pass. No live ATS compatibility is established.
