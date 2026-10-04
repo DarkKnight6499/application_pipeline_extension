@@ -11,6 +11,7 @@ import answer_sheet
 
 # Phenom test configuration
 ADAPTER_SCRIPT = HERE / "extension" / "adapters" / "phenom.js"
+PROGRESS_SCRIPT = HERE / "extension" / "progress.js"
 PHENOM_DIR = PAGES / "phenom"
 MANIFEST = PHENOM_DIR / "manifest.json"
 MARSH_URL = "https://careers.marsh.com/synthetic/apply"
@@ -21,7 +22,7 @@ INJECTION_FILES = ["popup.js", "review.js", "popup.html", "review.html"]
 GATE_IFRAME = '<iframe title="reCAPTCHA" src="https://www.google.com/recaptcha/api2/anchor?synthetic=1"></iframe>'
 GATE_WIDGET = '<div class="g-recaptcha" data-sitekey="synthetic"></div>'
 HCAPTCHA_WIDGET = '<iframe title="hCaptcha" src="https://hcaptcha.com/synthetic"></iframe>'
-TURNSTILE_WIDGET = '<div class="cf-turnstile"></div>'
+TURNSTILE_WIDGET = '<div class="cf-turnstile" style="width:120px;height:50px"></div>'
 FIRST_ID = "[id='name.first']"
 LAST_ID = "[id='name.last']"
 ADAPTER_CALL = "PortalAdapters.forLocation(location.href)"
@@ -34,8 +35,9 @@ def page(name):
 
 class PhenomBase(ReplayBrowserTest):
     def open_markup(self, markup, url=MARSH_URL):
-        super().open_markup(markup, url)
+        super().open_markup('<style>#guard-submit{display:none}</style>' + markup, url)
         self.page.add_script_tag(path=str(ADAPTER_SCRIPT))
+        self.page.add_script_tag(path=str(PROGRESS_SCRIPT))
         self.page.evaluate("globalThis.anyClicks = 0; document.addEventListener('click', () => anyClicks++, true)")
 
     def by_key(self, key):
@@ -136,6 +138,19 @@ class PublicPhenomTests(PhenomBase):
                 adapter = self.page.evaluate(f"""() => {{const a = {ADAPTER_CALL}; return {{review: a.detectFinalReview(), next: a.nextStep()}};}}""")
                 self.assertTrue(adapter["review"]["final"])
                 self.assertEqual(adapter["next"]["kind"], "final_review")
+                self.assertEqual(self.page.evaluate(COUNTERS), [0, 0, 0])
+
+    def test_phenom_progress_denials_and_default_off(self):
+        for control in ('<button type="button">Next</button><button type="button">Certify</button>', '<button type="submit">Next</button>'):
+            with self.subTest(control=control):
+                markup = page("page_1.html").replace('<button type="button" id="next">Next</button>',
+                    control)
+                self.open_markup(markup)
+                next_step = self.page.evaluate(f"{ADAPTER_CALL}.nextStep()")
+                self.assertNotEqual(next_step["kind"], "next")
+                self.assertFalse(self.page.evaluate("PortalProgress.settings.allowGuardedNext"))
+                result = self.page.evaluate(f"PortalProgress.guardedNext({ADAPTER_CALL})")
+                self.assertEqual(result["status"], "refused")
                 self.assertEqual(self.page.evaluate(COUNTERS), [0, 0, 0])
 
     def test_phenom_final_review_detected(self):

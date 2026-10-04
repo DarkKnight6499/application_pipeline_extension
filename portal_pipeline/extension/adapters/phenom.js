@@ -28,17 +28,22 @@
   }
 
   function detectFinalReview(doc = document) {
+    const shared = globalThis.PortalProgress?.detectFinalReview(doc);
     const info = stepInfo(doc), submit = buttons(doc).filter(node => SUBMIT_LABELS.test(labelOf(node)));
     const last = info.index !== null && info.index === info.total;
-    if (!submit.length) return {final: false, reasons: []};
-    const reasons = ["Submit control present"];
-    if (last) reasons.push(`Step ${info.index} of ${info.total}`);
-    if (/review/i.test(info.heading)) reasons.push("Review heading");
-    return {final: true, reasons};
+    const reasons = [...(shared?.reasons || [])];
+    if (submit.length) reasons.push("Submit control present");
+    if (submit.length && last) reasons.push(`Step ${info.index} of ${info.total}`);
+    if (submit.length && /review/i.test(info.heading)) reasons.push("Review heading");
+    return {final: reasons.length > 0, reasons};
   }
 
   function nextStep() {
-    if (detectFinalReview().final) return {kind: "final_review", label: labelOf(buttons(document).find(node => SUBMIT_LABELS.test(labelOf(node)))), ref: null};
+    if (detectFinalReview().final) {
+      const submit = buttons(document).find(node => SUBMIT_LABELS.test(labelOf(node)));
+      return {kind: "final_review", label: submit ? labelOf(submit) : "", ref: null};
+    }
+    if (globalThis.PortalProgress) return PortalProgress.nextStep(document);
     const next = buttons(document).filter(node => NEXT_LABELS.test(labelOf(node)));
     if (next.length > 1) return {kind: "ambiguous", label: "", ref: null};
     if (next.length === 1) return {kind: "next", label: labelOf(next[0]), ref: null};

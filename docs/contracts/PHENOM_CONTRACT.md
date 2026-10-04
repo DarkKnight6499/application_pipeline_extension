@@ -57,7 +57,7 @@ UNVERIFIED. The synthetic wizard has none. Work history and education pages, the
 
 ## Mode
 
-`fill`, as the plan sets for Phenom (rank 6). A CAPTCHA gate degrades a gated page to no writes. The adapter never clicks Next, Back or Submit; `nextStep` and `detectFinalReview` only report. Submit, Apply, Finish and Review and Submit take precedence over Next in the synthetic controls. Fill strategy is `native_setter`.
+`fill`, as the plan sets for Phenom (rank 6). A CAPTCHA gate degrades a gated page to no writes. The adapter never clicks Next, Back or Submit; `nextStep` and `detectFinalReview` only report. It composes the P7 progression denylist and default-off Next guard with Phenom's synthetic final-control markers. Submit, Apply, Finish and Review and Submit take precedence over Next in the synthetic controls. Fill strategy is `native_setter`.
 
 ## Open questions
 
