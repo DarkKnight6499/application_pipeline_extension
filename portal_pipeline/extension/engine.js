@@ -130,11 +130,20 @@
       element.getAttribute("data-automation-id"), element.closest("fieldset")?.querySelector("legend")?.textContent || ""].join("|");
   }
 
+  function protectedControl(element) {
+    const text = `${labelFor(element)} ${element.name || ""} ${element.id || ""} ${element.getAttribute("data-automation-id") || ""} ${element.closest("fieldset")?.querySelector("legend")?.textContent || ""}`;
+    return element.type === "password" || protectedTerms.test(text) || demographicTerms.test(text) || !!globalThis.PortalGreenhouse?.protectedField(element);
+  }
+
+  function radioMembers(element) {
+    return element.name ? [...document.querySelectorAll("input[type=radio]")].filter(item => item.name === element.name && item.form === element.form) : [element];
+  }
+
   function fingerprint(element) {
     const custom = element.getAttribute("role") === "combobox" && element.tagName !== "SELECT";
     const choices = custom ? globalThis.PortalListbox?.describe(element).options || []
       : element.tagName === "SELECT" ? [...element.options].map(option => [option.value, option.textContent.trim(), option.disabled])
-      : element.type === "radio" ? [...document.querySelectorAll("input[type=radio]")].filter(item => item.name === element.name && item.form === element.form).map(item => [item.value, labelFor(item), item.disabled]) : [];
+      : element.type === "radio" ? radioMembers(element).map(item => [item.value, controlIdentity(item), item.disabled]) : [];
     return [controlIdentity(element), JSON.stringify(choices),
       custom ? globalThis.PortalListbox?.identity(element) : ""].join("|");
   }
@@ -173,21 +182,20 @@
       const custom = element.getAttribute("role") === "combobox" && element.tagName !== "SELECT";
       const type = custom ? "combobox" : element.type || element.getAttribute("role") || element.tagName.toLowerCase();
       if (["hidden", "submit", "button", "reset", "image"].includes(type)) continue;
-      if (type === "radio" && element.name) {
-        if (seenRadio.has(element.name)) continue;
-        seenRadio.add(element.name);
+      if (type === "radio") {
+        if (seenRadio.has(element)) continue;
+        radioMembers(element).forEach(item => seenRadio.add(item));
       }
       let label = labelFor(element);
       let members = [element];
       if (type === "radio") {
-        members = [...document.querySelectorAll("input[type=radio]")].filter(item => item.name === element.name && visible(item));
+        members = radioMembers(element);
         label = element.closest("fieldset")?.querySelector("legend")?.textContent.trim() || element.getAttribute("aria-label") || element.name;
       }
       const identity = `${element.name || ""} ${element.id || ""} ${element.getAttribute("data-automation-id") || ""}`;
       const context = contextFor(element, contexts), record = records.get(context) || null;
       const section = record?.group || "contact";
-      const protectionText = `${label} ${identity} ${element.closest("fieldset")?.querySelector("legend")?.textContent || ""}`;
-      const blocked = element.type === "password" || protectedTerms.test(protectionText) || demographicTerms.test(protectionText) || !!globalThis.PortalGreenhouse?.protectedField(element);
+      const blocked = members.some(protectedControl);
       let key = blocked ? null : classify(label, identity, section);
       if (key?.includes(".")) {
         const [group, name] = key.split(".");
@@ -201,7 +209,7 @@
       const current = blocked ? "" : custom ? globalThis.PortalListbox?.read(element) ?? element.value ?? "" : type === "radio" ? members.find(item => item.checked)?.value || ""
         : type === "checkbox" ? element.checked : type === "file" ? [...element.files].map(file => file.name).join(", ") : element.value || "";
       const options = custom ? customInfo.options : element.tagName === "SELECT" ? [...element.options].map(option => ({value: option.value, label: option.textContent.trim(), disabled: option.disabled}))
-        : type === "radio" ? members.map(item => ({value: item.value, label: labelFor(item), disabled: item.disabled})) : [];
+        : type === "radio" ? members.map(item => ({value: item.value, label: labelFor(item), disabled: item.disabled || !visible(item)})) : [];
       const fact = key ? datePartFact(profile, key, element, options) : null;
       const field = {id, label, key, section: key?.split(".")[0] || section, type, current, options, record,
                      required: element.required || element.getAttribute("aria-required") === "true" || globalThis.PortalGreenhouse?.uploadGroup(element)?.getAttribute("aria-required") === "true",
@@ -212,7 +220,7 @@
                      proposal: fact?.value ?? "", source: record?.error || (record?.index === null ? "Choose a profile record for this row first." : fact?.source || "Manual answer required"),
                      status: blocked ? "manual_only" : !fact && type !== "file" ? "pending" : "prepared"};
       fields.push(field);
-      if (register) controls.set(id, {element, members, field, context, portalForm: globalThis.PortalGreenhouse?.formFor(element), contextIdentity: contextIdentity(context), fingerprint: fingerprint(element), identity: controlIdentity(element)});
+      if (register) controls.set(id, {element, members, field, context, radioForm: element.form, portalForm: globalThis.PortalGreenhouse?.formFor(element), contextIdentity: contextIdentity(context), fingerprint: fingerprint(element), identity: controlIdentity(element)});
     }
     return fields;
   }
@@ -307,6 +315,8 @@
           expected = option.value;
           if (field.type === "radio") {
             const target = members.find(item => item.value === option.value);
+            if (element.form !== control.radioForm || !radioMembers(element).includes(target)) throw new Error("The radio group changed. Rescan before filling.");
+            if (members.some(protectedControl)) throw new Error("This radio group is manual only.");
             if (!target?.isConnected || !visible(target) || target.disabled) throw new Error("The selected radio option is unavailable. Rescan before filling.");
             Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "checked").set.call(target, true);
             target.dispatchEvent(new Event("input", {bubbles: true}));

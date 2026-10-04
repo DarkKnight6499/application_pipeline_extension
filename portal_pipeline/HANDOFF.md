@@ -79,3 +79,9 @@ Six read-only lanes inspected baseline `de2e51b5e424634d2be66a32bcfa5627f5e1fbef
 Current public-checkout discovery produced three import errors and zero actual tests executed. All 81 test methods are blocked by the missing external workflow, recorded as SKIPPED-BY-ENVIRONMENT rather than passing. Default Playwright Chromium is missing; independent synthetic probes used fresh headless Edge contexts. Existing historical 81-pass results are retained and were not reproduced here. Real source data was not read or copied.
 
 Only probe documentation changed on `probe/2026-10-03`. Production code remains unchanged and every finding remains open. The next task is user selection from the report's ranked fix list. The supplied Phase B checkpoint requires that selection before production edits. After selection, write failing synthetic regressions first, make separate serial engine fixes, run available tests with honest integration skips, update these notes, and open an unmerged pull request. No live employer forms, accounts, submissions, or automatic push are authorized by this checkpoint.
+
+## Selected fixes, October 3, 2026
+
+The user selected recommended items 1-5 and requested a trial. Implementation is on `fix/probe-safety-1-5`; the trial uses synthetic data and isolated browser contexts only.
+
+E-01 is fixed: radio membership and deduplication use form ownership, every member is checked for protection, and changed membership is rejected before writing. Three new regressions failed before the fix; all four radio tests now pass using explicit `PORTAL_TEST_BROWSER=msedge`. Each test checks an untouched field, signature, certification, and zero submission clicks/events. The independent browser harness has no private workflow dependency. Live employer behavior and the full workflow suite remain unverified.
