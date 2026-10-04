@@ -1,0 +1,20 @@
+{"cases": [
+  {"name": "generic_page_1", "portal": "generic", "adapter": "generic", "pages": ["generic/three_page/page_1.html"], "url": "https://other.example.invalid/apply",
+   "expect": {"fields": 4, "required": 3, "keys": ["email", "first_name", "last_name", "phone"], "human_gate": null, "final_review": false, "next_kind": "none"},
+   "fill": [{"key": "first_name", "value": "Synthetic", "selector": "#first", "status": "filled", "after": "Synthetic"}]},
+  {"name": "generic_page_2", "portal": "generic", "adapter": "generic", "pages": ["generic/three_page/page_2.html"], "url": "https://other.example.invalid/apply",
+   "expect": {"fields": 2, "required": 0, "keys": ["authorized_us"], "human_gate": null, "final_review": false, "next_kind": "none"}},
+  {"name": "generic_page_3", "portal": "generic", "adapter": "generic", "pages": ["generic/three_page/page_3.html"], "url": "https://other.example.invalid/apply",
+   "expect": {"fields": 0, "required": 0, "keys": [], "human_gate": null, "final_review": false, "next_kind": "none"}},
+  {"name": "greenhouse_like", "portal": "greenhouse", "adapter": "greenhouse", "pages": ["greenhouse/application.html"], "url": "https://job-boards.greenhouse.io/synthetic/jobs/1",
+   "expect": {"fields": 5, "required": 3, "keys": ["email", "first_name", "last_name", "linkedin", "phone"], "human_gate": null, "final_review": false, "next_kind": "none"}},
+  {"name": "workday_like", "portal": "workday", "adapter": "workday", "pages": ["workday/page_1.html"], "url": "https://synthetic.myworkdayjobs.com/x",
+   "expect": {"fields": 5, "required": 3, "keys": ["email", "first_name", "last_name", "phone", "sponsorship_now"], "human_gate": null, "final_review": false, "next_kind": "none"}},
+  {"name": "hcaptcha_gate", "portal": "generic", "adapter": "generic", "pages": ["captcha/hcaptcha.html"], "url": "https://other.example.invalid/apply",
+   "expect": {"fields": 1, "required": 0, "keys": ["first_name"], "human_gate": "captcha", "final_review": false, "next_kind": "none"},
+   "fill": [{"key": "first_name", "value": "Synthetic", "selector": "#first", "status": "blocked_by_human_gate", "after": ""}]},
+  {"name": "password_with_fields", "portal": "generic", "adapter": "generic", "pages": ["password/password_and_fields.html"], "url": "https://other.example.invalid/apply",
+   "expect": {"fields": 3, "required": 0, "keys": ["email", "first_name"], "human_gate": null, "final_review": false, "next_kind": "none"},
+   "fill": [{"key": "first_name", "value": "Synthetic", "selector": "#first", "status": "filled", "after": "Synthetic"}],
+   "untouched": [{"selector": "#secret", "value": "SYNTHETIC_SECRET"}]}
+]}
