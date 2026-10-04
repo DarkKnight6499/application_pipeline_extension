@@ -65,3 +65,5 @@ Low findings cover Rescan host-policy inconsistency, caller-supplied sandbox pla
 ## Selected-fix validation, October 3, 2026
 
 The user selected recommended items 1-5. E-01 regressions initially failed in three cases: merged cross-form groups, selecting another form's attestation, and a protected member inside an ordinary group. Radio grouping now uses form ownership and validates every member's protection. All four independent synthetic radio tests pass, including a moved-member refusal. Untouched controls and submission counters remain unchanged. Real portal compatibility remains unverified.
+
+E-02 produced two failing regressions before repair: consent side effects continued into the next selected write, and changed password state was ignored. The baseline now includes registered protected controls and redacts their labels and values from error reports. All seven engine tests pass. A portal side effect can already have happened when detected; it is reported and later writes stop, without automatic rollback. Unscanned controls and delayed remote changes remain unverified.

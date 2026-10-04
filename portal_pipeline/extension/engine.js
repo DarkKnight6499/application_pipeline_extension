@@ -260,13 +260,14 @@
   async function fillSelected(selections, {overwrite = false, attachment = null} = {}) {
     const results = [];
     const selectedIds = new Set(selections.map(selection => selection.id));
-    const baseline = new Map([...controls].filter(([, control]) => !control.field.blocked).map(([id, control]) => [id, read(control)]));
+    const baseline = new Map([...controls].map(([id, control]) => [id, read(control)]));
     let aborted = false;
     const checkCollateral = () => {
-      const collateral = [...baseline].filter(([id, value]) => !selectedIds.has(id) && read(controls.get(id)) !== value);
+      const collateral = [...baseline].filter(([id, value]) => (!selectedIds.has(id) || controls.get(id).field.blocked) && read(controls.get(id)) !== value);
       if (collateral.length) {
         aborted = true;
-        throw new Error("An unselected field changed: " + collateral.map(([id]) => controls.get(id).field.label).join(", ") + ". Review the form manually.");
+        const labels = collateral.map(([id]) => controls.get(id).field.blocked ? "a protected field" : controls.get(id).field.label);
+        throw new Error("An unselected field changed: " + labels.join(", ") + ". Review the form manually.");
       }
     };
     const checkHistory = control => {
