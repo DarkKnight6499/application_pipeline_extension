@@ -372,7 +372,9 @@
     }
   }
 
-  async function fillSelected(selections, {overwrite = false, attachment = null} = {}) {
+  async function fillSelected(selections, {overwrite = false, attachment = null, manualIds = []} = {}) {
+    if (!Array.isArray(manualIds) || manualIds.some(id => typeof id !== "string")) throw new Error("Manual field IDs must be an array of strings.");
+    const manualFields = new Set(manualIds);
     const adapter = route();
     if (adapter && adapter.fillStrategy !== "native_setter") throw new Error(`Fill strategy ${adapter.fillStrategy} is not enabled.`);
     const gate = adapter?.humanGate(document);
@@ -381,7 +383,7 @@
       return selections.map(selection => ({id: selection.id, ok: false, status: "blocked_by_human_gate", actual: null, reason, message: reason}));
     }
     const results = [];
-    const selectedIds = new Set(selections.map(selection => selection.id));
+    const selectedIds = new Set(selections.filter(selection => !manualFields.has(selection.id)).map(selection => selection.id));
     const baseline = new Map([...controls].map(([id, control]) => [id, read(control)]));
     const state = {aborted: false};
     const liveProtected = control => control.field.blocked || control.members.some(protectedControl);
@@ -420,6 +422,11 @@
     };
     const verify = (control, expected) => (adapter ? adapter.verify(control, expected) : verifyCore(control, expected));
     for (const selection of selections) {
+      if (manualFields.has(selection.id)) {
+        const reason = "Preflight: answer this yourself. This field is manual only.";
+        results.push({id: selection.id, ok: false, status: "refused", actual: null, reason, message: reason});
+        continue;
+      }
       const control = controls.get(selection.id);
       const guard = {selection, overwrite, attachment, state, checkCollateral, checkCurrent, verify};
       results.push(!adapter ? await fillField(control, selection, guard)
