@@ -139,11 +139,19 @@
     return element.name ? [...document.querySelectorAll("input[type=radio]")].filter(item => item.name === element.name && item.form === element.form) : [element];
   }
 
+  function unavailable(element) {
+    return element.matches(":disabled") || !!element.readOnly || !!element.closest('[aria-disabled="true"],[aria-readonly="true"]');
+  }
+
+  function optionDisabled(option) {
+    return unavailable(option) || !!option.closest("optgroup:disabled");
+  }
+
   function fingerprint(element) {
     const custom = element.getAttribute("role") === "combobox" && element.tagName !== "SELECT";
     const choices = custom ? globalThis.PortalListbox?.describe(element).options || []
-      : element.tagName === "SELECT" ? [...element.options].map(option => [option.value, option.textContent.trim(), option.disabled])
-      : element.type === "radio" ? radioMembers(element).map(item => [item.value, controlIdentity(item), item.disabled]) : [];
+      : element.tagName === "SELECT" ? [...element.options].map(option => [option.value, option.textContent.trim(), optionDisabled(option)])
+      : element.type === "radio" ? radioMembers(element).map(item => [item.value, controlIdentity(item), unavailable(item)]) : [];
     return [controlIdentity(element), JSON.stringify(choices),
       custom ? globalThis.PortalListbox?.identity(element) : ""].join("|");
   }
@@ -208,13 +216,14 @@
       const customInfo = custom ? globalThis.PortalListbox?.describe(element) || {supported: false, reason: "No custom dropdown adapter is installed.", options: []} : null;
       const current = blocked ? "" : custom ? globalThis.PortalListbox?.read(element) ?? element.value ?? "" : type === "radio" ? members.find(item => item.checked)?.value || ""
         : type === "checkbox" ? element.checked : type === "file" ? [...element.files].map(file => file.name).join(", ") : element.value || "";
-      const options = custom ? customInfo.options : element.tagName === "SELECT" ? [...element.options].map(option => ({value: option.value, label: option.textContent.trim(), disabled: option.disabled}))
-        : type === "radio" ? members.map(item => ({value: item.value, label: labelFor(item), disabled: item.disabled || !visible(item)})) : [];
+      const options = custom ? customInfo.options : element.tagName === "SELECT" ? [...element.options].map(option => ({value: option.value, label: option.textContent.trim(), disabled: optionDisabled(option)}))
+        : type === "radio" ? members.map(item => ({value: item.value, label: labelFor(item), disabled: unavailable(item) || !visible(item)})) : [];
       const fact = key ? datePartFact(profile, key, element, options) : null;
       const field = {id, label, key, section: key?.split(".")[0] || section, type, current, options, record,
                      required: element.required || element.getAttribute("aria-required") === "true" || globalThis.PortalGreenhouse?.uploadGroup(element)?.getAttribute("aria-required") === "true",
-                     blocked, disabled: !!(element.disabled || element.readOnly || element.getAttribute("aria-disabled") === "true" || element.getAttribute("aria-readonly") === "true"),
+                     blocked, disabled: unavailable(element),
                      adapter: customInfo?.supported ? "aria-listbox" : null, manual_reason: customInfo?.reason || "",
+                     dropdown_state: customInfo?.dropdown_state || null,
                      structure: {tag: element.tagName.toLowerCase(), name: element.name || "", automation_id: element.getAttribute("data-automation-id") || "",
                        dom_id: element.id, role: element.getAttribute("role") || "", controls: element.getAttribute("aria-controls") || "", popup: element.getAttribute("aria-haspopup") || ""},
                      proposal: fact?.value ?? "", source: record?.error || (record?.index === null ? "Choose a profile record for this row first." : fact?.source || "Manual answer required"),
@@ -227,14 +236,21 @@
 
   function inspect() {
     const fields = scan({values: {}}, {register: false});
+    const outsidePanel = node => !node.closest("#portal-panel-host") && visible(node);
+    const frames = [...document.querySelectorAll("iframe")].filter(outsidePanel).length;
+    const shadowHosts = [...document.querySelectorAll("*")].filter(node => node.shadowRoot && outsidePanel(node)).length;
+    const spinbuttons = [...document.querySelectorAll('[role="spinbutton"]')].filter(node => !node.matches("input,select,textarea") && outsidePanel(node)).length;
+    const reasonCodes = [frames && "iframe_uninspected", shadowHosts && "open_shadow_uninspected", spinbuttons && "spinbutton_unsupported"].filter(Boolean);
     return {schema_version: 1, host: location.hostname, inspected_at: new Date().toISOString(),
       portal: globalThis.PortalGreenhouse?.active() ? "greenhouse" : "generic",
       portal_manual_reason: globalThis.PortalGreenhouse?.active() && !PortalGreenhouse.form() ? "No unique supported Greenhouse application form found. Inspect the employer page manually." : "",
       protected_fields_omitted: fields.filter(field => field.blocked).length,
+      coverage: {scope: "visible_light_dom_current_page", visible_iframes: frames, visible_open_shadow_hosts: shadowHosts,
+        unsupported_spinbuttons: spinbuttons, reason_codes: reasonCodes},
       fields: fields.filter(field => !field.blocked).map(field => ({label: field.label, type: field.type,
         required: field.required, disabled: field.disabled, section: field.section, adapter: field.adapter,
         record: field.record ? {id: field.record.id, group: field.record.group, label: field.record.label} : null,
-        manual_reason: field.manual_reason, option_count: field.options.length, structure: field.structure}))};
+        manual_reason: field.manual_reason, option_count: field.options.length, dropdown_state: field.dropdown_state, structure: field.structure}))};
   }
 
   function optionMatch(options, answer) {
@@ -284,7 +300,7 @@
       checkHistory(control);
       checkPortal(control);
       if (field.blocked || members.some(protectedControl)) throw new Error("This field is manual only.");
-      if (element.disabled || element.readOnly || element.getAttribute("aria-disabled") === "true" || element.getAttribute("aria-readonly") === "true") throw new Error("This field cannot be edited.");
+      if (unavailable(element)) throw new Error("This field cannot be edited.");
       const changed = field.type === "combobox" ? controlIdentity(element) !== control.identity : fingerprint(element) !== control.fingerprint;
       if (changed) throw new Error("Question or control identity changed. Rescan before filling.");
     };
@@ -324,14 +340,20 @@
           if (!option) throw new Error("No unique exact option matches the answer. Choose an available option.");
           expected = option.value;
           if (field.type === "radio") {
+            if (members.filter(item => item.value === option.value).length !== 1) throw new Error("The radio option value is ambiguous. Choose this answer manually.");
             const target = members.find(item => item.value === option.value);
             if (element.form !== control.nativeForm || !radioMembers(element).includes(target)) throw new Error("The radio group changed. Rescan before filling.");
             if (members.some(protectedControl)) throw new Error("This radio group is manual only.");
-            if (!target?.isConnected || !visible(target) || target.disabled) throw new Error("The selected radio option is unavailable. Rescan before filling.");
+            if (!target?.isConnected || !visible(target) || unavailable(target)) throw new Error("The selected radio option is unavailable. Rescan before filling.");
             Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "checked").set.call(target, true);
             target.dispatchEvent(new Event("input", {bubbles: true}));
             target.dispatchEvent(new Event("change", {bubbles: true}));
-          } else setNative(element, option.value);
+          } else {
+            if ([...element.options].filter(item => item.value === option.value).length !== 1) throw new Error("The native option value is ambiguous. Choose this answer manually.");
+            const target = [...element.options].find(item => item.value === option.value && item.textContent.trim() === option.label);
+            if (!target || optionDisabled(target)) throw new Error("The selected option is unavailable. Rescan before filling.");
+            setNative(element, option.value);
+          }
         } else if (field.type === "combobox") {
           if (!field.adapter || !globalThis.PortalListbox) throw new Error(field.manual_reason || "This custom dropdown requires manual review.");
           expected = await PortalListbox.choose(element, expected, () => {

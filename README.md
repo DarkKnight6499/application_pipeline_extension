@@ -45,6 +45,7 @@ The extension's persistent host permission covers only the local helper. Real ap
 
 - [Research and project plan](docs/PROJECT_PLAN.md)
 - [Development handoff](portal_pipeline/HANDOFF.md)
+- [Follow-up extension probes and safety improvements](docs/PROBE_FOLLOWUP_2026-10-03.md)
 - [Failures and limitations](docs/TRIAL_ERRORS.md)
 - [Greenhouse contract and evidence](docs/GREENHOUSE_CONTRACT.md)
 - [Original Greenhouse trial report](docs/trials/LEGACY_GREENHOUSE_TRIAL.md)
