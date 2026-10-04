@@ -157,6 +157,18 @@ class GreenhouseSelectTests(SyntheticBrowserTest):
         self.assertEqual(self.page.locator("#bee").input_value(), "")
         self.assertNotIn("honey-pot", json.dumps(self.page.evaluate("PortalEngine.inspect()")))
 
+    def test_survey_section_options_are_protected_by_their_container(self):
+        self.open_markup('<label>Full name<input id="n" name="name"></label>'
+                         '<div id="countrySurvey_abc"><ul data-qa="checkboxes"><li><label><input type="checkbox" id="w">White</label></li>'
+                         '<li><label><input type="checkbox" id="a">Asian</label></li></ul></div>')
+        fields = {field["structure"]["dom_id"]: field for field in self.scan(PROFILE_VALUES)}
+        self.assertFalse(fields["n"]["blocked"])
+        for name in ("w", "a"):
+            self.assertTrue(fields[name]["blocked"], name)
+        raw = json.dumps(self.page.evaluate("PortalEngine.inspect()"))
+        self.assertNotIn("White", raw)
+        self.assertNotIn("Asian", raw)
+
     def test_classification_corpus_is_negation_safe(self):
         rows = "".join(f'<label>{label}<select><option></option><option>Yes</option><option>No</option></select></label>' for label, _ in CLASSIFICATION_CORPUS)
         self.open_markup(rows)

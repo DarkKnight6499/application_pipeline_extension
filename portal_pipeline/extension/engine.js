@@ -156,11 +156,13 @@
   }
 
   // Bot traps that real forms hide from people; never fill or export them.
+  // Survey sections whose option labels (for example "White", "Asian") carry no demographic word of their own.
+  const demographicContainers = '[id^="countrySurvey_"],[data-qa*="demographic"],[data-qa*="survey"],[id*="demographic" i],[class*="demographic" i]';
   const honeypotTerms = /(honey.?pot|bee.?catcher|robots? only|do not enter if you are human|do not enter if you.?re human|leave (this )?(field )?(blank|empty))/i;
 
   function protectedControl(element) {
     const text = `${labelFor(element)} ${element.name || ""} ${element.id || ""} ${element.getAttribute("data-automation-id") || ""} ${element.closest("fieldset")?.querySelector("legend")?.textContent || ""}`;
-    return element.type === "password" || honeypotTerms.test(text) || protectedTerms.test(text) || demographicTerms.test(text) || !!globalThis.PortalGreenhouse?.protectedField(element);
+    return element.type === "password" || honeypotTerms.test(text) || !!element.closest(demographicContainers) || protectedTerms.test(text) || demographicTerms.test(text) || !!globalThis.PortalGreenhouse?.protectedField(element);
   }
 
   function radioMembers(element) {
