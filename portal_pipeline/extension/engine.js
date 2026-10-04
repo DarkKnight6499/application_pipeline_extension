@@ -114,7 +114,12 @@
     for (let node = element; node; node = node.parentElement) if (node.matches?.(scopes)) ancestors.add(node);
     const headings = [...document.querySelectorAll("h1,h2,h3,h4,h5,h6,[role=heading],legend")].filter(heading =>
       ancestors.has(heading.closest(scopes) || document.body) && !!(heading.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING));
-    return headings.at(-1)?.textContent || "";
+    const latest = headings.at(-1);
+    if (latest?.tagName === "LEGEND" && !globalThis.PortalClassifier?.hasAttestationText(latest.textContent)) {
+      const prior = headings.slice(0, -1).reverse().find(heading => heading.tagName !== "LEGEND" || globalThis.PortalClassifier?.hasAttestationText(heading.textContent));
+      if (prior && globalThis.PortalClassifier?.hasAttestationText(prior.textContent)) return prior.textContent;
+    }
+    return latest?.textContent || "";
   }
 
   function protectedControl(element) {
