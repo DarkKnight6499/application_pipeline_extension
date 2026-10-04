@@ -7,12 +7,24 @@
     ['iframe[src*="recaptcha"]', "captcha", "reCAPTCHA frame"],
     ['[class*="cf-turnstile"]', "captcha", "Turnstile widget"]
   ];
+  // Only a challenge a person can see blocks; hidden frames and the invisible reCAPTCHA badge do not.
+  function visibleChallenge(node) {
+    if (node.closest(".grecaptcha-badge")) return false;
+    for (let item = node; item; item = item.parentElement) {
+      const style = getComputedStyle(item);
+      if (item.hidden || style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+    }
+    const box = node.getBoundingClientRect(), view = node.ownerDocument.defaultView;
+    return box.width > 0 && box.height > 0 && box.right > 0 && box.bottom > 0 && box.left < view.innerWidth;
+  }
   const core = () => PortalEngine.core;
 
   const generic = {
     id: "generic", version: "1", hosts: [], mode: "fill", fillStrategy: "native_setter",
     humanGate(doc) {
-      for (const [selector, kind, evidence] of GATES) if (doc.querySelector(selector)) return {kind, evidence};
+      for (const [selector, kind, evidence] of GATES) {
+        for (const node of doc.querySelectorAll(selector)) if (visibleChallenge(node)) return {kind, evidence};
+      }
       return null;
     },
     scan: (profile, options) => core().scan(profile, options),
