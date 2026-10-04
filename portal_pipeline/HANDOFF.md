@@ -1,5 +1,9 @@
 # Portal development handoff
 
+## PR review update, October 3, 2026
+
+The three stacked PRs were reviewed together at PR #3 head `bd1a31fc4d826bebd571f64dc8397c7a4a6e052a` in a separate worktree. The source-enabled suite ran 168 tests: 160 passed, 5 failed, 1 errored, and 2 skipped. Hold merging until the confirmed annotated boolean format and two stale integration assertions are reconciled. No merge or external review comment occurred. See [the review report](../docs/PR_STACK_REVIEW_2026-10-03.md) for findings, revision IDs, and validation.
+
 Date: October 3, 2026.
 
 Current repository: `D:\Code\application_pipeline_extension`, remote `https://github.com/DarkKnight6499/application_pipeline_extension.git`, branch `main`. The user requested publication to this repository and commits after each completed phase. The initial export contains only portal code, research, and trial reports. It does not contain the private Resume Git history or candidate data.
