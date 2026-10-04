@@ -110,9 +110,10 @@
 
   function protectionHeading(element) {
     const scopes = "fieldset,section,[role=group],form";
-    const scope = element.closest(scopes) || document.body;
-    const headings = [...scope.querySelectorAll("h1,h2,h3,h4,h5,h6,[role=heading],legend")].filter(heading =>
-      (heading.closest(scopes) || document.body) === scope && !!(heading.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING));
+    const ancestors = new Set([document.body]);
+    for (let node = element; node; node = node.parentElement) if (node.matches?.(scopes)) ancestors.add(node);
+    const headings = [...document.querySelectorAll("h1,h2,h3,h4,h5,h6,[role=heading],legend")].filter(heading =>
+      ancestors.has(heading.closest(scopes) || document.body) && !!(heading.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING));
     return headings.at(-1)?.textContent || "";
   }
 
