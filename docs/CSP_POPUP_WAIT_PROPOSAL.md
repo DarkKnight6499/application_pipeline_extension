@@ -12,7 +12,7 @@ with an `unsafe-eval` error. The popup sets the correct status in `popup.js`
 after a successful `/api/config` response. Another inherited popup function
 wait has the same CSP exposure.
 
-Proposed inherited test change, pending approval to edit an existing test:
+Yazad approved the following inherited test changes on October 4, 2026. Both waits are now implemented; production CSP remains unchanged:
 
 ```diff
  import json

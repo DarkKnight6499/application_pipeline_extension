@@ -1,7 +1,7 @@
 ---
 author: Yazad Madan
 updated: 2026-10-04
-status: Main 2c981b8 includes PF5 and placeholder fixes; safety branch PUBLIC 264 OK with 2 skips, FULL 345 has 1 CSP harness error and 2 skips; test edits await approval
+status: Approved CSP repair and safety integration validated: FULL 346 and PUBLIC 264 OK with 2 skips each; session-profile and PF4 work under review
 ---
 
 # Status and next steps
@@ -13,6 +13,8 @@ This replaces the earlier probe reports and the two-prototype review. Their find
 A Manifest V3 extension and a local Python helper that review and fill only the fields the user selects. The human logs in, navigates and submits. The tool never submits, signs, attests, or handles passwords or CAPTCHAs. Sponsorship now and sponsorship in the future stay separate answers, and unknown answers stay pending.
 
 ## Done so far
+
+**Approved safety landing (October 4, 2026).** Yazad approved the exact two inherited CSP waits and five session-profile mock setup changes. The two popup waits now use locator assertions preserving their prefix/substring conditions and 30-second timeouts. Production CSP remains unchanged. The previously held manual-field, attestation, and first/repeated resume-upload guards are now validated with this harness repair. FULL 346 tests in 212.146 seconds and PUBLIC 264 tests in 153.942 seconds pass with two symlink-privilege skips each. JavaScript syntax, Python compilation, and diff checks pass. No live portal actions occurred. Session-profile implementation and PF4 synthetic coverage are separately under review.
 
 **Parallel safety integration held for harness approval (October 4, 2026).** Final validation at code commit dd92b4b: FULL 345 tests in 198.366 seconds has one inherited CSP harness error and two symlink skips. The isolated case failed again after an earlier isolated pass. PUBLIC 264 tests in 148.794 seconds passes with two skips. JSCHECK, PYCHECK and diff checks pass. No production safety rule was weakened, no inherited test was edited, and no live portal actions occurred. The completed code and failure evidence are saved on integration/validated-portal-phases, held off main until the inherited test wait can be repaired with approval and FULL rerun successfully.
 
@@ -63,11 +65,9 @@ Also found:
 
 ## Way ahead
 
-Phase order lives in D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md. The user authorized parallel lower-tier agents on October 4, 2026 and direct pushes to main after validation. Sponsorship and P7 are landed. PF5 and placeholder fixes are landed at main 2c981b8. Manual-field, attestation, and upload hardening are saved separately because final FULL validation has an inherited CSP harness error. Session-profile review preparation is isolated pending explicit approval for existing synthetic mock setup edits. No live trial is authorized by the current handoff.
+Phase order lives in D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md. Yazad authorized parallel lower-tier agents and reviewed non-force pushes to main. The safety batch now passes FULL and PUBLIC after the approved CSP test-only repair. Existing assertion conditions and production CSP remain intact.
 
-The exact CSP test-only proposal and passing proof are saved on branch test/csp-safe-popup-wait at b39cb5f, in docs/CSP_POPUP_WAIT_PROPOSAL.md. The session-profile proposal and six regression cases are saved on fix/session-profile-review at c49d86c. No inherited tests have been changed.
-
-The next action is approval and repair of the inherited CSP wait so the safety integration can receive a passing FULL validation and land. Session-profile review also needs its listed mock setup approval, then PF4 Greenhouse completion follows. P9 cannot begin until PF1 and PF2 are merged and its approved pending-question corpus requirement is satisfied. Workday and Oracle live compatibility remain blocked on Inspect-only exports; synthetic success does not replace those exports.
+Next: integrate the approved session-profile repair and its cache/draft regressions, then PF4 Greenhouse synthetic coverage. Both are being reviewed in isolated worktrees. Workday and Oracle remain synthetic-only without post-login Inspect-only exports. P9 remains blocked until PF1/PF2 and its approved pending-question corpus prerequisite are complete. No live trial is authorized by the current handoff.
 
 ## Rules to keep when working here
 
