@@ -33,8 +33,8 @@ class Pipeline:
         if not (self.reference / "Resume_Content_Master.json").is_file():
             raise ValueError("The source must be an existing Resume repository.")
         self.data = data.resolve()
-        if self.data == self.source or self.data.is_relative_to(self.reference) or self.data.is_relative_to(self.source / "Applications"):
-            raise ValueError("Sandbox output must not use the source references or Applications folder.")
+        if self.data.is_relative_to(self.source) or self.source.is_relative_to(self.data):
+            raise ValueError("Sandbox output and source workflow directories must not overlap.")
         self.data.mkdir(parents=True, exist_ok=True)
         sys.path.insert(0, str(self.reference))
         import atomic_json
@@ -48,25 +48,44 @@ class Pipeline:
     def templates(self):
         return ["Resume_Content_Master.json"] + [p.name for p in sorted((self.reference / "Drafts").glob("*.json"))]
 
-    def folder(self, session_id):
+    def _contained(self, path, boundary):
+        resolved = path.resolve()
+        if not resolved.is_relative_to(boundary):
+            raise ValueError("Sandbox path escapes its allowed directory.")
+        return resolved
+
+    def _artifact(self, folder, filename):
+        directory = self._contained(folder, self.data)
+        target = self._contained(directory / filename, directory)
+        if target == directory:
+            raise ValueError("Sandbox artifact must be a file inside its directory.")
+        return target
+
+    def _session_directory(self, session_id):
         if not isinstance(session_id, str) or not re.fullmatch(r"[a-f0-9]{32}", session_id):
             raise ValueError("Invalid session identifier.")
-        folder = self.data / session_id
-        if not (folder / "session.json").is_file():
+        folder = self._contained(self.data / session_id, self.data)
+        if folder == self.data:
+            raise ValueError("Session directory must stay inside the sandbox.")
+        return folder
+
+    def folder(self, session_id):
+        folder = self._session_directory(session_id)
+        if not self._artifact(folder, "session.json").is_file():
             raise ValueError("Session not found.")
         return folder
 
     def current(self):
-        path = self.data / "current.json"
+        path = self._artifact(self.data, "current.json")
         if not path.exists():
             return None
         return self.read(json.loads(path.read_text(encoding="utf-8"))["id"])
 
     def read(self, session_id):
         folder = self.folder(session_id)
-        session = json.loads((folder / "session.json").read_text(encoding="utf-8"))
-        session["content"] = json.loads((folder / "resume_content.json").read_text(encoding="utf-8"))
-        keywords = folder / "keywords.json"
+        session = json.loads(self._artifact(folder, "session.json").read_text(encoding="utf-8"))
+        session["content"] = json.loads(self._artifact(folder, "resume_content.json").read_text(encoding="utf-8"))
+        keywords = self._artifact(folder, "keywords.json")
         if keywords.is_file():
             session["requirements"] = json.loads(keywords.read_text(encoding="utf-8"))
         return session
@@ -81,17 +100,17 @@ class Pipeline:
         portal_url = posting_url(portal_url) if portal_url.strip() else None
         context, content, document, evidence = inspect_application(self.source, selected)
         session_id = uuid.uuid4().hex
-        folder = self.data / session_id
+        folder = self._session_directory(session_id)
         folder.mkdir()
         session = {**context, **evidence, "id": session_id, "mode": "audited_import", "state": "built",
                    "tracker_url": context["url"], "url": portal_url or context["url"],
                    "upload_reviewed": False, "resume_sha256": hashlib.sha256(document).hexdigest(),
                    "checks": {"blocking": [], "advisory": ["Existing application audit passed. Read its report below.",
                        "Review wrapping and widows in Word before enabling attachment. Tracker status stays unchanged."]}}
-        (folder / "Yazad_Madan.docx").write_bytes(document)
-        self.atomic.write(folder / "resume_content.json", content)
-        self.atomic.write(folder / "session.json", session)
-        self.atomic.write(self.data / "current.json", {"id": session_id})
+        self._artifact(folder, "Yazad_Madan.docx").write_bytes(document)
+        self.atomic.write(self._artifact(folder, "resume_content.json"), content)
+        self.atomic.write(self._artifact(folder, "session.json"), session)
+        self.atomic.write(self._artifact(self.data, "current.json"), {"id": session_id})
         return self.read(session_id)
 
     def create(self, body):
@@ -106,19 +125,19 @@ class Pipeline:
             raise ValueError("Posting URL must use HTTP or HTTPS.")
         path = self.reference / template if template == "Resume_Content_Master.json" else self.reference / "Drafts" / template
         session_id = uuid.uuid4().hex
-        folder = self.data / session_id
+        folder = self._session_directory(session_id)
         folder.mkdir()
         content = json.loads(path.read_text(encoding="utf-8"))
         session = {"id": session_id, "company": body["company"].strip(), "role": body["role"].strip(),
                    "url": url, "template": template, "state": "draft", "upload_reviewed": False,
                    "application_id": None, "checks": None}
-        self.atomic.write(folder / "resume_content.json", content)
-        self.atomic.write(folder / "session.json", session)
-        (folder / "jd.txt").write_text(body["jd"], encoding="utf-8")
-        self.intake.save_jd_docx(body["jd"], session["company"], session["role"], str(folder / "JD.docx"))
-        self.atomic.write(folder / "keywords.json", {"company": session["company"], "role": session["role"],
+        self.atomic.write(self._artifact(folder, "resume_content.json"), content)
+        self.atomic.write(self._artifact(folder, "session.json"), session)
+        self._artifact(folder, "jd.txt").write_text(body["jd"], encoding="utf-8")
+        self.intake.save_jd_docx(body["jd"], session["company"], session["role"], str(self._artifact(folder, "JD.docx")))
+        self.atomic.write(self._artifact(folder, "keywords.json"), {"company": session["company"], "role": session["role"],
                                                      "keywords": self.intake.extract_keywords(body["jd"])})
-        self.atomic.write(self.data / "current.json", {"id": session_id})
+        self.atomic.write(self._artifact(self.data, "current.json"), {"id": session_id})
         return self.read(session_id)
 
     def build(self, session_id, body):
@@ -148,20 +167,20 @@ class Pipeline:
         session.pop("content", None)
         session.pop("requirements", None)
         session.update(state="draft", upload_reviewed=False, checks=None)
-        self.atomic.write(folder / "session.json", session)
-        self.atomic.write(folder / "resume_content.json", content)
-        keywords = json.loads((folder / "keywords.json").read_text(encoding="utf-8"))
+        self.atomic.write(self._artifact(folder, "session.json"), session)
+        self.atomic.write(self._artifact(folder, "resume_content.json"), content)
+        keywords = json.loads(self._artifact(folder, "keywords.json").read_text(encoding="utf-8"))
         keywords.update(resume_terms=terms, eligibility_requirements=eligibility,
                         requirements_reviewed=body.get("requirements_reviewed") is True)
-        self.atomic.write(folder / "keywords.json", keywords)
-        result = subprocess.run(["node", str(self.reference / "build_resume.js"), str(folder / "resume_content.json"),
-                                 str(folder / "Yazad_Madan.docx")], cwd=folder, capture_output=True, text=True, timeout=40)
+        self.atomic.write(self._artifact(folder, "keywords.json"), keywords)
+        result = subprocess.run(["node", str(self.reference / "build_resume.js"), str(self._artifact(folder, "resume_content.json")),
+                                 str(self._artifact(folder, "Yazad_Madan.docx"))], cwd=self._session_directory(session_id), capture_output=True, text=True, timeout=40)
         if result.returncode:
             raise ValueError("The existing builder rejected this content: " + result.stderr[-1600:])
-        docx = folder / "Yazad_Madan.docx"
+        docx = self._artifact(folder, "Yazad_Madan.docx")
         count, words = self.fit.count_bullets_and_words(str(docx))
         blocking, advisory = self.fit.evaluate_fit(count, words)
-        _, matched, missing, rate = self.ats.check_resume_terms(str(docx), str(folder / "keywords.json"))
+        _, matched, missing, rate = self.ats.check_resume_terms(str(docx), str(self._artifact(folder, "keywords.json")))
         if keywords["requirements_reviewed"] is not True:
             blocking.append("JD requirements have not been reviewed.")
         if body.get("content_reviewed") is not True:
@@ -180,8 +199,8 @@ class Pipeline:
                        content_reviewed=body.get("content_reviewed") is True,
                        checks={"bullets": count, "words": words, "terms_matched": matched,
                                "terms_missing": missing, "terms_rate": rate, "blocking": blocking, "advisory": advisory},
-                       resume_sha256=hashlib.sha256(docx.read_bytes()).hexdigest())
-        self.atomic.write(folder / "session.json", session)
+                       resume_sha256=hashlib.sha256(self._artifact(folder, "Yazad_Madan.docx").read_bytes()).hexdigest())
+        self.atomic.write(self._artifact(folder, "session.json"), session)
         return self.read(session_id)
 
     def approve_upload(self, session_id, body):
@@ -194,13 +213,13 @@ class Pipeline:
         session.pop("content", None)
         session.pop("requirements", None)
         session["upload_reviewed"] = True
-        self.atomic.write(folder / "session.json", session)
+        self.atomic.write(self._artifact(folder, "session.json"), session)
         return self.read(session_id)
 
     def resume(self, session_id, *, for_upload=False):
         folder = self.folder(session_id)
         session = self.read(session_id)
-        file = folder / "Yazad_Madan.docx"
+        file = self._artifact(folder, "Yazad_Madan.docx")
         if not file.is_file():
             raise ValueError("Build a resume first.")
         if for_upload and (not session["upload_reviewed"] or session["state"] != "built"):
@@ -211,7 +230,7 @@ class Pipeline:
             target = urlsplit(session.get("url", ""))
             if target.hostname != "127.0.0.1" or target.path != "/fixture":
                 raise ValueError("Sandbox documents attach only to the local fixture. Import an audited application for a real portal.")
-        data = file.read_bytes()
+        data = self._artifact(folder, "Yazad_Madan.docx").read_bytes()
         if for_upload and hashlib.sha256(data).hexdigest() != session.get("resume_sha256"):
             raise ValueError("The document changed after review. Rebuild and review it again.")
         return data
