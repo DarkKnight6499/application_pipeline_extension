@@ -13,7 +13,7 @@ HERE = Path(__file__).resolve().parents[1]
 BROWSER_CHANNEL = os.environ.get("PORTAL_TEST_BROWSER", "")
 HEADFUL = os.environ.get("PORTAL_TEST_HEADFUL") == "1"
 SYNTHETIC_URL = "https://safety-fixture.myworkdayjobs.com/application"
-ENGINE_SCRIPTS = ["adapters/registry.js", "adapters/generic.js", "adapters/aria-listbox.js", "adapters/greenhouse.js", "adapters/greenhouse-select.js", "engine.js"]
+ENGINE_SCRIPTS = ["adapters/registry.js", "adapters/generic.js", "adapters/aria-listbox.js", "adapters/greenhouse.js", "adapters/greenhouse-select.js", "classifier.js", "engine.js"]
 BOUNDARY_MARKUP = """
 <label>Untouched field<input id="guard-untouched" value="Keep untouched"></label>
 <label>Boundary signature<input id="guard-signature"></label>

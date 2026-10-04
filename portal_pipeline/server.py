@@ -301,7 +301,7 @@ def make_server(pipeline, port=8766, token=None):
                 files = {"/": HERE / "web/index.html", "/app.js": HERE / "web/app.js", "/style.css": HERE / "web/style.css",
                          "/fixture": HERE / "fixtures/workday.html", "/fixture.js": HERE / "fixtures/workday.js",
                          "/fixture-adapter.js": HERE / "extension/adapters/aria-listbox.js",
-                         "/fixture-engine.js": HERE / "extension/engine.js", "/fixture-panel.js": HERE / "extension/panel.js"}
+                         "/fixture-classifier.js": HERE / "extension/classifier.js", "/fixture-engine.js": HERE / "extension/engine.js", "/fixture-panel.js": HERE / "extension/panel.js"}
                 file = files.get(path)
                 if not file:
                     return self.send(404, {"error": "Not found."})

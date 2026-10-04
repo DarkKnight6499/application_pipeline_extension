@@ -93,10 +93,11 @@
         await sleep(POLL_MS);
       }
       if (!state) throw new Error("The dropdown menu did not open. Choose this answer manually.");
-      const hits = state.nodes.filter((node, index) => normalize(state.labels[index]) === wanted && node.getAttribute("aria-disabled") !== "true" && visible(node));
-      if (hits.length !== 1) throw new Error("No unique exact dropdown option matches the answer. Choose this answer manually.");
+      const candidates = state.nodes.map((node, index) => ({label: state.labels[index], value: state.labels[index], node, disabled: node.getAttribute("aria-disabled") === "true" || !visible(node)}));
+      const hit = globalThis.PortalClassifier.matchOption(candidates, answer);
+      if (!hit) throw new Error("No unique exact dropdown option matches the answer. Choose this answer manually.");
       assertCurrent();
-      const target = hits[0], label = target.textContent.trim();
+      const target = hit.node, label = target.textContent.trim();
       if (!target.isConnected || target.closest('[role="listbox"]') !== state.popup || target.closest("a,button,input,select,textarea")) throw new Error("The dropdown option was replaced. Rescan before filling.");
       target.click();
       const settle = performance.now() + SETTLE_TIMEOUT_MS;

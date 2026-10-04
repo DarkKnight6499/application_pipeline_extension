@@ -95,60 +95,8 @@
     });
   }
 
-  // Negation-safe work authorization and sponsorship intents; anything place-dependent or negated stays pending.
-  function eligibilityIntent(text) {
-    const sponsor = /\b(sponsor|sponsorship|visa|immigration support|work permit)\b/.test(text);
-    const needs = /\b(require|requires|need|needs|needing)\b/.test(text);
-    if (/\b(without|no need|do not need|don t need)\b/.test(text)) return null;
-    if (/\b(location s|stated location|selected|country where|country in which|in which you are applying|where this (role|job|position)|position is located|current location)\b/.test(text)) return null;
-    if (sponsor && needs) {
-      const now = /\b(now|currently|at present)\b/.test(text), future = /\b(future|ever|any point|going forward)\b/.test(text);
-      return now && future ? "sponsorship_now_or_future" : future ? "sponsorship_future" : now ? "sponsorship_now" : null;
-    }
-    const inUS = /\b(us|usa|u s|united states)\b/.test(text);
-    if (!sponsor && !needs && inUS && /\b(authori[sz]ed to (lawfully |legally )?work|eligible to work|work authori[sz]ed to work)\b/.test(text)) return "authorized_us";
-    return null;
-  }
-
-  function classify(label, identity, section) {
-    const aliases = {
-      first_name: ["first name", "legal first name", "given name"],
-      last_name: ["last name", "legal last name", "family name", "surname"],
-      full_name: ["full name", "legal name"], email: ["email", "email address", "e mail"],
-      phone: ["phone", "phone number", "mobile phone", "telephone"],
-      linkedin: ["linkedin", "linkedin profile", "linkedin url"], github: ["github", "github url", "github profile"],
-      city: ["city", "city of residence"], location: ["current location", "location of residence"],
-      authorized_us: ["are you authorized to work in the us", "are you legally authorized to work in the united states", "are you authorized to work in the united states"],
-      sponsorship_now: ["do you require sponsorship now", "do you currently require sponsorship", "do you require visa sponsorship now"],
-      sponsorship_future: ["will you require sponsorship in the future", "will you require visa sponsorship in the future", "do you require sponsorship in the future"],
-      citizenship: ["country of citizenship", "citizenship country", "nationality"],
-      visa_type: ["visa type"], relocation: ["are you willing to relocate", "open to relocation"],
-      salary: ["salary expectation", "salary expectations", "compensation expectation"],
-      available_from: ["available from", "earliest start date", "when are you available to start"],
-      job_source: ["how did you hear about this job", "how did you hear about us", "job source"]
-    };
-    const text = normalize(label);
-    const history = section === "employment" ? {
-      "employment.company": ["employer", "employer name", "company", "company name"],
-      "employment.title": ["job title", "role title", "position title"],
-      "employment.start_date": ["start date", "from date"], "employment.end_date": ["end date", "to date"],
-      "employment.start_month": ["start month", "from month"], "employment.start_year": ["start year", "from year"],
-      "employment.end_month": ["end month", "to month"], "employment.end_year": ["end year", "to year"],
-      "employment.description": ["job description", "responsibilities", "role description"],
-      "employment.location": ["location", "employment location"]
-    } : section === "education" ? {
-      "education.school": ["school", "school name", "university", "institution"],
-      "education.degree": ["degree", "degree earned"], "education.end_date": ["end date", "graduation date"],
-      "education.start_date": ["start date", "from date"], "education.location": ["location", "education location"],
-      "education.start_month": ["start month", "from month"], "education.start_year": ["start year", "from year"],
-      "education.end_month": ["end month", "graduation month", "to month"], "education.end_year": ["end year", "graduation year", "to year"]
-    } : {};
-    const scoped = ["employment", "education"].includes(section) ? history : aliases;
-    for (const [key, labels] of Object.entries(scoped)) {
-      if (labels.includes(text)) return key;
-    }
-    return scoped === aliases ? eligibilityIntent(text) : null;
-  }
+  // Classification and option matching live in classifier.js, loaded before this file.
+  const classify = (label, identity, section) => globalThis.PortalClassifier.classify(label, identity, section);
 
   function controlIdentity(element) {
     return [labelFor(element), element.type || element.getAttribute("role"), element.name, element.id,
@@ -244,8 +192,10 @@
       const identity = `${element.name || ""} ${element.id || ""} ${element.getAttribute("data-automation-id") || ""}`;
       const context = contextFor(element, contexts), record = records.get(context) || null;
       const section = record?.group || "contact";
-      const blocked = members.some(protectedControl);
+      let blocked = members.some(protectedControl);
       let key = blocked ? null : classify(label, identity, section);
+      const required = element.required || element.getAttribute("aria-required") === "true";
+      if (!blocked && type === "checkbox" && PortalClassifier.isAttestationCheckbox({type, label, key, required, checked: element.checked})) { blocked = true; key = null; }
       if (key?.includes(".")) {
         const [group, name] = key.split(".");
         key = Number.isInteger(record?.index) ? `${group}.${record.index}.${name}` : null;
@@ -294,14 +244,7 @@
         manual_reason: field.manual_reason, option_count: field.options.length, dropdown_state: field.dropdown_state, structure: field.structure}))};
   }
 
-  function optionMatch(options, answer) {
-    const wanted = answerKey(answer);
-    if (!wanted) return null;
-    const exact = options.filter(option => !option.disabled && (answerKey(option.label) === wanted || answerKey(option.value) === wanted));
-    if (exact.length === 1) return exact[0];
-    // Never use substring matching: "not authorized" must not match "authorized".
-    return null;
-  }
+  const optionMatch = (options, answer) => globalThis.PortalClassifier.matchOption(options, answer);
 
   function setNative(element, value) {
     const prototype = element.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype

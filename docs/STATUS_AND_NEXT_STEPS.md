@@ -1,7 +1,7 @@
 ---
 author: Yazad Madan
 updated: 2026-10-04
-status: Greenhouse dropdowns verified live on one public form, Workday and Oracle blocked on post-login structure
+status: P3 landed: shared classifier and honest option matcher; Greenhouse dropdowns verified live on one public form, Workday and Oracle blocked on post-login structure
 ---
 
 # Status and next steps

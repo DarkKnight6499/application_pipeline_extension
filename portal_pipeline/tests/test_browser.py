@@ -765,7 +765,7 @@ class BrowserTests(unittest.TestCase):
         url = "https://job-boards.greenhouse.io/synthetic/jobs/123"
         self.page.route(url, lambda route: route.fulfill(content_type="text/html", body=(HERE / "fixtures/greenhouse.html").read_text(encoding="utf-8")))
         self.page.goto(url)
-        for name in ["adapters/aria-listbox.js", "adapters/greenhouse.js", "adapters/greenhouse-select.js", "engine.js"]:
+        for name in ["adapters/aria-listbox.js", "adapters/greenhouse.js", "adapters/greenhouse-select.js", "classifier.js", "engine.js"]:
             self.page.add_script_tag(path=str(HERE / "extension" / name))
 
     def test_greenhouse_scopes_application_and_excludes_internal_and_survey_controls(self):
