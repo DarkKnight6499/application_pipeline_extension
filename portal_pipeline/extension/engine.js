@@ -6,6 +6,7 @@
   const normalize = value => String(value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   const answerKey = value => String(value ?? "").toLowerCase().replace(/\s+/g, " ").trim();
   let controls = new Map();
+  let registeredSurface = [];
   let filling = false;
   const recordIds = new WeakMap();
   const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -85,6 +86,15 @@
     return upload ? visible(upload) && !element.closest('[aria-hidden="true"],[hidden]') : visible(element);
   }
 
+  function visibleControls() {
+    return [...document.querySelectorAll("input,select,textarea,[role=combobox]")].filter(element => {
+      if (element.closest("#portal-panel-host") || !controlVisible(element)) return false;
+      if (globalThis.PortalGreenhouse?.active() && !PortalGreenhouse.formFor(element)) return false;
+      const type = element.getAttribute("role") === "combobox" && element.tagName !== "SELECT" ? "combobox" : element.type;
+      return !["hidden", "submit", "button", "reset", "image"].includes(type);
+    });
+  }
+
   function classify(label, identity, section) {
     const aliases = {
       first_name: ["first name", "legal first name", "given name"],
@@ -130,11 +140,28 @@
       element.getAttribute("data-automation-id"), element.closest("fieldset")?.querySelector("legend")?.textContent || ""].join("|");
   }
 
+  function protectedControl(element) {
+    const text = `${labelFor(element)} ${element.name || ""} ${element.id || ""} ${element.getAttribute("data-automation-id") || ""} ${element.closest("fieldset")?.querySelector("legend")?.textContent || ""}`;
+    return element.type === "password" || protectedTerms.test(text) || demographicTerms.test(text) || !!globalThis.PortalGreenhouse?.protectedField(element);
+  }
+
+  function radioMembers(element) {
+    return element.name ? [...document.querySelectorAll("input[type=radio]")].filter(item => item.name === element.name && item.form === element.form) : [element];
+  }
+
+  function unavailable(element) {
+    return element.matches(":disabled") || !!element.readOnly || !!element.closest('[aria-disabled="true"],[aria-readonly="true"]');
+  }
+
+  function optionDisabled(option) {
+    return unavailable(option) || !!option.closest("optgroup:disabled");
+  }
+
   function fingerprint(element) {
     const custom = element.getAttribute("role") === "combobox" && element.tagName !== "SELECT";
     const choices = custom ? globalThis.PortalListbox?.describe(element).options || []
-      : element.tagName === "SELECT" ? [...element.options].map(option => [option.value, option.textContent.trim(), option.disabled])
-      : element.type === "radio" ? [...document.querySelectorAll("input[type=radio]")].filter(item => item.name === element.name && item.form === element.form).map(item => [item.value, labelFor(item), item.disabled]) : [];
+      : element.tagName === "SELECT" ? [...element.options].map(option => [option.value, option.textContent.trim(), optionDisabled(option)])
+      : element.type === "radio" ? radioMembers(element).map(item => [item.value, controlIdentity(item), unavailable(item)]) : [];
     return [controlIdentity(element), JSON.stringify(choices),
       custom ? globalThis.PortalListbox?.identity(element) : ""].join("|");
   }
@@ -167,27 +194,26 @@
         record.index = null; record.error = "The same profile record is assigned to multiple visible rows. Choose different records or manual answers.";
       }
     });
-    for (const element of document.querySelectorAll("input, select, textarea, [role='combobox']")) {
-      if (element.closest("#portal-panel-host") || !controlVisible(element)) continue;
-      if (globalThis.PortalGreenhouse?.active() && !PortalGreenhouse.formFor(element)) continue;
+    const surface = visibleControls();
+    if (register) registeredSurface = surface;
+    for (const element of surface) {
       const custom = element.getAttribute("role") === "combobox" && element.tagName !== "SELECT";
       const type = custom ? "combobox" : element.type || element.getAttribute("role") || element.tagName.toLowerCase();
       if (["hidden", "submit", "button", "reset", "image"].includes(type)) continue;
-      if (type === "radio" && element.name) {
-        if (seenRadio.has(element.name)) continue;
-        seenRadio.add(element.name);
+      if (type === "radio") {
+        if (seenRadio.has(element)) continue;
+        radioMembers(element).forEach(item => seenRadio.add(item));
       }
       let label = labelFor(element);
       let members = [element];
       if (type === "radio") {
-        members = [...document.querySelectorAll("input[type=radio]")].filter(item => item.name === element.name && visible(item));
+        members = radioMembers(element);
         label = element.closest("fieldset")?.querySelector("legend")?.textContent.trim() || element.getAttribute("aria-label") || element.name;
       }
       const identity = `${element.name || ""} ${element.id || ""} ${element.getAttribute("data-automation-id") || ""}`;
       const context = contextFor(element, contexts), record = records.get(context) || null;
       const section = record?.group || "contact";
-      const protectionText = `${label} ${identity} ${element.closest("fieldset")?.querySelector("legend")?.textContent || ""}`;
-      const blocked = element.type === "password" || protectedTerms.test(protectionText) || demographicTerms.test(protectionText) || !!globalThis.PortalGreenhouse?.protectedField(element);
+      const blocked = members.some(protectedControl);
       let key = blocked ? null : classify(label, identity, section);
       if (key?.includes(".")) {
         const [group, name] = key.split(".");
@@ -200,33 +226,41 @@
       const customInfo = custom ? globalThis.PortalListbox?.describe(element) || {supported: false, reason: "No custom dropdown adapter is installed.", options: []} : null;
       const current = blocked ? "" : custom ? globalThis.PortalListbox?.read(element) ?? element.value ?? "" : type === "radio" ? members.find(item => item.checked)?.value || ""
         : type === "checkbox" ? element.checked : type === "file" ? [...element.files].map(file => file.name).join(", ") : element.value || "";
-      const options = custom ? customInfo.options : element.tagName === "SELECT" ? [...element.options].map(option => ({value: option.value, label: option.textContent.trim(), disabled: option.disabled}))
-        : type === "radio" ? members.map(item => ({value: item.value, label: labelFor(item), disabled: item.disabled})) : [];
+      const options = custom ? customInfo.options : element.tagName === "SELECT" ? [...element.options].map(option => ({value: option.value, label: option.textContent.trim(), disabled: optionDisabled(option)}))
+        : type === "radio" ? members.map(item => ({value: item.value, label: labelFor(item), disabled: unavailable(item) || !visible(item)})) : [];
       const fact = key ? datePartFact(profile, key, element, options) : null;
       const field = {id, label, key, section: key?.split(".")[0] || section, type, current, options, record,
                      required: element.required || element.getAttribute("aria-required") === "true" || globalThis.PortalGreenhouse?.uploadGroup(element)?.getAttribute("aria-required") === "true",
-                     blocked, disabled: !!(element.disabled || element.readOnly || element.getAttribute("aria-disabled") === "true" || element.getAttribute("aria-readonly") === "true"),
+                     blocked, disabled: unavailable(element),
                      adapter: customInfo?.supported ? "aria-listbox" : null, manual_reason: customInfo?.reason || "",
+                     dropdown_state: customInfo?.dropdown_state || null,
                      structure: {tag: element.tagName.toLowerCase(), name: element.name || "", automation_id: element.getAttribute("data-automation-id") || "",
                        dom_id: element.id, role: element.getAttribute("role") || "", controls: element.getAttribute("aria-controls") || "", popup: element.getAttribute("aria-haspopup") || ""},
                      proposal: fact?.value ?? "", source: record?.error || (record?.index === null ? "Choose a profile record for this row first." : fact?.source || "Manual answer required"),
                      status: blocked ? "manual_only" : !fact && type !== "file" ? "pending" : "prepared"};
       fields.push(field);
-      if (register) controls.set(id, {element, members, field, context, portalForm: globalThis.PortalGreenhouse?.formFor(element), contextIdentity: contextIdentity(context), fingerprint: fingerprint(element), identity: controlIdentity(element)});
+      if (register) controls.set(id, {element, members, field, context, nativeForm: element.form, portalForm: globalThis.PortalGreenhouse?.formFor(element), contextIdentity: contextIdentity(context), fingerprint: fingerprint(element), identity: controlIdentity(element)});
     }
     return fields;
   }
 
   function inspect() {
     const fields = scan({values: {}}, {register: false});
+    const outsidePanel = node => !node.closest("#portal-panel-host") && visible(node);
+    const frames = [...document.querySelectorAll("iframe")].filter(outsidePanel).length;
+    const shadowHosts = [...document.querySelectorAll("*")].filter(node => node.shadowRoot && outsidePanel(node)).length;
+    const spinbuttons = [...document.querySelectorAll('[role="spinbutton"]')].filter(node => !node.matches("input,select,textarea") && outsidePanel(node)).length;
+    const reasonCodes = [frames && "iframe_uninspected", shadowHosts && "open_shadow_uninspected", spinbuttons && "spinbutton_unsupported"].filter(Boolean);
     return {schema_version: 1, host: location.hostname, inspected_at: new Date().toISOString(),
       portal: globalThis.PortalGreenhouse?.active() ? "greenhouse" : "generic",
       portal_manual_reason: globalThis.PortalGreenhouse?.active() && !PortalGreenhouse.form() ? "No unique supported Greenhouse application form found. Inspect the employer page manually." : "",
       protected_fields_omitted: fields.filter(field => field.blocked).length,
+      coverage: {scope: "visible_light_dom_current_page", visible_iframes: frames, visible_open_shadow_hosts: shadowHosts,
+        unsupported_spinbuttons: spinbuttons, reason_codes: reasonCodes},
       fields: fields.filter(field => !field.blocked).map(field => ({label: field.label, type: field.type,
         required: field.required, disabled: field.disabled, section: field.section, adapter: field.adapter,
         record: field.record ? {id: field.record.id, group: field.record.group, label: field.record.label} : null,
-        manual_reason: field.manual_reason, option_count: field.options.length, structure: field.structure}))};
+        manual_reason: field.manual_reason, option_count: field.options.length, dropdown_state: field.dropdown_state, structure: field.structure}))};
   }
 
   function optionMatch(options, answer) {
@@ -252,13 +286,22 @@
   async function fillSelected(selections, {overwrite = false, attachment = null} = {}) {
     const results = [];
     const selectedIds = new Set(selections.map(selection => selection.id));
-    const baseline = new Map([...controls].filter(([, control]) => !control.field.blocked).map(([id, control]) => [id, read(control)]));
+    const baseline = new Map([...controls].map(([id, control]) => [id, read(control)]));
     let aborted = false;
+    const liveProtected = control => control.field.blocked || control.members.some(protectedControl);
     const checkCollateral = () => {
-      const collateral = [...baseline].filter(([id, value]) => !selectedIds.has(id) && read(controls.get(id)) !== value);
+      const surface = visibleControls();
+      const changedMembership = [...controls.values()].some(control => control.field.type === "radio" &&
+        (radioMembers(control.element).length !== control.members.length || radioMembers(control.element).some(item => !control.members.includes(item))));
+      if (surface.length !== registeredSurface.length || surface.some(element => !registeredSurface.includes(element)) || changedMembership) {
+        aborted = true;
+        throw new Error("The visible form structure changed. Stop and rescan before filling more fields.");
+      }
+      const collateral = [...baseline].filter(([id, value]) => (!selectedIds.has(id) || liveProtected(controls.get(id))) && read(controls.get(id)) !== value);
       if (collateral.length) {
         aborted = true;
-        throw new Error("An unselected field changed: " + collateral.map(([id]) => controls.get(id).field.label).join(", ") + ". Review the form manually.");
+        const labels = collateral.map(([id]) => liveProtected(controls.get(id)) ? "a protected field" : controls.get(id).field.label);
+        throw new Error("An unselected field changed: " + labels.join(", ") + ". Review the form manually.");
       }
     };
     const checkHistory = control => {
@@ -268,6 +311,17 @@
       if (globalThis.PortalGreenhouse?.active() && (!control.portalForm || PortalGreenhouse.formFor(control.element) !== control.portalForm)) throw new Error("The Greenhouse application form changed. Rescan before filling.");
       if (globalThis.PortalGreenhouse?.protectedField(control.element)) throw new Error("This field is manual only.");
     };
+    const checkCurrent = control => {
+      const {element, members, field} = control;
+      if (!element.isConnected || !controlVisible(element)) throw new Error("Field is no longer visible. Scan again.");
+      if (element.form !== control.nativeForm) throw new Error("The field's form changed. Rescan before filling.");
+      checkHistory(control);
+      checkPortal(control);
+      if (field.blocked || members.some(protectedControl)) throw new Error("This field is manual only.");
+      if (unavailable(element)) throw new Error("This field cannot be edited.");
+      const changed = field.type === "combobox" ? controlIdentity(element) !== control.identity : fingerprint(element) !== control.fingerprint;
+      if (changed) throw new Error("Question or control identity changed. Rescan before filling.");
+    };
     for (const selection of selections) {
       const control = controls.get(selection.id);
       let outcome;
@@ -275,13 +329,10 @@
         if (!control) throw new Error("Field changed. Scan the page again.");
         if (aborted) throw new Error("Filling stopped after an unexpected form change. Rescan and review.");
         const {element, members, field} = control;
-        if (!element.isConnected || !controlVisible(element)) throw new Error("Field is no longer visible. Scan again.");
-        checkPortal(control);
+        checkCollateral();
+        checkCurrent(control);
         if (fingerprint(element) !== control.fingerprint) throw new Error("Question or control identity changed. Rescan before filling.");
         if (field.record?.index === null) throw new Error(field.record.error || "Choose a profile record or manual answers for this row before filling.");
-        checkHistory(control);
-        if (field.blocked || protectedTerms.test(`${labelFor(element)} ${element.name || ""}`) || globalThis.PortalGreenhouse?.protectedField(element)) throw new Error("This field is manual only.");
-        if (element.disabled || element.readOnly) throw new Error("This field cannot be edited.");
         const current = field.type === "combobox" ? read(control) : field.type === "radio" ? members.find(item => item.checked)?.value || ""
           : field.type === "checkbox" ? element.checked : field.type === "file" ? element.files.length : element.value;
         if (!(selection.overwrite === true || overwrite) && current !== "" && current !== false && current !== 0) {
@@ -298,6 +349,8 @@
           if (hash !== attachment.sha256) throw new Error("Resume checksum does not match.");
           const transfer = new DataTransfer();
           transfer.items.add(new File([bytes], attachment.name, {type: attachment.mime}));
+          checkCollateral();
+          checkCurrent(control);
           element.files = transfer.files;
           element.dispatchEvent(new Event("change", {bubbles: true}));
           expected = attachment.name;
@@ -306,17 +359,25 @@
           if (!option) throw new Error("No unique exact option matches the answer. Choose an available option.");
           expected = option.value;
           if (field.type === "radio") {
+            if (members.filter(item => item.value === option.value).length !== 1) throw new Error("The radio option value is ambiguous. Choose this answer manually.");
             const target = members.find(item => item.value === option.value);
-            if (!target?.isConnected || !visible(target) || target.disabled) throw new Error("The selected radio option is unavailable. Rescan before filling.");
+            if (element.form !== control.nativeForm || !radioMembers(element).includes(target)) throw new Error("The radio group changed. Rescan before filling.");
+            if (members.some(protectedControl)) throw new Error("This radio group is manual only.");
+            if (!target?.isConnected || !visible(target) || unavailable(target)) throw new Error("The selected radio option is unavailable. Rescan before filling.");
             Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "checked").set.call(target, true);
             target.dispatchEvent(new Event("input", {bubbles: true}));
             target.dispatchEvent(new Event("change", {bubbles: true}));
-          } else setNative(element, option.value);
+          } else {
+            if ([...element.options].filter(item => item.value === option.value).length !== 1) throw new Error("The native option value is ambiguous. Choose this answer manually.");
+            const target = [...element.options].find(item => item.value === option.value && item.textContent.trim() === option.label);
+            if (!target || optionDisabled(target)) throw new Error("The selected option is unavailable. Rescan before filling.");
+            setNative(element, option.value);
+          }
         } else if (field.type === "combobox") {
           if (!field.adapter || !globalThis.PortalListbox) throw new Error(field.manual_reason || "This custom dropdown requires manual review.");
           expected = await PortalListbox.choose(element, expected, () => {
             checkCollateral();
-            checkHistory(control);
+            checkCurrent(control);
             if (controlIdentity(element) !== control.identity) throw new Error("The dropdown question changed while opening. Rescan before filling.");
           });
         } else if (field.type === "checkbox") {
@@ -329,8 +390,7 @@
         }
         await new Promise(resolve => setTimeout(resolve, 500));
         checkCollateral();
-        checkHistory(control);
-        checkPortal(control);
+        checkCurrent(control);
         const actual = field.type === "combobox" ? read(control) : field.type === "file" ? element.files[0]?.name : field.type === "radio" ? members.find(item => item.checked)?.value : element.value;
         if (actual !== expected) throw new Error("Portal did not retain the value. Review this field manually.");
         if (!element.isConnected) throw new Error("Portal replaced the field after filling. Scan again to verify.");

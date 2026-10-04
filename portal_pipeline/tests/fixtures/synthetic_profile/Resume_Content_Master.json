@@ -1,0 +1,12 @@
+{
+  "fixture_notice": "Fabricated candidate facts for tests only. Author: Yazad Madan.",
+  "header": {
+    "name": "Synthetic Candidate",
+    "contact": "candidate@example.invalid | 555-0100 | Example City, ZZ",
+    "linkedin": "https://example.invalid/synthetic-linkedin",
+    "github": "https://example.invalid/synthetic-github"
+  },
+  "experience": [],
+  "education": [],
+  "certifications": []
+}

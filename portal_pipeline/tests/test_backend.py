@@ -14,10 +14,11 @@ sys.path.insert(0, str(HERE))
 from portal_profile import hard_fact_errors, resolve_profile
 from server import Pipeline, make_server
 
-from test_support import workflow_source
+from test_support import INTEGRATION_SKIP_REASON, workflow_source
 SOURCE = workflow_source()
 
 
+@unittest.skipIf(SOURCE is None, INTEGRATION_SKIP_REASON)
 class BackendTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

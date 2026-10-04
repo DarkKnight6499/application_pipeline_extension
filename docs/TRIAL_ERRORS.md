@@ -44,3 +44,72 @@ Latest completed validation before Greenhouse development: 76 tests passed in 46
 ## Acceptance still pending
 
 DOM readback does not prove remote saving. A file input's filename does not prove remote upload completion. Neither Workday nor Greenhouse has a real employer application validated through final review. Final submission stays manual.
+
+## Independent synthetic probe, October 3, 2026
+
+Baseline: `de2e51b5e424634d2be66a32bcfa5627f5e1fbef`. Full evidence, reproductions, earlier-review status, and ranked proposed fixes are in [PROBE_REPORT_2026-10-03.md](PROBE_REPORT_2026-10-03.md). No production fix has been applied at this checkpoint.
+
+| Failure | Evidence | Fix and validation status | Remaining limit |
+| --- | --- | --- | --- |
+| Cross-form radio writes protected attestation | Synthetic same-name radios in separate forms; ordinary selected Yes checked protected second-form radio and reported filled. | Open, personally reproduced by coordinator. Proposed form/member binding regression and fix. | Selected-only and protected-field invariant violated. |
+| Protected collateral missed | Selected text input side effect checked unselected agreement; next selected write continued. | Open, personally reproduced. Proposed protected-state monitoring without disclosure. | No automatic rollback assumed safe. |
+| Unconfirmed answer promoted | Synthetic `Yes [CONFIRM]` became Yes and filled authorization select. | Open, personally reproduced. Proposed uncertainty-preserving parser and regression. | Unknown facts must remain pending. |
+| Upload guard stale across checksum await | Queued synthetic label change to protected question was observed at file assignment; result still filled. | Open, personally reproduced. Proposed immediate post-await guard revalidation. | A checksum validates bytes, not current question identity. |
+| ARIA-state and dropdown visibility gaps | Stale ARIA read-only input filled; ARIA-hidden option clicked. | Open, lane reproductions recorded. | Current native/ARIA availability needs consistent checks. |
+| Parsing fragility | Blank boilerplate consumed next line; contact length/reordering caused crash or wrong mapping. | Open, synthetic reproductions recorded. | Private actual source parsing was deliberately not checked. |
+| Public suite unavailable | Three module import errors, zero actual tests executed; inventory is 81 methods. | SKIPPED-BY-ENVIRONMENT, not passing. Proposed independent synthetic test setup. | External real audit/build and default Chromium unavailable. |
+| Unsupported surfaces omitted | Synthetic iframe, shadow-root, and spinbutton controls absent from inspection with no incomplete-surface reason. | Open, synthetic reproduction recorded. | Does not authorize new portal families or live probes. |
+
+Low findings cover Rescan host-policy inconsistency, caller-supplied sandbox placement, probable session reparse-point containment, and weak test cardinality assertions. No critical issue or employer-page-readable extension PII channel was established. Historical live limits and validation records above remain unchanged. Await the user's ranked-item selection before production fixes.
+
+## Selected-fix validation, October 3, 2026
+
+The user selected recommended items 1-5. E-01 regressions initially failed in three cases: merged cross-form groups, selecting another form's attestation, and a protected member inside an ordinary group. Radio grouping now uses form ownership and validates every member's protection. All four independent synthetic radio tests pass, including a moved-member refusal. Untouched controls and submission counters remain unchanged. Real portal compatibility remains unverified.
+
+E-02 produced two failing regressions before repair: consent side effects continued into the next selected write, and changed password state was ignored. The baseline now includes registered protected controls and redacts their labels and values from error reports. All seven engine tests pass. A portal side effect can already have happened when detected; it is reported and later writes stop, without automatic rollback. Unscanned controls and delayed remote changes remain unverified.
+
+E-04 regressions demonstrated protected-label, disabled-control, detached-node, and changed-form writes during checksum awaiting. The detached-node case previously reported failure after it had already received a file. Live guards now run after the await and before assignment, preventing all four writes. All 13 engine tests pass; checksum mismatch still leaves the input empty and valid synthetic bytes still attach. Native and ARIA editability checks share this guard. No remote employer upload or real document validation was performed.
+
+C3-01 fabricated profile tests failed on 13 subcases and raised one whitespace exception before repair. Unknown or unconfirmed text is now omitted, and only exact Yes/No values become eligibility booleans. All three profile tests and the browser pending-answer regression pass. Confirmed present/future sponsorship remains separate. Annotated eligibility requires manual clarification; the private source was not inspected. Contact-schema and general multiline parsing fixes remain outside the selected batch.
+
+L6-01's source-missing regression initially raised an import-time RuntimeError. Independent profile, HTTP boundary, engine, and loaded-extension trial tests now run on fabricated data. Explicitly configured bad sources still error; absent sources skip external integration. Combined result: 27 passed, 0 failed/errors, 81 skipped, 108 total in 25.677 seconds. This does not reproduce the historical 81 integration passes.
+
+The requested visible Edge browser trial passed two tests in 13.962 seconds: loaded-extension pairing/review/selected fill/custom dropdown/synthetic attachment/final protected review/inspection refusal, and synthetic Greenhouse filling/hidden upload/editable-dropdown refusal. Unselected fields, cover letters, protected survey, signatures, and attestation remained untouched. Submission counters stayed zero. The helper's session and attachment methods are explicitly fabricated stubs; genuine resume audit/build and remote upload acceptance were not tested.
+
+New trial harness failures and corrections are preserved here: Playwright string waiting violated extension CSP, fixed with a locator wait; its network filter accidentally blocked extension scripts, narrowed to allow only the test's localhost and extension origins; appended boundary controls duplicated fixture IDs, fixed with distinct guard IDs; and an isolation assertion initially saw the local fixture's own engine, fixed by removing page-owned engine/panel scripts from the routed test response. Production guards and manifest permissions were unchanged for these harness corrections. Screenshots remain local and ignored.
+
+The selected batch is published as [open PR 1](https://github.com/DarkKnight6499/application_pipeline_extension/pull/1). It is not merged. All four selected high findings are repaired; remaining probe findings and unverified external/live acceptance limits are retained above.
+
+## Follow-up extension validation, October 3, 2026
+
+Author: Yazad Madan. User authorization covers extending this extension and additional subagent probes, within Workday and Greenhouse.
+
+C5-01 remained reproducible: ARIA-hidden options and hidden ancestors overridden by CSS were clicked. Six new regressions failed before repair. Semantic visibility and final target checks now reject these cases; all 12 listbox tests pass in isolated Edge. Lazy creation and closed-popup inventory remain passing. Structural description does not click or expose answer values. Remote ATS behavior remains unverified.
+
+B-01 was reproduced with an unchanged loaded extension inspecting unpaired localhost. The old review failed the new rejection regression because inspection succeeded. Shared host validation now precedes injection on initialization and every Rescan. Both tests pass, including 18 URL cases and navigation refusal. A test harness argument error was corrected before meaningful red evidence. Actual browser-action permission acquisition remains unverified.
+
+Profile regressions produced 14 failed subcases and three errors before repairs. Blank answers consumed later labels; malformed contact crashed or misrouted facts; contradictory duplicates selected the last answer; uncertain master facts and reversed dates were proposed. Single-line parsing, conflict detection, guarded contact validation, shared uncertainty checks, and chronology rejection resolve those cases. Review additionally reproduced partial surname leakage from `[CONFIRM] Jane` and `Unknown Person`; the whole uncertain name is now suppressed. All 14 tests pass. No new pending-reason schema was introduced. External source compatibility is unverified.
+
+Native and coverage regressions initially produced five failed subcases and two missing-metadata errors. Effective disabled state, actual radio target availability, and optgroup availability now govern proposals and writes. Independent review caught duplicate select values selecting the opposite label while readback falsely passed; root also reproduced duplicate radio values. Both are now refused before writing. All nine native/inspection tests pass. Structural coverage warnings expose omitted surfaces without their contents or protected labels. Hidden/future pages and closed shadows remain uninspected.
+
+Root corrected two test assertions: panel text resides in its shadow root; the omitted-protection count is three because it includes the password and both boundary controls. Final result: 61 passed, 81 environment skips, 142 total, zero failures/errors in 46.816 seconds. Both visible Edge trials passed in 15.173 seconds; submission counters remained zero. Screenshots were inspected and remain local. Syntax/diff checks passed. See [follow-up evidence and deferred findings](PROBE_FOLLOWUP_2026-10-03.md).
+
+Follow-up is published as [open PR 2](https://github.com/DarkKnight6499/application_pipeline_extension/pull/2), stacked on PR 1. Neither is merged; main and employer applications remain unchanged.
+
+## Continued gap validation, October 3, 2026
+
+Author: Yazad Madan. Four dynamic protected-side-effect cases were reproduced after the follow-up batch. Cached protection exempted a newly protected selected value, stale radio members hid replacement state, and new/revealed consent controls were absent from monitoring. Five root regressions failed before repair, including a newly introduced control before filling. Live protection and visible/radio membership checks now stop subsequent writes and redact protected collateral. Five new tests and 16 existing engine tests pass. Reordering remains allowed; topology changes need Rescan. Already-triggered portal side effects are reported without rollback. No live forms or submissions were used.
+
+Independent review found a new filter regression: native button type was checked before its supported combobox role. A scan-count regression failed, then passed after role-first filtering was restored. All six dynamic tests pass. Twelve listbox tests and bound-row reorder/identity probes remain passing. Unsafe action dropdowns remain governed by the existing bounded adapter contract.
+
+L6-02/L6-03 mutation tests confirmed all three weaknesses: empty protected scans, history scans containing only two asserted dates, and truncated history results survived old assertions. New exact field/result coverage rejects each mutant; the unmutated synthetic fixture passes. Four standalone Edge tests pass in 23.943 seconds. Target methods are extracted without executing integration imports or private-source setup. This verifies those assertions, not the skipped external workflow suite.
+
+Duplicate required tracker headers overwrote company/role/link context and allowed first Status Applied to be replaced by second Status New. Conflicting ID columns also selected by one position while reporting a different mapped identity. Five duplicate-header subcases failed before required-header uniqueness checks; empty-workbook handling initially raised StopIteration. Named row selection and clear missing-header errors now pass all five public tests. Reordering and exact-ID selection remain sound. Only temporary fabricated workbooks were used.
+
+L2-01 was reproduced by writing a fabricated JD/session into a source Projects descendant. L2-02 is now verified rather than probable: a temporary Windows junction redirected actual session reads, resume bytes, and approval writes outside the sandbox. The junction itself was removed nonrecursively and its target survived. Six initial regression failures preceded path guards. Review reproduced a source nested under sandbox overlap; both ancestor directions are now rejected. Eight tests pass and two physical file-symlink tests skip for missing privilege. Portable resolve mocks verify per-artifact guard branches. Existing HTTP tests pass. Normal create/import/build tests use explicit fabricated workflow stubs; they do not validate genuine audits or builders. Hardlinks and concurrent local filesystem replacement remain outside this guarantee.
+
+Final continued discovery passed 84 tests and skipped 83, 167 total, no failures/errors in 75.783 seconds. Two skips require file-symlink privilege; the other 81 require external workflow. Visible Edge trial passed both tests in 16.963 seconds with no submissions. Syntax/diff checks passed. [Continued report](PROBE_CONTINUATION_2026-10-03.md) maps original findings to current repairs and preserves live/filesystem limits.
+
+Final instruction audit found that unrelated reference/tracker-looking paths still passed the overlap policy. Three fabricated `_Reference`, `Applications`, and `Applications.xlsx` destination cases failed before reserved path components were refused case-insensitively before mkdir. Nine path tests pass, two physical symlink tests skip, and four HTTP tests pass. This completes the named-directory portion of L2-01; ordinary external sandboxes remain supported.
+
+Post-audit suite: 168 total, 85 passed, 83 skips, zero failures/errors, 75.249 seconds. Review verified six mixed-case reserved destinations refused and four ordinary or similarly prefixed names remained usable. [PR 3](https://github.com/DarkKnight6499/application_pipeline_extension/pull/3) is open and unmerged, stacked on PR 2. No source/main/tracker changes or employer submissions occurred.

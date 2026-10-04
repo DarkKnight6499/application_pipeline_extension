@@ -15,6 +15,8 @@ Choose **Export field structure** before filling. Name each downloaded report fo
 
 The export omits entered and proposed answers, option text, protected controls, and URL query strings. It does not include HTML, cookies, passwords, or the pairing token. Review labels and identifiers before sharing because the employer can embed personal information there. Reports stay wherever the browser saves downloads; nothing is uploaded by this feature.
 
+Inspection is a snapshot of visible controls in the main document. Coverage counts visible frames, detectable open shadow hosts, and unsupported spinbuttons without reading their contents. Hidden sections, later pages, and closed shadows remain uninspected. If choices have not been observed, open the dropdown manually and Rescan. Inspection does not open dropdowns.
+
 For each page, record:
 
 | Item | Observation |

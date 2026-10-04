@@ -10,6 +10,14 @@ import sys
 from pathlib import Path
 from urllib.parse import urlsplit
 
+# Tracker column configuration
+APPLICATION_ID_COLUMN = "Application ID"
+COMPANY_COLUMN = "Company"
+ROLE_COLUMN = "Role Title"
+LINK_COLUMN = "Link"
+STATUS_COLUMN = "Status"
+REQUIRED_COLUMNS = {APPLICATION_ID_COLUMN, COMPANY_COLUMN, ROLE_COLUMN, LINK_COLUMN, STATUS_COLUMN}
+
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -28,24 +36,25 @@ def tracker_context(source, application_id):
     workbook = load_workbook(source / "Applications.xlsx", read_only=True, data_only=True)
     try:
         rows = workbook.active.iter_rows(values_only=True)
-        headers = next(rows)
-        required = {"Application ID", "Company", "Role Title", "Link", "Status"}
-        if not required.issubset(headers):
+        headers = next(rows, ())
+        if not REQUIRED_COLUMNS.issubset(headers):
             raise ValueError("The tracker is missing required application columns.")
-        index = headers.index("Application ID")
-        matches = [dict(zip(headers, row)) for row in rows if row[index] == application_id]
+        if any(headers.count(column) != 1 for column in REQUIRED_COLUMNS):
+            raise ValueError("Required tracker column names must be unique.")
+        named_rows = (dict(zip(headers, values)) for values in rows)
+        matches = [row for row in named_rows if row[APPLICATION_ID_COLUMN] == application_id]
     finally:
         workbook.close()
     if len(matches) != 1:
         raise ValueError("The application marker must match exactly one tracker row.")
     row = matches[0]
-    if row["Status"] not in {"New", "To Apply"}:
+    if row[STATUS_COLUMN] not in {"New", "To Apply"}:
         raise ValueError("Only New or To Apply applications can be imported. This prototype never changes tracker status.")
-    url = posting_url(row["Link"])
-    if not row["Company"] or not row["Role Title"]:
+    url = posting_url(row[LINK_COLUMN])
+    if not row[COMPANY_COLUMN] or not row[ROLE_COLUMN]:
         raise ValueError("The tracker row needs a company and role title.")
-    return {"application_id": application_id, "company": str(row["Company"]), "role": str(row["Role Title"]),
-            "url": url, "tracker_status": row["Status"]}
+    return {"application_id": application_id, "company": str(row[COMPANY_COLUMN]), "role": str(row[ROLE_COLUMN]),
+            "url": url, "tracker_status": row[STATUS_COLUMN]}
 
 
 def application_files(source, folder):

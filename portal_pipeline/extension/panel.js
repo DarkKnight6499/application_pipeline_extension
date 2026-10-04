@@ -46,7 +46,9 @@
       try {
         const report = await options.transport.inspect();
         status.textContent = `${report.host}: ${report.fields.length} visible, unprotected controls. Inspection only. No candidate profile loaded and no fields filled.`;
-        panel.append(element("p", "Export one structure report per page. Login and navigation stay manual. Reports omit entered answers and option text; review labels before sharing.", {class: "source"}));
+        panel.append(element("p", "This is a current-page snapshot of visible controls in the main document. Hidden sections, future pages, and closed shadow roots remain uninspected. Navigate manually and export each page. Reports omit entered answers and option text; review labels before sharing.", {class: "source"}));
+        const coverage = report.coverage;
+        if (coverage?.reason_codes.length) panel.append(element("p", `Incomplete inspection: ${coverage.visible_iframes} visible iframe(s), ${coverage.visible_open_shadow_hosts} visible open shadow host(s), and ${coverage.unsupported_spinbuttons} unsupported spinbutton(s). Inspect those surfaces manually.`, {class: "note"}));
         if (!report.fields.length) panel.append(element("p", "No application fields found. This may be a posting, login page, or unsupported form. Inspect the next application page after manual navigation.", {class: "note"}));
         if (report.portal_manual_reason) panel.append(element("p", report.portal_manual_reason, {class: "note"}));
         for (const field of report.fields) {
@@ -54,6 +56,7 @@
           card.append(element("h3", field.label || "Unlabelled control"));
           card.append(element("p", `${field.type}, ${field.section}${field.required ? ", required" : ""}${field.disabled ? ", disabled" : ""}. ${field.option_count} options.`, {class: "source"}));
           if (field.adapter) card.append(element("p", `Adapter: ${field.adapter}`, {class: "source"}));
+          if (field.dropdown_state && !field.dropdown_state.options_observed) card.append(element("p", "Choices have not been inspected. Open this dropdown manually and rescan to inspect its structure.", {class: "source"}));
           if (field.manual_reason) card.append(element("p", field.manual_reason, {class: "source"}));
           panel.append(card);
         }

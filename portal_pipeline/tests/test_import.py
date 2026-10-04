@@ -9,12 +9,13 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(HERE))
 from server import Pipeline
-from test_support import audited_fixture, workflow_source
+from test_support import INTEGRATION_SKIP_REASON, audited_fixture, workflow_source
 from openpyxl import load_workbook
 
 SOURCE = workflow_source()
 
 
+@unittest.skipIf(SOURCE is None, INTEGRATION_SKIP_REASON)
 class ImportTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

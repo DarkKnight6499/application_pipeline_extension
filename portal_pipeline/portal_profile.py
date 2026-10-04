@@ -5,6 +5,17 @@ import json
 import re
 from pathlib import Path
 
+# Answer validation configuration
+UNRESOLVED_ANSWER = re.compile(
+    r"\b(confirm|confirmation|unconfirmed|unknown|pending|tbd|tbc|unsure)\b|\?"
+    r"|\bnot\s+(?:yet\s+)?(?:specified|provided|known|confirmed|sure)\b"
+    r"|\bto\s+be\s+(?:determined|confirmed)\b|\[(?:verify|tailor)\]", re.I)
+BOOLEAN_ANSWER_KEYS = {"authorized_us", "sponsorship_now", "sponsorship_future", "relocation"}
+EMAIL_PATTERN = re.compile(r"[^\s@|]+@[^\s@|]+\.[^\s@|]+")
+PHONE_PATTERN = re.compile(r"\+?[\d().\s-]+(?:\s*(?:ext\.?|x)\s*\d+)?", re.I)
+MIN_PHONE_DIGITS = 7
+CONTACT_FIELD_NAMES = ("email", "phone", "location")
+
 
 def plain(value: str) -> str:
     return value.replace("**", "").replace("\u2014", ",").strip()
@@ -28,24 +39,49 @@ def resolve_profile(root: Path) -> dict:
     values = {}
 
     def add(key, value, source):
+        if isinstance(value, str):
+            value = value.strip()
+            if UNRESOLVED_ANSWER.search(value):
+                return
         if value is not None and value != "":
             values[key] = {"value": value, "source": source}
 
     header = master["header"]
-    name = header["name"].split(",")[0].strip().title().split()
-    contact = header["contact"].split("|")
+    raw_name = header.get("name", "")
+    name = [] if UNRESOLVED_ANSWER.search(raw_name) else raw_name.split(",")[0].strip().title().split()
+    segments = header.get("contact", "").split("|")
     source = "Resume_Content_Master.json: header"
-    add("first_name", name[0], source)
+    add("first_name", name[0] if name else None, source)
     add("last_name", " ".join(name[1:]), source)
     add("full_name", " ".join(name), source)
-    add("email", contact[0].strip(), source)
-    add("phone", contact[1].strip(), source)
-    add("location", contact[2].strip(), source)
-    add("city", contact[2].split(",")[0].strip(), source)
+    if len(segments) == len(CONTACT_FIELD_NAMES):
+        contact = dict(zip(CONTACT_FIELD_NAMES, (segment.strip() for segment in segments)))
+        email = contact["email"]
+        phone = contact["phone"]
+        location = contact["location"]
+        valid_contact = (EMAIL_PATTERN.fullmatch(email) and PHONE_PATTERN.fullmatch(phone)
+                         and sum(character.isdigit() for character in phone) >= MIN_PHONE_DIGITS
+                         and location and not EMAIL_PATTERN.fullmatch(location)
+                         and not PHONE_PATTERN.fullmatch(location)
+                         and not any(UNRESOLVED_ANSWER.search(value) for value in contact.values()))
+        if valid_contact:
+            for key, value in contact.items():
+                add(key, value, source)
+            add("city", location.split(",")[0].strip(), source)
     add("linkedin", header.get("linkedin"), source)
     add("github", header.get("github"), source)
 
-    answers = dict(re.findall(r"^- ([^:\n]+):\s*(.+)$", boiler, re.M))
+    answers = {}
+    conflicts = set()
+    for line in boiler.splitlines():
+        match = re.fullmatch(r"- ([^:]+):[ \t]*(.*)", line)
+        if not match:
+            continue
+        label, raw = match.groups()
+        value = plain(raw)
+        if label in answers and answers[label].casefold() != value.casefold():
+            conflicts.add(label)
+        answers[label] = value
     answer_map = {
         "Work authorized in US": "authorized_us",
         "Require sponsorship now": "sponsorship_now",
@@ -58,11 +94,17 @@ def resolve_profile(root: Path) -> dict:
         "Country of citizenship": "citizenship",
     }
     for label, key in answer_map.items():
+        if label in conflicts:
+            continue
         raw = answers.get(label)
         if raw:
             value = plain(raw)
-            if key in {"authorized_us", "sponsorship_now", "sponsorship_future", "relocation"}:
-                value = value.split()[0]
+            if not value or UNRESOLVED_ANSWER.search(value):
+                continue
+            if key in BOOLEAN_ANSWER_KEYS:
+                if value.lower() not in {"yes", "no"}:
+                    continue
+                value = value.title()
             add(key, value, f"Application_Boilerplate.md: {label}")
 
     descriptions = re.findall(r"^### (.+)\n(.+?)(?=\n---|\n##|\Z)", boiler, re.M | re.S)
@@ -89,6 +131,8 @@ def resolve_profile(root: Path) -> dict:
                     if found:
                         start, end = map(month, found.groups())
                         date_source = "Builder_Internals.md: non-overlapping application role dates"
+            if start and end and start > end:
+                start = end = None
             add(prefix + "start_date", start, date_source)
             add(prefix + "end_date", end, date_source)
             for heading, paragraph in descriptions:

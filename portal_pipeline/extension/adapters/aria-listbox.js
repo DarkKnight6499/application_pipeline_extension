@@ -2,7 +2,8 @@
 (() => {
   if (globalThis.PortalListbox) return;
   const normalize = value => String(value ?? "").toLowerCase().replace(/\s+/g, " ").trim();
-  const visible = node => node?.isConnected && !node.hidden && getComputedStyle(node).visibility !== "hidden" && node.getClientRects().length > 0;
+  const visible = node => node?.isConnected && !node.closest('[aria-hidden="true"],[hidden]')
+    && getComputedStyle(node).visibility !== "hidden" && node.getClientRects().length > 0;
   const disabled = node => node.disabled || node.getAttribute("aria-disabled") === "true" || !!node.closest('[aria-disabled="true"]');
   const optionLabel = node => (node.getAttribute("aria-label") || node.textContent).trim();
   const safeClick = node => {
@@ -32,8 +33,13 @@
   }
 
   function describe(element) {
-    try { return {supported: true, reason: "", options: contract(element).choices}; }
-    catch (error) { return {supported: false, reason: error.message, options: []}; }
+    try {
+      const state = contract(element);
+      return {supported: true, reason: "", options: state.choices, dropdown_state: {
+        popup_present: !!state.popup, expanded: element.getAttribute("aria-expanded") === "true",
+        options_observed: state.choices.length > 0}};
+    }
+    catch (error) { return {supported: false, reason: error.message, options: [], dropdown_state: null}; }
   }
 
   function read(element) {
@@ -73,9 +79,13 @@
     const matches = state.choices.map((choice, index) => ({choice, node: state.nodes[index]}))
       .filter(({choice, node}) => !choice.disabled && visible(node) && normalize(choice.label) === wanted);
     if (matches.length !== 1) throw new Error("No unique exact listbox option matches the answer. Choose this answer manually.");
-    assertCurrent();
+    const current = assertCurrent();
     const match = matches[0];
-    if (!match.node.isConnected || match.node.closest('[role="listbox"]') !== state.popup) throw new Error("The dropdown option was replaced. Rescan before filling.");
+    const currentIndex = current.nodes.indexOf(match.node);
+    if (current.popup !== state.popup || currentIndex < 0 || match.node.closest('[role="listbox"]') !== current.popup) throw new Error("The dropdown option was replaced. Rescan before filling.");
+    if (element.getAttribute("aria-expanded") !== "true" || !visible(current.popup)
+        || !visible(match.node) || current.choices[currentIndex].disabled
+        || normalize(optionLabel(match.node)) !== wanted) throw new Error("The dropdown option is no longer available. Rescan before filling.");
     match.node.click();
     return match.choice.label;
   }

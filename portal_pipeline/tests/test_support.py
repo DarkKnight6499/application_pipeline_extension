@@ -3,9 +3,16 @@ import os
 import shutil
 from pathlib import Path
 
+# Integration test configuration
+SOURCE_ENVIRONMENT = "PORTAL_SOURCE"
+INTEGRATION_SKIP_REASON = "SKIPPED-BY-ENVIRONMENT: set PORTAL_SOURCE for external workflow integration."
+
 
 def workflow_source():
-    source = Path(os.environ.get("PORTAL_SOURCE", Path(__file__).resolve().parents[2])).resolve()
+    configured = os.environ.get(SOURCE_ENVIRONMENT)
+    if not configured:
+        return None
+    source = Path(configured).resolve()
     if not (source / "_Reference/build_resume.js").is_file() or not (source / "node_modules/docx").is_dir():
         raise RuntimeError("Set PORTAL_SOURCE to the existing Resume checkout with its Node builder dependencies installed.")
     return source

@@ -1,3 +1,5 @@
-# Runtime uses the existing workflow's python-docx and openpyxl dependencies.
-# Browser tests were verified with this Playwright version.
+# Public discovery needs these imports without the private workflow.
 playwright==1.63.0
+python-docx==1.2.0
+openpyxl==3.1.5
+Pillow==12.3.0
