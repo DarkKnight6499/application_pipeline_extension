@@ -6,7 +6,9 @@
     return profile && typeof profile === "object" && !Array.isArray(profile)
       && profile.values && typeof profile.values === "object" && !Array.isArray(profile.values)
       && Object.values(profile.values).every(fact => fact && typeof fact === "object" && !Array.isArray(fact)
-        && Object.hasOwn(fact, "value") && fact.value !== undefined && fact.value !== null
+        && Object.hasOwn(fact, "value")
+        && (typeof fact.value === "string" || typeof fact.value === "boolean"
+          || (typeof fact.value === "number" && Number.isFinite(fact.value)))
         && typeof fact.source === "string" && fact.source.trim() !== ""
         && (fact.status === undefined || typeof fact.status === "string"));
   }
