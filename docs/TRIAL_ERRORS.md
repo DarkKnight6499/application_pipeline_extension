@@ -40,6 +40,7 @@ The original report is preserved in [LEGACY_GREENHOUSE_TRIAL.md](trials/LEGACY_G
 | Live browser unavailable during the latest session | Edge selection failed; inventory contained no browsers; automatic browser selection returned `No browser is available`. | No live DOM walkthrough occurred in this session. |
 | Test popup did not receive activeTab permission | Opening popup.html in a test tab does not reproduce clicking the browser extension action. The routed-host test uses an explicit temporary test-only host permission. | Production activeTab flow still needs a connected real browser. |
 | Shadow host inner_text returned an empty string | Browser assertions now read the panel element inside the shadow root. | This was a test assertion issue, not a missing review panel. |
+| Popup status wait failed under extension CSP | Replaced two inherited `wait_for_function` calls with locator text assertions after explicit approval. The synthetic pairing proof and both affected browser methods pass. | Test synchronization changed only. Production CSP and pairing behavior are unchanged. |
 
 Latest completed validation before Greenhouse development: 76 tests passed in 46.206 seconds, with JavaScript syntax checks passing. Backend tests confirmed source trackers and references were unchanged.
 
