@@ -5,6 +5,10 @@ import json
 import re
 from pathlib import Path
 
+# Answer validation configuration
+UNRESOLVED_ANSWER = re.compile(r"\b(confirm|confirmation|unconfirmed|unknown|pending|tbd|tbc|unsure)\b|\?", re.I)
+BOOLEAN_ANSWER_KEYS = {"authorized_us", "sponsorship_now", "sponsorship_future", "relocation"}
+
 
 def plain(value: str) -> str:
     return value.replace("**", "").replace("\u2014", ",").strip()
@@ -61,8 +65,12 @@ def resolve_profile(root: Path) -> dict:
         raw = answers.get(label)
         if raw:
             value = plain(raw)
-            if key in {"authorized_us", "sponsorship_now", "sponsorship_future", "relocation"}:
-                value = value.split()[0]
+            if not value or UNRESOLVED_ANSWER.search(value):
+                continue
+            if key in BOOLEAN_ANSWER_KEYS:
+                if value.lower() not in {"yes", "no"}:
+                    continue
+                value = value.title()
             add(key, value, f"Application_Boilerplate.md: {label}")
 
     descriptions = re.findall(r"^### (.+)\n(.+?)(?=\n---|\n##|\Z)", boiler, re.M | re.S)

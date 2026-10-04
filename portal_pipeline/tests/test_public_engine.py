@@ -1,19 +1,49 @@
 """Regression tests use only synthetic answers and isolated local pages."""
 import base64
 import hashlib
+import shutil
+import sys
+import tempfile
 import unittest
+from pathlib import Path
 
-from browser_test_support import SyntheticBrowserTest
+from browser_test_support import HERE, SyntheticBrowserTest
 
 # Synthetic answer configuration
 AUTHORIZATION_FACT = {"authorized_us": {"value": "Yes", "source": "Synthetic fixture"}}
+PROFILE_FIXTURE = Path(__file__).resolve().parent / "fixtures/synthetic_profile"
 ATTACHMENT_BYTES = b"\x01\x02\x03"
 ATTACHMENT = {"base64": base64.b64encode(ATTACHMENT_BYTES).decode(),
               "sha256": hashlib.sha256(ATTACHMENT_BYTES).hexdigest(),
               "name": "Synthetic_Resume.docx", "mime": "application/octet-stream"}
 
+sys.path.insert(0, str(HERE))
+from portal_profile import resolve_profile
+
 
 class PublicEngineTests(SyntheticBrowserTest):
+    def test_unconfirmed_source_stays_pending_in_browser(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            shutil.copytree(PROFILE_FIXTURE, root / "_Reference")
+            (root / "_Reference/Application_Boilerplate.md").write_text(
+                "- Work authorized in US: Yes [CONFIRM]\n- Start date: Unknown\n", encoding="utf-8")
+            profile = resolve_profile(root)
+        self.open_markup('''
+          <label>First name<input id="first"></label>
+          <label>Are you authorized to work in the United States?<select id="auth"><option value=""></option><option>Yes</option><option>No</option></select></label>
+          <label>Available from<input id="available"></label>
+        ''')
+        fields = self.scan(profile["values"])
+        unresolved = [field for field in fields if field["key"] in {"authorized_us", "available_from"}]
+        self.assertEqual(len(unresolved), 2)
+        self.assertTrue(all(field["status"] == "pending" and field["proposal"] == "" for field in unresolved))
+        first = next(field for field in fields if field["key"] == "first_name")
+        result = self.fill([{"id": first["id"], "value": first["proposal"]}])
+        self.assertEqual(result[0]["status"], "filled")
+        self.assertEqual(self.page.locator("#auth").input_value(), "")
+        self.assertEqual(self.page.locator("#available").input_value(), "")
+
     def upload_with_microtask(self, mutation):
         self.open_markup('<form id="original"><label id="upload-label">Resume<input id="upload" type="file"></label></form><form id="other"></form>')
         upload = next(field for field in self.scan() if field["type"] == "file")
