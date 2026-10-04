@@ -51,6 +51,10 @@ Latest completed validation before Greenhouse development: 76 tests passed in 46
 - Five new browser regressions and the extended loaded-extension inspection test pass. The full suite passed 81 tests in 50.944 seconds. JavaScript syntax checks passed.
 - Public HTML inspection and synthetic verification do not establish live persistence or upload completion. Detailed evidence and the next task are in [GREENHOUSE_CONTRACT.md](GREENHOUSE_CONTRACT.md).
 
+## PF4 Greenhouse completion, October 4, 2026
+
+Nine new synthetic Edge browser tests pass. A control replaced after scanning is refused as stale. An explicit rescan registers the replacement and permits selected filling. Country and city role=combobox controls without verified popup ownership stay manual. The remaining seven cases check routing, read-only scan, selected-only fill, overwrite-off preservation, CAPTCHA gating, final-review detection, and zero submit events. No production code, inherited test, live portal, or Resume workflow file changed. Live typeahead behavior, react-select popup behavior, remote persistence, and upload completion remain unverified.
+
 ## Acceptance still pending
 
 DOM readback does not prove remote saving. A file input's filename does not prove remote upload completion. Neither Workday nor Greenhouse has a real employer application validated through final review. Final submission stays manual.

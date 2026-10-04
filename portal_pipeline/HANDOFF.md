@@ -1,5 +1,11 @@
 # Portal development handoff
 
+## October 4, 2026: PF4 Greenhouse synthetic completion
+
+Author: Yazad Madan.
+
+Branch `feat/pf4-greenhouse-completion`, based on `a1f215f`. Added one new synthetic Edge test file with nine cases. Seven cover standard fill-mode boundaries. Stale react-select references fail closed after rerender and work after explicit rescan. Country and city typeahead remain manual without a verified popup contract. All nine targeted tests pass. No production code, existing tests, host permissions, Resume workflow files, tracker files, or candidate application data changed. No live portal was inspected. Popup ownership, typeahead option selection, remote persistence, and upload completion remain unverified.
+
 ## October 4, 2026: sponsorship toggle landing
 
 Author: Yazad Madan.
