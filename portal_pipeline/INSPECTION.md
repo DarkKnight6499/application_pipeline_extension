@@ -4,7 +4,7 @@ Use this checklist when Yazad selects an employer posting. The local fixtures pr
 
 ## Preparation
 
-1. Reload extension version `0.4.0` and refresh the application tab. Workday and Greenhouse are the current portal tracks.
+1. Reload the extension from the intended checkout and refresh the application tab. Workday and Greenhouse remain the primary portal tracks; registered Phenom hosts have synthetic-only support. Oracle cannot use this capture flow until a reviewed inspection access path exists. See `docs/EXPORT_CAPTURE_CHECKLIST.md` for current policy and report limits.
 2. Start with **Inspect page only** in the extension popup. Inspection does not require the local helper, pairing, a candidate profile, or an application import. It displays structural control details and exports reports without offering filling. Navigate manually and use Rescan for each page.
 3. Let Yazad sign in and handle MFA or CAPTCHA. Keep navigation and submission manual.
 4. When ready to validate filling, prepare the resume through the existing workflow and import its audited application folder. If its tracker URL is a job board link, supply the exact employer posting URL during import. Pair the extension, reopen it with **Scan current page**, and confirm the selected employer and role before any filling.

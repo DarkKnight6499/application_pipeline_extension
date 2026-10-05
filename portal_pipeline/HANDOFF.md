@@ -22,7 +22,7 @@ No live portal work occurred. The next task is P7 landing from `feat/p7-progress
 
 Date: October 3, 2026.
 
-Current repository: `D:\Code\application_pipeline_extension`, remote `https://github.com/DarkKnight6499/application_pipeline_extension.git`, branch `docs/p0-contracts` (docs only, cut from `origin/main` at `765e17b`; PRs 4 and 5 not yet merged). The user requested publication to this repository and commits after each completed phase. The initial export contains only portal code, research, and trial reports. It does not contain the private Resume Git history or candidate data.
+Historical repository checkpoint before consolidation: `D:\Code\application_pipeline_extension`, remote `https://github.com/DarkKnight6499/application_pipeline_extension.git`, branch `docs/p0-contracts` (docs only, cut from `origin/main` at `765e17b`; PRs 4 and 5 not yet merged). The user requested publication to this repository and commits after each completed phase. The initial export contains only portal code, research, and trial reports. It does not contain the private Resume Git history or candidate data.
 
 Provenance: the original prototype worktree is `D:\Code\Resume_portal_pipeline`, branch `feat/portal-pipeline`, baseline `1b7827d`. Leave that worktree, the independent `Resume_portal_trial` worktree, and unrelated files intact. Use `D:\Code\Resume` as an explicitly configured, read-only workflow source.
 
@@ -52,7 +52,7 @@ The initial portal priority remains unconfirmed. Workday is the development assu
 
 ## Next exact task
 
-Phase order lives in `D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md`. Next task: finish P0 (merge PRs 4 and 5, rerun the full suite on `main`, merge `docs/p0-contracts`), then P1 (adapter interface and registry). The walkthrough guidance below remains valid input for contracts under `docs/contracts/`.
+Phase order lives in `D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md`. P0 through P8, PF4, and synthetic PF5 are already integrated. Current work prepares PF1 Workday and PF2 Oracle against synthetic fixtures. Real compatibility requires reviewed structure exports. Oracle remains unrouted; application-scoped CAPTCHA downgrade persistence is still proposed. See the latest validation entry below and `docs/EXPORT_CAPTURE_CHECKLIST.md`. Current work stays uncommitted until Yazad requests commits and pushes.
 
 Connect a real browser and continue one employer-specific walkthrough at a time. Workday still needs a selected employer URL and real form inspection. Greenhouse has the public Justworks structural reference, but its editable dropdown and upload completion contracts need rendered browser observations. Use **Export field structure** and follow [INSPECTION.md](INSPECTION.md). Record real page behavior and final-review persistence without submitting. See [GREENHOUSE_CONTRACT.md](../docs/GREENHOUSE_CONTRACT.md) for that track's next exact control.
 
@@ -201,3 +201,15 @@ Author: Yazad Madan. Yazad explicitly approved both prepared test changes. The t
 Author: Yazad Madan. Three isolated parallel tasks completed: approved CSP test-only repairs, session-profile review persistence, and PF4 Greenhouse synthetic completion. Coordinator review added malformed scalar-value refusal and verified that a changed proposal resets edited answers, selection, and overwrite together. No inherited assertion was altered by the five approved mock setup repairs. Changed and legacy snapshots reset review choices; unchanged sourced proposals preserve human edits. Tailored drafts are displayed for review without automatic insertion or selection. Greenhouse stale controls remain refused until rescan; unsupported country/city typeahead stays manual.
 
 Final code at c3f8487 passed FULL 368 in 226.742 seconds and PUBLIC 286 in 170.509 seconds, each with two expected Windows file-symlink privilege skips. Replay 4 passed in 7.749 seconds; JSCHECK, PYCHECK, and diff checks pass. The old missing-folder mock exception no longer appears after the approved synthetic session-folder setup. Manifest 0.8.0 adds no permissions or hosts. Workday and Oracle export directories are absent in the primary checkout, so real post-login compatibility remains unverified. No live portal action, application submission, candidate-data publication, or Resume workflow mutation occurred. This supersedes earlier pending approvals and held-validation notes.
+
+## Local version 0.9.0 preparation, October 5, 2026
+
+Author: Yazad Madan. Branch integration/pf1-pf2-preparation in D:\Code\application_pipeline\worktrees\integration_next contains uncommitted preparation based on 47bc4a1. Workday registration moved to its dedicated file without host or behavior changes, with 14 new tests. Oracle remains outside production injection and routing, defaults to answer_sheet_only, refuses text and upload writes, and has 13 new tests plus three invented replay pages. Its pure mode transition is nonpersistent. The application-lifetime downgrade design is documented, not implemented.
+
+Five new tests reproduced actual Next clicks in answer-sheet mode, including a mode change during the awaited sweep. Entry and immediate pre-click mode checks now refuse those actions. Twenty inherited progression tests passed unchanged. Only the shared harness script-name list changed in an existing test support file; inherited assertions stayed unchanged.
+
+FULL 400 in 221.495 seconds and PUBLIC 318 in 165.735 seconds pass, each with two expected Windows symlink-privilege skips. Replay 4 in 7.226 seconds passes. JSCHECK, PYCHECK, and diff checks pass. Manifest 0.9.0 changes version only, with unchanged permissions. New fixture metadata names Yazad Madan. No live employer page was opened, filled, or submitted. Current work remains uncommitted and unpushed at Yazad's request.
+
+The Resume status fingerprint changed during validation as additional application artifacts appeared; the existing reference change flags stayed the same. This run does not claim an unchanged whole source checkout. Phase code and test additions are confined to the extension workspace; the private plan receives only the authorized section 9 handoff entry. Current resume generation remains independent.
+
+Next: commit and push only when requested. Obtain Workday page exports and establish a reviewed Oracle inspection path before collecting Oracle exports. Complete application-scoped CAPTCHA downgrade persistence before enabling Oracle fill. P9 still requires merged PF1/PF2 and 50 approved real pending wordings.

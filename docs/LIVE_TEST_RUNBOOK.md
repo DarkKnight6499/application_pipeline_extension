@@ -4,7 +4,7 @@ Run on Windows with Microsoft Edge. Never let the tool click Submit; you click S
 
 ## 1. Start the helper
 
-From D:\Code\application_pipeline_extension:
+From D:\Code\application_pipeline\worktrees\integration_next:
 
 ```powershell
 .\portal_pipeline\start.ps1 -Source D:\Code\Resume
@@ -23,7 +23,7 @@ Open http://127.0.0.1:8766 in Edge. Use this exact loopback address.
 1. Open `edge://extensions` in Edge.
 2. Enable Developer mode (toggle, top right).
 3. Select Load unpacked.
-4. Browse to D:\Code\application_pipeline_extension\portal_pipeline\extension.
+4. Browse to D:\Code\application_pipeline\worktrees\integration_next\portal_pipeline\extension.
 5. Extension loads as "Resume Portal Prototype".
 
 ## 3. Inspect the page without pairing (optional first look)
@@ -119,7 +119,7 @@ Open http://127.0.0.1:8766 in Edge. Use this exact loopback address.
 
 1. Select Export field structure in the side panel anytime.
 2. Browser downloads a JSON file (e.g., `01-contact.json`).
-3. Save to D:\Code\application_pipeline_extension\portal_pipeline\data\exports\greenhouse\ (created if missing).
+3. Save to D:\Code\application_pipeline\worktrees\integration_next\portal_pipeline\data\exports\greenhouse\ (created if missing).
 4. Include the filename and the observation in your notes.
 
 ## 14. After you submit

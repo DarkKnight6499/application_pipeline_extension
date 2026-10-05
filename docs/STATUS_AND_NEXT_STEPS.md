@@ -1,7 +1,7 @@
 ---
 author: Yazad Madan
-updated: 2026-10-04
-status: Version 0.8.0 validated: session-profile repair and PF4 synthetic coverage complete; FULL 368 and PUBLIC 286 OK with 2 skips each
+updated: 2026-10-05
+status: Version 0.9.0 checkpoint validated: FULL 400 and PUBLIC 318 OK with 2 skips each; replay 4 OK
 ---
 
 # Status and next steps
@@ -13,6 +13,10 @@ This replaces the earlier probe reports and the two-prototype review. Their find
 A Manifest V3 extension and a local Python helper that review and fill only the fields the user selects. The human logs in, navigates and submits. The tool never submits, signs, attests, or handles passwords or CAPTCHAs. Sponsorship now and sponsorship in the future stay separate answers, and unknown answers stay pending.
 
 ## Done so far
+
+**October 5, 2026 publication checkpoint.** Yazad authorized committing and pushing the validated preparation before further development. Workday is saved as e559549, Oracle preparation as 3312242, and the answer-sheet Next guard as 3569f24. The validation below applies to this combined code. The next implementation task is application-scoped Oracle mode persistence, with real hosts still disabled. Earlier uncommitted notes describe the pre-publication checkpoint.
+
+**October 5, 2026 local preparation, uncommitted.** Workday now has a dedicated adapter preserving its existing host and behavior, with 14 new synthetic tests. Oracle has an unrouted, answer-sheet-only preparation adapter, three fabricated replay pages, and 13 new tests. Its text and upload writers refuse; its pure CAPTCHA transition is explicitly nonpersistent. Five new progression tests reproduced actual Next clicks in answer-sheet mode and verified the entry and pre-click guards. FULL 400 tests in 221.495 seconds passes with two expected symlink skips. PUBLIC 318 tests in 165.735 seconds passes with the same two skips; replay 4 tests in 7.226 seconds passes. JSCHECK, PYCHECK, and diff checks pass. Manifest permissions are unchanged. Capture instructions and an application-scoped Oracle persistence proposal are included. No live employer flow was used. Current branch is integration/pf1-pf2-preparation in worktrees/integration_next; no commits or pushes.
 
 **Version 0.8.0 reviewed integration (October 4, 2026).** Application review now requires a structurally valid session profile, rejects malformed fact values, keeps unknown empty profiles reviewable, and invalidates cached edits, selection, and overwrite when their sourced proposal or draft changes. Unchanged snapshots preserve human edits. Tailored employment drafts appear separately without automatic insertion or selection. Thirteen new session-profile tests and nine PF4 Greenhouse tests are integrated. Greenhouse control replacements fail closed until an explicit rescan; country and city typeahead stay manual without a verified popup contract. Only the five approved mock setup files changed, without altering inherited assertions. FULL 368 tests in 226.742 seconds and PUBLIC 286 tests in 170.509 seconds pass, each with two Windows symlink-privilege skips. Four replay tests pass in 7.749 seconds; JSCHECK, PYCHECK, and diff checks pass. Manifest version is 0.8.0 with unchanged permissions. Synthetic only; no live employer application was filled or submitted.
 
@@ -62,7 +66,7 @@ Public pages only, nothing typed or submitted.
 | Greenhouse | handful | Yes | Done for Yes/No dropdowns; country and city typeahead stay manual |
 
 Also found:
-- The extension only allows Greenhouse and Workday hosts today.
+- Registered host policy permits Workday and Greenhouse, plus the two synthetic-only Phenom career-site patterns. Oracle remains unsupported.
 - Some queue links are dead: 6 of 18 sampled Workday tenants showed a missing posting, and the Marsh links redirect to the home page.
 - No public source holds a recorded post-login Workday page or any Oracle apply-flow automation. Workday selectors found in open-source code are from hand-written or live-run code and are unverified here.
 - Greenhouse, Lever and Workable publish their question lists through public endpoints, which could remove DOM guessing for those systems. Eightfold's questions endpoint exists, but its body was not read.
@@ -73,11 +77,11 @@ Also found:
 
 Phase order lives in D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md. The approved safety, CSP harness, session-profile, and PF4 Greenhouse phases are validated and integrated. Their earlier pending-approval and held-validation entries are historical.
 
-Next: Workday PF1 and Oracle PF2 may continue against synthetic fixtures, but real post-login compatibility requires Yazad's Inspect-only exports. Neither portal's export directory exists in the primary checkout as of October 4, 2026. Keep login, MFA, CAPTCHA, signatures, and submission manual. Country/city typeahead and remote upload completion remain unverified. P9 stays blocked until PF1/PF2 are merged and the corpus includes at least 50 Yazad-approved real pending wordings. No real model calls or live portal probes are authorized by this handoff.
+Next: review the local PF1/PF2 preparation checkpoint and implement application-scoped Oracle mode persistence before enabling any real Oracle fill. Workday and Oracle real post-login compatibility requires reviewed structure exports; the current popup cannot capture Oracle without a reviewed inspection access path. Neither portal's export directory exists in the primary checkout as of October 4, 2026. Keep login, MFA, CAPTCHA, signatures, and submission manual. Country/city typeahead and remote upload completion remain unverified. P9 stays blocked until PF1/PF2 are merged and the corpus includes at least 50 Yazad-approved real pending wordings. No real model calls or live portal probes are authorized by this handoff.
 
 ## Rules to keep when working here
 
 - Run tests with the real source checkout configured, since the synthetic-only run hid the regression in item 2.
 - Give subagents narrow, measurable jobs. A summarizing probe fabricated field counts and time savings, while scanner-only runs returned usable data.
 - Never write real candidate data into this public repository.
-- Commit each completed phase separately. The active user instruction authorizes reviewed, validated, non-force pushes directly to main.
+- Keep each completed phase independently validated and documented. Yazad authorized pushing the validated checkpoint, then continuing the next steps. Commit only phase-owned paths and push reviewed, passing phases without force.

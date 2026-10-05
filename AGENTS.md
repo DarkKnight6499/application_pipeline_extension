@@ -9,7 +9,9 @@ Author: Yazad Madan.
 - Keep chat concise. Use the caveman skill at full level when available. Use normal prose in persisted artifacts. Never use em dashes or double-hyphen punctuation in prose or comments.
 - Set file author metadata to Yazad Madan wherever supported.
 - Record failures, their evidence, fixes, validation, and remaining limits. Do not call synthetic success live compatibility.
-- The user requested commits at the end of each completed phase. Validate the phase, update the handoff and error notes, then commit only its owned paths. Do not leave completed phases uncommitted or combine unrelated work. Push when requested or when covered by an active push instruction.
+- Keep completed phases independently validated and documented. Yazad authorized pushing the validated checkpoint and continuing the next steps. Commit only the phase-owned paths and push reviewed, passing phases without force.
 - Workday, Greenhouse, and synthetic-only Phenom are within the authorized development scope. Further portal work must follow the active handoff and phased plan; synthetic coverage is not live compatibility.
 - Do not spawn sub-agents unless explicitly requested.
 - Phase order lives in D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md. Follow it instead of any other next-step list.
+
+- Keep all extension repositories, worktrees, and experiments under D:\Code\application_pipeline. Create future worktrees in its worktrees folder, never directly under D:\Code.
