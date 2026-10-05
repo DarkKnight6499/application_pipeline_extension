@@ -1,0 +1,24 @@
+{
+  "author": "Yazad Madan",
+  "evidence": "synthetic_only",
+  "cases": [
+    {
+      "name": "oracle_form",
+      "page": "page_1.html",
+      "fields": 3,
+      "gate": null
+    },
+    {
+      "name": "oracle_email_gate",
+      "page": "email_gate.html",
+      "fields": 1,
+      "gate": "email_code"
+    },
+    {
+      "name": "oracle_hcaptcha_form",
+      "page": "hcaptcha_form.html",
+      "fields": 1,
+      "gate": "captcha"
+    }
+  ]
+}
