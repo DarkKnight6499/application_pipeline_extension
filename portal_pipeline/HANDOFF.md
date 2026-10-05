@@ -1,5 +1,17 @@
 # Portal development handoff
 
+## October 5, 2026: parallel long-form support and loaded MV3 persistence
+
+Author: Yazad Madan.
+
+Integration branch integration/longform-and-mode-tests in D:\Code\application_pipeline\worktrees\parallel_next, based on e901138. User authorized parallel work. Lower-tier agents supplied the long-form module, real loaded-extension test, and broker review/regressions in separate worktrees. Coordinator added the readonly current-session route, draft review UI, engine/bridge enforcement, transport and fill locks, and asynchronous limit checks. No model calls, draft generation, source profile/builder/tracker/application edits, or live portal actions occurred. Oracle remains unrouted and answer-sheet only. Manifest 0.11.0 changes version only. No inherited tests changed.
+
+Failed numeric-unit, prompt vocabulary, direct-write and stale-limit regressions were resolved before final acceptance. A new test import removed after an earlier passing run was restored and rerun. Focused integration passes thirteen cases; focused loaded MV3 passes one case. See LONGFORM_VALIDATION.md and APPLICATION_MODE_MV3_VALIDATION.md for evidence and limits. Final acceptance is recorded in STATUS_AND_NEXT_STEPS.md.
+
+Final FULL passes 453 tests in 249.239 seconds with only the two expected Windows symlink skips. JavaScript syntax, Python compilation, and normal Git diff check pass. Four monitored tracker/reference hashes match pre-validation values; whole-checkout immutability is not claimed. PUBLIC and replay results are recorded in the final status entry. Keep future work under D:\Code\application_pipeline.
+
+Final PUBLIC passes 371 tests in 188.060 seconds, with the same two expected skips. Both phases have passing focused tests, independent review findings addressed, and combined acceptance. No new production host permissions or Oracle routing were added.
+
 ## October 5, 2026: application mode persistence, version 0.10.0
 
 Author: Yazad Madan.

@@ -1,7 +1,7 @@
 ---
 author: Yazad Madan
 updated: 2026-10-05
-status: Version 0.10.0 validated: FULL 428 and PUBLIC 346 OK with 2 skips each; replay 4 OK
+status: Version 0.11.0 validated: FULL 453 and PUBLIC 371 OK with 2 skips each; replay 4 OK
 ---
 
 # Status and next steps
@@ -13,6 +13,12 @@ This replaces the earlier probe reports and the two-prototype review. Their find
 A Manifest V3 extension and a local Python helper that review and fill only the fields the user selects. The human logs in, navigates and submits. The tool never submits, signs, attests, or handles passwords or CAPTCHAs. Sponsorship now and sponsorship in the future stay separate answers, and unknown answers stay pending.
 
 ## Done so far
+
+**October 5, 2026 parallel long-form and loaded MV3 work.** Version 0.11.0 adds read-only sourced evidence and checks for human-authored project and motivation answers. Drafts show exact UTF-16 counts and numeric screening, require explicit review and manual selection, invalidate on edits, and receive a fresh engine check before writing. No evidence or verified portal limit leaves them unselectable. The bridge and broker recheck current session and page authority. Five backend, thirteen route/engine/panel, and six broker/report cases are new. An additional loaded MV3 test uses actual extension storage and isolated scripting through page reload, persistent browser reopen, helper port change, and another application ID. Source helper responses and employer pages remain fabricated. No inherited tests or manifest permissions changed. See LONGFORM_VALIDATION.md and APPLICATION_MODE_MV3_VALIDATION.md.
+
+Final FULL passes 453 tests in 249.239 seconds and PUBLIC passes 371 in 188.060 seconds, each with only the two expected Windows symlink skips. JSCHECK, PYCHECK, and normal Git diff check pass. Four monitored tracker/reference hashes match their pre-validation values. Branch: integration/longform-and-mode-tests in worktrees/parallel_next, based on e901138. No live employer actions occurred.
+
+Replay passes four tests in 5.988 seconds. Manifest 0.11.0 changes version only. The reviewed long-form phase and loaded-MV3 phase are saved separately before the release checkpoint.
 
 **October 5, 2026 application restriction persistence, version 0.10.0.** A positive audited Application ID now owns a monotonic CAPTCHA restriction sidecar, shared across imported sessions. The extension journals the restriction before helper requests and rechecks session identity, mode, page URL, and human gates after awaits. Review hydrates mode before offering writes; engine and Next guards enforce it independently. Completed results remain visible if a restriction stops a later field. Eight new backend tests and 20 browser tests use fabricated identities and mocked Chrome APIs. Oracle is opt-in but stays unrouted, outside production injection, and answer-sheet only. No inherited tests changed. See APPLICATION_MODE_SECURITY_NOTES.md and APPLICATION_MODE_VALIDATION.md for evidence and limits.
 
