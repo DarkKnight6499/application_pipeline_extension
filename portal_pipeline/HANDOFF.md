@@ -1,5 +1,11 @@
 # Portal development handoff
 
+## October 5, 2026: live trial intentionally deferred
+
+Author: Yazad Madan.
+
+The user deferred live validation. No live employer page was opened or tested. No exports were found in the extension workspace and the browser connector inventory was empty. The version 0.11.0 local helper returned HTTP 200 and was stopped after the deferral; port 8766 no longer had a listener. No application was imported and no source profile, builder, tracker, or application was changed. Updated LIVE_TEST_RUNBOOK.md and added LIVE_VALIDATION_EVIDENCE_TEMPLATE.md. These are documentation-only changes; validated code remains at 9c5ed08. Resume on the user's request after obtaining the exact employer application URL and audited application folder. Login, CAPTCHA, navigation, signatures, and submission stay human.
+
 ## October 5, 2026: parallel long-form support and loaded MV3 persistence
 
 Author: Yazad Madan.

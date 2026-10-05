@@ -1,10 +1,14 @@
 # Live Greenhouse Test Runbook
 
+Author: Yazad Madan.
+
+Updated October 5, 2026 for validated version 0.11.0. Use the same selected-field and upload evidence checks for a selected Workday application. Oracle stays unrouted until its exact hostname and inspection contract are reviewed.
+
 Run on Windows with Microsoft Edge. Never let the tool click Submit; you click Submit yourself. All navigation, login, MFA, CAPTCHA, and signatures are manual.
 
 ## 1. Start the helper
 
-From D:\Code\application_pipeline\worktrees\integration_next:
+From D:\Code\application_pipeline\worktrees\live_prep:
 
 ```powershell
 .\portal_pipeline\start.ps1 -Source D:\Code\Resume
@@ -23,8 +27,8 @@ Open http://127.0.0.1:8766 in Edge. Use this exact loopback address.
 1. Open `edge://extensions` in Edge.
 2. Enable Developer mode (toggle, top right).
 3. Select Load unpacked.
-4. Browse to D:\Code\application_pipeline\worktrees\integration_next\portal_pipeline\extension.
-5. Extension loads as "Resume Portal Prototype".
+4. Browse to D:\Code\application_pipeline\worktrees\live_prep\portal_pipeline\extension.
+5. Extension loads as "Resume Portal Prototype". Confirm version 0.11.0. Reload an existing installation after updating this checkout.
 
 ## 3. Inspect the page without pairing (optional first look)
 
@@ -88,8 +92,9 @@ Open http://127.0.0.1:8766 in Edge. Use this exact loopback address.
 2. Select that field in the panel.
 3. Check Replace existing if the field already has a file.
 4. Select Fill selected fields.
-5. The tool reads the audited imported resume, verifies its checksum, and uploads.
-6. Read back the uploaded filename on the page by eye. Do not assume silent completion.
+5. The tool reads the audited imported resume, verifies its checksum, and assigns the selected file input. This alone does not prove employer upload completion.
+6. Check the filename and the employer's completion indicator. Record uploading, processing, and errors as unverified or failed.
+7. Navigate manually to a later page and back. Check that the attachment remains. Check its filename or preview again at final review. Record these observations privately without candidate answers or document contents.
 
 ## 10. Navigate and rescan
 
@@ -119,20 +124,19 @@ Open http://127.0.0.1:8766 in Edge. Use this exact loopback address.
 
 1. Select Export field structure in the side panel anytime.
 2. Browser downloads a JSON file (e.g., `01-contact.json`).
-3. Save to D:\Code\application_pipeline\worktrees\integration_next\portal_pipeline\data\exports\greenhouse\ (created if missing).
+3. Save to D:\Code\application_pipeline\worktrees\live_prep\portal_pipeline\data\exports\greenhouse\, or exports\workday\ for Workday. These local folders are Git-ignored.
 4. Include the filename and the observation in your notes.
 
 ## 14. After you submit
 
-1. When you complete the Greenhouse application yourself (including final submission), note the Application ID or confirmation number.
+1. After you submit yourself, keep the existing audited Application ID unchanged. Record an employer confirmation number separately as Employer Reference ID.
 2. Return to http://127.0.0.1:8766.
-3. The dashboard displays the mark_application_status command if available (UNVERIFIED if not yet implemented).
-4. Copy and run that command to update the Applications.xlsx tracker with the submission status.
+3. In the extension's Application record, enter any employer reference and choose I submitted this myself. The extension prints the tracker command and does not update the tracker.
+4. Run that command through the existing Resume workflow only after confirming submission. It uses --id for Application ID and --employer-ref for the employer reference when supplied.
 
 ## Unverified items
 
-- Sponsorship toggle in the side panel may not exist yet (UNVERIFIED).
-- mark_application_status command output on dashboard (UNVERIFIED if P8 not landed).
+- Sponsorship toggle and the extension's printed tracker command are implemented and synthetically tested. Employer retention of the reviewed fields remains unverified.
 - Remote upload completion confirmation from Greenhouse (UNVERIFIED; checksum verified locally only).
 - History row grouping on real Greenhouse forms (UNVERIFIED; tested on synthetic fixture only).
 - Editable dropdown manual reason and unsupported control handling (UNVERIFIED on live Greenhouse).
