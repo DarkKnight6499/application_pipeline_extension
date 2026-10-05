@@ -192,3 +192,19 @@ FULL 400 in 221.495 seconds and PUBLIC 318 in 165.735 seconds pass, each with tw
 The Resume status fingerprint changed during validation as additional application artifacts appeared; the existing reference change flags stayed the same. This run does not claim an unchanged whole source checkout. Phase code and test additions are confined to the extension workspace; the private plan receives only the authorized section 9 handoff entry. Current resume generation remains independent.
 
 Next: commit and push only when requested. Obtain Workday page exports and establish a reviewed Oracle inspection path before collecting Oracle exports. Complete application-scoped CAPTCHA downgrade persistence before enabling Oracle fill. P9 still requires merged PF1/PF2 and 50 approved real pending wordings.
+
+## October 5, 2026: application-scoped restriction persistence
+
+Author: Yazad Madan.
+
+The version 0.9.0 checkpoint was pushed to main as 7310dda before this phase. Version 0.10.0 adds an audited-application restriction sidecar, an immutable extension journal, and opt-in engine and Next checks. Oracle remains unrouted, outside production injection, and answer-sheet only. No manifest permission or inherited test changed.
+
+The initial browser integration tests exposed thrown initial refusals, loss of earlier results when a later mode check denied a field, and inspection-message precedence. Coordinator fixes return structured refusals, preserve earlier results, and keep the inspection denial before the new tab check. Newly authored fixture mistakes were corrected in the new file only. One coordinator optional-chain assignment caused syntax errors and was corrected. A late text-length test reproduced an actual write after maxLength changed during the mode await; the final pre-assignment check now prevents that write. Twenty focused browser tests pass in 7.223 seconds. Backend has eight new tests with no new skips.
+
+Final FULL passes 428 tests in 223.978 seconds with two expected Windows symlink skips. PUBLIC and replay results are recorded in the final handoff and STATUS_AND_NEXT_STEPS.md. The new browser persistence tests mock Chrome APIs and helper responses on fabricated pages. They simulate worker reload and helper port changes; they do not establish actual Oracle MV3 lifecycle behavior. Existing loaded-extension tests remain unchanged in acceptance.
+
+Storage failures block current writes. If both durable stores fail and process memory is later lost, no recovery of an unpersisted restriction is claimed. Helper locking is process-local. Remote field persistence, remote upload completion, malicious filesystem replacement, and real portal compatibility remain unverified. See APPLICATION_MODE_SECURITY_NOTES.md and APPLICATION_MODE_VALIDATION.md.
+
+Source fingerprints changed during this session, so whole-source immutability is not claimed. This phase changes no source profile, builder, tracker, or application artifact; it appends only the authorized private plan handoff. No live employer page was opened, filled, or submitted. Next evidence: Workday structure exports and one Oracle hostname for reviewed inspection access. P9 prerequisites remain unmet.
+
+Final PUBLIC passes 346 tests in 174.403 seconds with the same two expected skips. Replay passes four tests in 5.890 seconds. JavaScript syntax, Python compilation, manifest permission comparison, and diff checks pass.

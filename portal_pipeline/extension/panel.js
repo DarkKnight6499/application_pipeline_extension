@@ -90,6 +90,18 @@
       const target = new URL(targetUrl);
       if (session.mode !== "audited_import" && !(target.hostname === "127.0.0.1" && target.pathname === "/fixture")) throw new Error("Sandbox sessions are only for the local fixture. Import an audited application for an employer portal.");
       if (session.url && new URL(session.url).origin !== new URL(targetUrl).origin) throw new Error("This page has a different origin from the selected posting. Prepare or import the correct application first.");
+      options.transport?.bindSession?.(session);
+      let applicationMode = null, applicationModeError = "";
+      if (options.transport?.mode) {
+        try {
+          applicationMode = await options.transport.mode();
+          if (applicationMode !== null && (applicationMode?.schema_version !== 1 ||
+              applicationMode.application_id !== session.application_id ||
+              !["fill", "answer_sheet_only"].includes(applicationMode.mode))) throw new Error("Invalid application mode response.");
+        } catch (error) { applicationModeError = error.message; }
+      }
+      const modeBlocked = () => !!applicationModeError || applicationMode?.mode === "answer_sheet_only";
+      if (modeBlocked()) panel.append(element("p", applicationModeError || "This application is answer sheet only. No fields or Next controls will be written.", {class: "note"}));
       const cacheKey = `${session.id}|${new URL(targetUrl).origin}${new URL(targetUrl).pathname}`;
       const saved = options.reviewState || await storage.load(cacheKey) || {};
       const bindings = options.bindings || {};
@@ -296,12 +308,13 @@
           const missing = report.missing.map(item => `${item.label} (${item.reason})`).join("; ");
           progressNote.textContent = report.final_review.final ? "Final review. Submit it yourself."
             : `${report.missing.length ? "Missing: " + missing + "." : "No required control is empty."}${report.stall.stalled ? " The same set repeats. Fix it by hand." : ""} Next button: ${report.next.kind}. Click Next yourself.`;
-          next.hidden = !(report.allow_guarded_next && !report.final_review.final);
+          next.hidden = modeBlocked() || !(report.allow_guarded_next && !report.final_review.final);
         } catch (error) { progressNote.textContent = error.message; }
       };
       const next = element("button", "Click Next", {type: "button"});
       next.hidden = true;
       next.onclick = async () => {
+        if (modeBlocked()) return;
         try { progressNote.textContent = (await runProgress("next")).message; } catch (error) { progressNote.textContent = error.message; }
       };
       footer.append(matchLabel, element("p"), fill, check, next, progressNote);
@@ -333,10 +346,11 @@
       };
       copyCommand.onclick = () => navigator.clipboard?.writeText(command.textContent);
       const acknowledged = () => !preflightError && acknowledgements.every(box => box.checked);
-      const refreshFill = () => { fill.disabled = sponsorshipSaving || !acknowledged(); };
+      const refreshFill = () => { fill.disabled = modeBlocked() || sponsorshipSaving || !acknowledged(); };
       acknowledgements.forEach(box => { box.onchange = refreshFill; });
       refreshFill();
       fill.onclick = async () => {
+        if (modeBlocked()) return;
         if (!acknowledged()) return;
         fill.disabled = true;
         const locked = [...rows.values()].flatMap(row => [row.checkbox, row.answer, row.overwrite]).concat(mappingChoosers, select, clear, groupSelect, close, sponsorBox);
@@ -359,7 +373,7 @@
             if (result.validation_error) row.result.append(element("div", `Portal validation error: ${result.validation_error}`, {class: "validation-error"}));
             row.lastResult = result;
           });
-          status.textContent = `${results.filter(item => item.status === "filled").length} filled, ${results.filter(item => item.status === "preserved").length} preserved, ${results.filter(item => item.status === "failed").length} need attention. Continue and submit manually.${results.some(item => item.status === "skipped_existing") ? " Resume already attached, skipped." : ""}`;
+          status.textContent = `${results.filter(item => item.status === "filled").length} filled, ${results.filter(item => item.status === "preserved").length} preserved, ${results.filter(item => ["failed", "refused", "blocked_by_human_gate"].includes(item.status)).length} need attention. Continue and submit manually.${results.some(item => item.status === "skipped_existing") ? " Resume already attached, skipped." : ""}`;
           await save();
           api(`/api/sessions/${session.id}/record`, {page: portalPage("partially_filled")}).catch(() => {});
         } catch (error) { status.textContent = error.message; }

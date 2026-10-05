@@ -1,7 +1,7 @@
 ---
 author: Yazad Madan
 updated: 2026-10-05
-status: Version 0.9.0 checkpoint validated: FULL 400 and PUBLIC 318 OK with 2 skips each; replay 4 OK
+status: Version 0.10.0 validated: FULL 428 and PUBLIC 346 OK with 2 skips each; replay 4 OK
 ---
 
 # Status and next steps
@@ -13,6 +13,10 @@ This replaces the earlier probe reports and the two-prototype review. Their find
 A Manifest V3 extension and a local Python helper that review and fill only the fields the user selects. The human logs in, navigates and submits. The tool never submits, signs, attests, or handles passwords or CAPTCHAs. Sponsorship now and sponsorship in the future stay separate answers, and unknown answers stay pending.
 
 ## Done so far
+
+**October 5, 2026 application restriction persistence, version 0.10.0.** A positive audited Application ID now owns a monotonic CAPTCHA restriction sidecar, shared across imported sessions. The extension journals the restriction before helper requests and rechecks session identity, mode, page URL, and human gates after awaits. Review hydrates mode before offering writes; engine and Next guards enforce it independently. Completed results remain visible if a restriction stops a later field. Eight new backend tests and 20 browser tests use fabricated identities and mocked Chrome APIs. Oracle is opt-in but stays unrouted, outside production injection, and answer-sheet only. No inherited tests changed. See APPLICATION_MODE_SECURITY_NOTES.md and APPLICATION_MODE_VALIDATION.md for evidence and limits.
+
+Final acceptance: FULL 428 tests in 223.978 seconds and PUBLIC 346 tests in 174.403 seconds pass with only the two expected Windows symlink skips each. Replay 4 tests in 5.890 seconds passes. JSCHECK, PYCHECK, and diff checks pass. Manifest 0.10.0 changes version only. Branch: integration/application-mode-persistence in worktrees/mode_integration, based on main 7310dda. No live employer actions occurred.
 
 **October 5, 2026 publication checkpoint.** Yazad authorized committing and pushing the validated preparation before further development. Workday is saved as e559549, Oracle preparation as 3312242, and the answer-sheet Next guard as 3569f24. The validation below applies to this combined code. The next implementation task is application-scoped Oracle mode persistence, with real hosts still disabled. Earlier uncommitted notes describe the pre-publication checkpoint.
 
@@ -77,7 +81,7 @@ Also found:
 
 Phase order lives in D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md. The approved safety, CSP harness, session-profile, and PF4 Greenhouse phases are validated and integrated. Their earlier pending-approval and held-validation entries are historical.
 
-Next: review the local PF1/PF2 preparation checkpoint and implement application-scoped Oracle mode persistence before enabling any real Oracle fill. Workday and Oracle real post-login compatibility requires reviewed structure exports; the current popup cannot capture Oracle without a reviewed inspection access path. Neither portal's export directory exists in the primary checkout as of October 4, 2026. Keep login, MFA, CAPTCHA, signatures, and submission manual. Country/city typeahead and remote upload completion remain unverified. P9 stays blocked until PF1/PF2 are merged and the corpus includes at least 50 Yazad-approved real pending wordings. No real model calls or live portal probes are authorized by this handoff.
+Next: obtain Workday structure exports and identify one exact Oracle apply hostname for a reviewed inspection access path. The current popup still cannot capture Oracle. Real post-login compatibility, remote persistence, and upload completion remain unverified. Keep login, MFA, CAPTCHA, signatures, and submission manual. Country/city typeahead stays manual without an observed popup contract. P9 stays blocked until PF1/PF2 prerequisites and at least 50 Yazad-approved real pending wordings are satisfied. No real model calls or live portal probes are authorized by this handoff. Application restriction persistence is now implemented synthetically; it does not supply those missing contracts.
 
 ## Rules to keep when working here
 

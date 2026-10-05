@@ -1,17 +1,25 @@
 ﻿---
 author: Yazad Madan
-status: Proposed, not implemented
+status: Implemented for synthetic enforcement, real hosts disabled
 ---
 
 # Oracle application mode persistence proposal
 
-## Current boundary
+## October 5 implementation
+
+The proposal below is retained as design history. The current implementation uses a separate restriction sidecar at data/application_modes/<application_id>.json rather than adding a fill_mode field to portal records. GET /api/sessions/<id>/fill-mode reads the overlay; POST accepts only a CAPTCHA downgrade. Sessions require a positive audited Application ID. Corrupt or inaccessible state returns answer_sheet_only. Per-application helper locks and atomic replacement protect updates within one helper process; ordinary record or sponsorship writes cannot erase the sidecar.
+
+The extension journals a restriction by Application ID before requesting the helper downgrade. The mode broker checks audited session identity before and after reads and intersects responses with the latest journal. The application guard checks page identity and human gates after awaits. Review hydrates mode before offering writes, and engine and progression boundaries independently refuse restricted writes. The mechanism is opt-in through requiresApplicationMode. Oracle is the only production adapter declaring this flag, and it remains unrouted, outside production injection, and answer_sheet_only.
+
+New browser tests run actual guard and broker code with mocked Chrome storage, runtime, and helper responses. They establish synthetic behavior, not actual Oracle extension isolation, remote persistence, or live compatibility. Existing loaded-extension regressions remain in the full suite. See APPLICATION_MODE_SECURITY_NOTES.md for authority boundaries and persistence limits. The pure nextMode helper remains nonpersistent by itself.
+
+## Original proposal boundary
 
 Oracle preparation is synthetic only. The production adapter has no routed hosts and defaults to answer_sheet_only. Its pure mode transition helper demonstrates a CAPTCHA downgrade using caller-supplied state. It does not persist application state across navigation, extension reloads, helper restarts, or another imported session.
 
 The existing helper stores sessions in session.json and audited application records under data/records/<application_id>.json. server.py record_for rejects sessions without an audited Application ID. portal_record.py does not currently store an enforced portal fill mode. Sponsorship answer mode is a separate property and must remain separate.
 
-## Proposed enforcement
+## Original proposed enforcement
 
 Before enabling any Oracle host, obtain verified structure exports and implement an application-scoped monotonic mode restriction. Record the restriction against the audited Application ID rather than a tab or session ID. All sessions for that application must observe the same restriction. A new session, browser restart, CAPTCHA removal, or successful human gate completion must not restore fill mode after a mid-form CAPTCHA.
 

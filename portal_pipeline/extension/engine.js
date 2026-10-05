@@ -306,7 +306,7 @@
 
   // One selected field, written only through the guard's live-structure checks; selection is the proposal.
   async function fillField(control, selection, guard) {
-    const {checkCollateral, checkCurrent, attachment, overwrite} = guard;
+    const {checkCollateral, checkCurrent, checkApplication, attachment, overwrite} = guard;
     try {
       if (!control) throw new Error("Field changed. Scan the page again.");
       if (guard.state.aborted) throw new Error("Filling stopped after an unexpected form change. Rescan and review.");
@@ -328,6 +328,7 @@
         const existingHash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", existingBytes))].map(v => v.toString(16).padStart(2, "0")).join("");
         if (element.multiple) throw new Error("Multiple-file upload requires manual selection in this prototype.");
         if (element.files.length !== 1 || element.files[0] !== existing) throw new Error("Resume file changed during verification. Rescan before filling.");
+        if (checkApplication?.required) await checkApplication();
         checkCollateral();
         checkCurrent(control);
         if (existingHash === attachment.sha256) {
@@ -349,8 +350,13 @@
         const bytes = Uint8Array.from(atob(attachment.base64), char => char.charCodeAt(0));
         const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map(v => v.toString(16).padStart(2, "0")).join("");
         if (hash !== attachment.sha256) throw new Error("Resume checksum does not match.");
+        if (checkApplication?.required) await checkApplication();
         const transfer = new DataTransfer();
         transfer.items.add(new File([bytes], attachment.name, {type: attachment.mime}));
+        checkCollateral();
+        checkCurrent(control);
+        if (element.multiple) throw new Error("Multiple-file upload requires manual selection in this prototype.");
+        if (checkApplication?.required) await checkApplication();
         checkCollateral();
         checkCurrent(control);
         if (element.multiple) throw new Error("Multiple-file upload requires manual selection in this prototype.");
@@ -367,6 +373,9 @@
           if (element.form !== control.nativeForm || !radioMembers(element).includes(target)) throw new Error("The radio group changed. Rescan before filling.");
           if (members.some(protectedControl)) throw new Error("This radio group is manual only.");
           if (!target?.isConnected || !visible(target) || unavailable(target)) throw new Error("The selected radio option is unavailable. Rescan before filling.");
+          if (checkApplication?.required) await checkApplication();
+          checkCollateral();
+          checkCurrent(control);
           Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "checked").set.call(target, true);
           target.dispatchEvent(new Event("input", {bubbles: true}));
           target.dispatchEvent(new Event("change", {bubbles: true}));
@@ -374,9 +383,13 @@
           if ([...element.options].filter(item => item.value === option.value).length !== 1) throw new Error("The native option value is ambiguous. Choose this answer manually.");
           const target = [...element.options].find(item => item.value === option.value && item.textContent.trim() === option.label);
           if (!target || optionDisabled(target)) throw new Error("The selected option is unavailable. Rescan before filling.");
+          if (checkApplication?.required) await checkApplication();
+          checkCollateral();
+          checkCurrent(control);
           setNative(element, option.value);
         }
       } else if (field.type === "combobox") {
+        if (checkApplication?.required) throw new Error("Application-scoped dropdown filling needs a verified asynchronous guard. Choose this field manually.");
         if (!field.adapter || !dropdown(element)) throw new Error(field.manual_reason || "This custom dropdown requires manual review.");
         expected = await dropdown(element).choose(element, expected, () => {
           checkCollateral();
@@ -388,6 +401,10 @@
       } else {
         expected = String(expected ?? "");
         if (!expected.trim()) throw new Error("Provide an answer before selecting this field.");
+        if (element.maxLength > 0 && expected.length > element.maxLength) throw new Error("Answer exceeds the portal's length limit.");
+        if (checkApplication?.required) await checkApplication();
+        checkCollateral();
+        checkCurrent(control);
         if (element.maxLength > 0 && expected.length > element.maxLength) throw new Error("Answer exceeds the portal's length limit.");
         setNative(element, expected);
       }
@@ -417,8 +434,19 @@
     if (adapter && adapter.fillStrategy !== "native_setter") throw new Error(`Fill strategy ${adapter.fillStrategy} is not enabled.`);
     const gate = adapter?.humanGate(document);
     if (gate) {
+      if (adapter?.requiresApplicationMode === true && globalThis.PortalApplicationMode) {
+        try { await PortalApplicationMode.observe(adapter); } catch { /* The human gate still blocks every write. */ }
+      }
       const reason = `A ${gate.kind} step needs you. Nothing was written. Complete it yourself, then rescan.`;
       return selections.map(selection => ({id: selection.id, ok: false, status: "blocked_by_human_gate", actual: null, reason, message: reason}));
+    }
+    const refused = (selection, reason) => ({id: selection.id, ok: false, status: "refused", actual: null, reason, message: reason});
+    if (adapter?.requiresApplicationMode === true) {
+      try {
+        if (adapter.mode === "answer_sheet_only") throw new Error("Application adapter is answer sheet only.");
+        if (!globalThis.PortalApplicationMode) throw new Error("Application mode guard is unavailable.");
+        await PortalApplicationMode.check(adapter);
+      } catch (error) { return selections.map(selection => refused(selection, error.message)); }
     }
     const results = [];
     const selectedIds = new Set(selections.filter(selection => !manualFields.has(selection.id)).map(selection => selection.id));
@@ -466,7 +494,21 @@
         continue;
       }
       const control = controls.get(selection.id);
-      const guard = {selection, overwrite, attachment, state, checkCollateral, checkCurrent, verify};
+      const checkApplication = async () => {
+        if (adapter?.requiresApplicationMode === true) {
+          if (!globalThis.PortalApplicationMode) throw new Error("Application mode guard is unavailable.");
+          await PortalApplicationMode.check(adapter);
+        }
+      };
+      checkApplication.required = adapter?.requiresApplicationMode === true;
+      if (checkApplication?.required) {
+        try { await checkApplication(); }
+        catch (error) {
+          results.push(...selections.slice(results.length).map(item => refused(item, error.message)));
+          break;
+        }
+      }
+      const guard = {selection, overwrite, attachment, state, checkCollateral, checkCurrent, checkApplication, verify};
       results.push(!adapter ? await fillField(control, selection, guard)
         : control?.field.type === "file" ? await adapter.upload(control, attachment, guard) : await adapter.fill(control, selection, guard));
     }

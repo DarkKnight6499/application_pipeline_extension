@@ -40,6 +40,7 @@
     version: "synthetic-1",
     hosts: [],
     mode: "answer_sheet_only",
+    requiresApplicationMode: true,
     fillStrategy: "native_setter",
     humanGate,
     scan(profile, options) {

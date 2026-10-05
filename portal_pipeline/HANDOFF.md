@@ -1,5 +1,15 @@
 # Portal development handoff
 
+## October 5, 2026: application mode persistence, version 0.10.0
+
+Author: Yazad Madan.
+
+Worktree: D:\Code\application_pipeline\worktrees\mode_integration. Branch: integration/application-mode-persistence, based on main 7310dda. Implemented a separate audited-application CAPTCHA sidecar and extension journal, opt-in engine and Next guards, strict identity and response checks after awaits, review hydration, and preservation of completed results when later fields are refused. Oracle stays unrouted and answer-sheet only. No inherited tests or manifest permissions changed. Eight new backend cases and 20 mocked-browser cases are synthetic. FULL passes 428 tests in 223.978 seconds, with two expected Windows symlink skips. Final PUBLIC and replay results live in STATUS_AND_NEXT_STEPS.md. Review findings, failed regressions, and limits live in APPLICATION_MODE_VALIDATION.md and APPLICATION_MODE_SECURITY_NOTES.md.
+
+Keep the source Resume workflow independent. No source profiles, builders, trackers, or application artifacts were edited in this phase. Source fingerprints changed during the session, so whole-source immutability is not claimed. No live portal work occurred. Next: Workday structure exports and an exact Oracle apply hostname for reviewed inspection access. P9 requirements remain outstanding.
+
+Final acceptance for this phase: FULL 428 in 223.978 seconds and PUBLIC 346 in 174.403 seconds, each OK with two expected symlink skips; replay 4 in 5.890 seconds OK. JSCHECK, PYCHECK, and diff checks pass. The manifest changes version only. Commit and push are authorized for this reviewed passing phase.
+
 ## Session-profile review fix, October 4, 2026
 
 An isolated branch now requires the per-session profile before scanning or filling. It rejects malformed profile facts, keeps a valid empty values object pending, and clears stale cached review state when sourced proposals or tailored drafts change. Matching employment description drafts appear separately for review and are never inserted automatically. Eleven focused regressions and 23 approved mock-dependent tests pass. JavaScript syntax, Python compilation, and diff checks pass. Synthetic evidence only; no live portal validation or source checkout write.
@@ -52,7 +62,7 @@ The initial portal priority remains unconfirmed. Workday is the development assu
 
 ## Next exact task
 
-Phase order lives in `D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md`. P0 through P8, PF4, and synthetic PF5 are already integrated. Current work prepares PF1 Workday and PF2 Oracle against synthetic fixtures. Real compatibility requires reviewed structure exports. Oracle remains unrouted; application-scoped CAPTCHA downgrade persistence is still proposed. See the latest validation entry below and `docs/EXPORT_CAPTURE_CHECKLIST.md`. Current work stays uncommitted until Yazad requests commits and pushes.
+Phase order lives in `D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md`. P0 through P8, PF4, and synthetic PF5 are integrated. PF1 Workday and PF2 Oracle preparation is on main at 7310dda. Application-scoped CAPTCHA restriction persistence is now implemented synthetically, with Oracle still unrouted and answer-sheet only. Real compatibility requires reviewed structure exports and a reviewed Oracle inspection access path. See the latest validation entry below, `docs/APPLICATION_MODE_SECURITY_NOTES.md`, and `docs/EXPORT_CAPTURE_CHECKLIST.md`. Yazad authorized committing and pushing reviewed passing phases.
 
 Connect a real browser and continue one employer-specific walkthrough at a time. Workday still needs a selected employer URL and real form inspection. Greenhouse has the public Justworks structural reference, but its editable dropdown and upload completion contracts need rendered browser observations. Use **Export field structure** and follow [INSPECTION.md](INSPECTION.md). Record real page behavior and final-review persistence without submitting. See [GREENHOUSE_CONTRACT.md](../docs/GREENHOUSE_CONTRACT.md) for that track's next exact control.
 

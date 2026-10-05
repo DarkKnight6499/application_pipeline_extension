@@ -4,6 +4,8 @@ author: Yazad Madan
 
 # PF2 Oracle synthetic preparation
 
+October 5, 2026 integration adds an application-scoped restriction sidecar, extension journal, and opt-in write guards with separate backend and browser regressions. The original findings below describe the preparation baseline. The pure nextMode function is still nonpersistent; application persistence belongs to the new layer. Oracle remains unrouted and answer_sheet_only. See APPLICATION_MODE_SECURITY_NOTES.md for synthetic evidence and limits.
+
 Branch `feat/pf2-oracle-synthetic` is based on `47bc4a1`. Tests were added first. The initial targeted run had seven errors because `oracle.js` did not yet exist. After implementation, targeted runs exposed a fixture URL that did not contain `hcaptcha`, a scan assertion that counted the shared guard controls, and an email-code row still present in the Oracle scan. Those were corrected. All examples use fabricated values and `example.invalid` test routing.
 
 The adapter remains unrouted and in `answer_sheet_only`. Human gates stop engine writes before the adapter writer. The pure mode transition proves a monotonic downgrade but is not persisted; unknown state fails closed. The engine does not enforce `adapter.mode` globally, so Oracle's own text and upload writers explicitly refuse. The base version did not enforce adapter mode in enabled `PortalProgress.guardedNext`. Coordinator integration now refuses explicit answer_sheet_only mode on entry and immediately before clicking; its global default remains off. See ANSWER_SHEET_NEXT_GUARD.md. This guard does not implement persisted application state. No helper route, record schema, host policy, manifest permission, or production injection list changed.

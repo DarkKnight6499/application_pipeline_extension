@@ -8,6 +8,8 @@ Status: synthetic preparation only. No Oracle post-login Inspect-only export exi
 
 ## Hosts and mode
 
+October 5, 2026: the opt-in application mode guard and helper sidecar now provide synthetic restriction persistence independently of the pure nextMode helper. See ../APPLICATION_MODE_SECURITY_NOTES.md and ../ORACLE_MODE_PERSISTENCE_PROPOSAL.md. A helper fill overlay never enables this adapter. Oracle keeps its fixed answer-sheet capability and no real hosts.
+
 The Oracle adapter has `hosts: []` and is not in a production injection list. Production routing does not reach it. Its fixed mode is `answer_sheet_only`; its text and upload writers return `refused`. Only tests clone it onto `oracle-fixture.example.invalid`. No Oracle host permission was added. A real host can be registered only after a structure export establishes the exact apply host and a reviewed contract supports it.
 
 ## Fabricated page sequence
@@ -18,9 +20,9 @@ The fixtures under `portal_pipeline/fixtures/replay/oracle/` are invented. `page
 
 The adapter composes the generic visible CAPTCHA gate. It identifies an email-code gate only when a visible email verification heading and a visible code input coexist. Both gates are checked by the engine before its adapter writer. A visible honeypot and the code field are filtered from Oracle scan output. Shared engine protection also blocks a honeypot writer. The adapter never interacts with a CAPTCHA or code input and never clicks Next or Submit. P7 guarded Next stays off by default.
 
-`nextMode(previousMode, gate)` is a pure, nonpersistent design proof: a CAPTCHA changes `fill` to `answer_sheet_only`, and that mode does not revert when the challenge disappears. An unknown previous mode fails closed to `answer_sheet_only`. The production adapter already starts in `answer_sheet_only`. The helper is not connected to session storage, so it cannot enforce the downgrade across navigation, page reload, panel closure, or a new browser context. Do not describe a page-local state or browser flag as application lifetime persistence. See `../ORACLE_MODE_PERSISTENCE_PROPOSAL.md` for the application-scoped integration design. No route or schema change was made here.
+`nextMode(previousMode, gate)` remains a pure, nonpersistent design proof: a CAPTCHA changes `fill` to `answer_sheet_only`, and that mode does not revert when the challenge disappears. An unknown previous mode fails closed to `answer_sheet_only`. It does not itself enforce application lifetime persistence. The separate application_mode backend and extension guard now supply that restriction overlay, with mocked browser lifecycle evidence and the limits in `../APPLICATION_MODE_SECURITY_NOTES.md`.
 
-The shared engine does not enforce `adapter.mode` at its write boundary, so Oracle's own text and upload writers refuse. The shared `PortalProgress.guardedNext` also ignores the adapter's `nextStep` method. Its global default-off setting blocks the current synthetic test, but an enabled setting requires a separate shared mode guard before Oracle can be injected into production.
+Oracle's own text and upload writers refuse. The engine also refuses adapter answer-sheet mode for adapters requiring application mode. Shared guarded Next checks answer-sheet mode and the opt-in persistence guard; it remains off by default. These guards do not authorize Oracle production injection or establish a verified Next contract.
 
 ## Open evidence
 

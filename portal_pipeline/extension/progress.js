@@ -101,6 +101,9 @@
 
   async function guardedNext(adapter = null) {
     if (settings.allowGuardedNext !== true) return refuse("guarded_next_off");
+    if (adapter?.requiresApplicationMode === true && globalThis.PortalApplicationMode) {
+      try { await PortalApplicationMode.check(adapter); } catch { return refuse("application_mode"); }
+    } else if (adapter?.requiresApplicationMode === true && adapter.mode !== "answer_sheet_only") return refuse("application_mode");
     if (adapter?.mode === "answer_sheet_only") return refuse("answer_sheet_only");
     if (adapter?.humanGate(document)) return refuse("human_gate");
     if (detectFinalReview(document, adapter).final) return refuse("final_review");
@@ -116,6 +119,12 @@
     if (!node || node.matches("button[type=submit],input[type=submit],input[type=image]")
         || DENY.some(term => normalize(labelOf(node)).includes(term))) return refuse("next_unresolved");
     if (adapter?.mode === "answer_sheet_only") return refuse("answer_sheet_only");
+    if (adapter?.requiresApplicationMode === true) {
+      try { await PortalApplicationMode.check(adapter); } catch { return refuse("application_mode"); }
+      if (settings.allowGuardedNext !== true) return refuse("guarded_next_off");
+      if (detectFinalReview(document, adapter).final) return refuse("final_review");
+      if (adapter?.humanGate(document) || !node.isConnected || nextStep(document).ref !== next.ref) return refuse("next_unresolved");
+    }
     nextActions++;
     node.click();
     return {status: "clicked", ref: next.ref, label: next.label, message: "Next clicked once."};

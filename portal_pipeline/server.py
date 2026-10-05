@@ -19,6 +19,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import answer_sheet
+import application_mode
 import portal_record
 import question_corpus
 from portal_profile import hard_fact_errors, load_sponsorship_mode, resolve_for_application, resolve_profile, save_override, save_sponsorship_mode
@@ -305,6 +306,9 @@ def make_server(pipeline, port=8766, token=None):
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/record", path)
                     if match:
                         return self.send(200, {"record": pipeline.record_for(match[1])[1]})
+                    match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/fill-mode", path)
+                    if match:
+                        return self.send(200, application_mode.effective(pipeline.data, pipeline.read(match[1])))
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/sponsorship-mode", path)
                     if match:
                         return self.send(200, {"mode": load_sponsorship_mode(pipeline.folder(match[1]))})
@@ -373,6 +377,9 @@ def make_server(pipeline, port=8766, token=None):
                         else:
                             raise ValueError("Send a page or an event to record.")
                         return self.send(200, {"record": record})
+                    match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/fill-mode", path)
+                    if match:
+                        return self.send(200, application_mode.restrict(pipeline.data, pipeline.read(match[1]), body, pipeline.atomic.write))
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/reported-submitted", path)
                     if match:
                         application_id, _ = pipeline.record_for(match[1])
