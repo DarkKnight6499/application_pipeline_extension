@@ -179,6 +179,7 @@
       const exportSheet = element("button", "Export answer sheet", {type: "button"});
       panel.append(exportSheet);
       const rows = new Map();
+      let filling = false;
       const recordBoxes = new Set();
       const mappingChoosers = [];
       const capture = () => Object.fromEntries([...rows].map(([id, row]) => [id, {selected: row.checkbox.checked, value: row.answer.value, overwrite: row.overwrite.checked,
@@ -271,10 +272,58 @@
         checkbox.onchange = save;
         answer.onchange = save;
         overwrite.onchange = save;
+        if (PortalEngine.isLongform?.(field) && !checkbox.disabled) {
+          checkbox.checked = false;
+          checkbox.disabled = true;
+          const draftNote = element("div", "Draft needs review. Check evidence and portal character limit before selection.", {class: "source", role: "status"});
+          const checkDraft = element("button", "Check draft", {type: "button", "aria-label": `Check draft for ${field.label}`});
+          card.append(checkDraft, draftNote);
+          const row = rows.get(field.id);
+          row.longform = true;
+          row.draftChecked = false;
+          row.checkDraft = checkDraft;
+          let draftVersion = 0;
+          const invalidate = () => {
+            draftVersion++;
+            row.draftChecked = false;
+            checkbox.checked = false;
+            checkbox.disabled = true;
+            draftNote.textContent = "Draft changed. Check it again before selection.";
+          };
+          answer.addEventListener("input", invalidate);
+          answer.addEventListener("change", invalidate);
+          checkDraft.onclick = async () => {
+            if (filling) return;
+            invalidate();
+            const version = draftVersion, draftText = answer.value;
+            const limit = field.structure?.maxlength;
+            if (!Number.isSafeInteger(limit) || limit <= 0) {
+              draftNote.textContent = "No verified portal character limit. Complete this draft manually.";
+              return;
+            }
+            checkDraft.disabled = true;
+            row.checkingDraft = true;
+            refreshFill();
+            try {
+              const report = await api(`/api/sessions/${session.id}/longform`, {question: field.label, draft: draftText, limit});
+              if (version !== draftVersion || answer.value !== draftText) return;
+              const valid = report?.selectable === true && report.status === "draft_needs_review" && report.fit?.ok === true
+                && report.limit === limit && Number.isSafeInteger(report.count) && Array.isArray(report.unsupported_numbers)
+                && !report.unsupported_numbers.length && Array.isArray(report.evidence) && report.evidence.length
+                && report.evidence.every(item => typeof item.text === "string" && typeof item.source === "string" && item.source.trim());
+              row.draftChecked = !!valid;
+              checkbox.disabled = !valid;
+              draftNote.textContent = `${report.count ?? "Unknown"}/${limit} characters. ${report.status || "pending"}. ${valid ? "Read the evidence, then select this draft yourself." : "Draft cannot be selected."}`;
+              for (const item of report.evidence || []) draftNote.append(element("p", `${item.text} (${item.source})`));
+              if (report.unsupported_numbers?.length) draftNote.append(element("p", `Unsupported numbers: ${report.unsupported_numbers.join(", ")}`));
+            } catch (error) { draftNote.textContent = error.message; }
+            finally { row.checkingDraft = false; checkDraft.disabled = filling; refreshFill(); }
+          };
+        }
       }
       select.onclick = () => {
         rows.forEach(row => {
-          if (!row.checkbox.disabled && row.field.proposal !== "" && row.field.type !== "file" && row.answer.value && (groupSelect.value === "all" || row.field.section === groupSelect.value)) row.checkbox.checked = true;
+          if (!row.longform && !row.checkbox.disabled && row.field.proposal !== "" && row.field.type !== "file" && row.answer.value && (groupSelect.value === "all" || row.field.section === groupSelect.value)) row.checkbox.checked = true;
         });
         save();
       };
@@ -346,25 +395,29 @@
       };
       copyCommand.onclick = () => navigator.clipboard?.writeText(command.textContent);
       const acknowledged = () => !preflightError && acknowledgements.every(box => box.checked);
-      const refreshFill = () => { fill.disabled = modeBlocked() || sponsorshipSaving || !acknowledged(); };
+      const refreshFill = () => { fill.disabled = filling || modeBlocked() || sponsorshipSaving || [...rows.values()].some(row => row.checkingDraft) || !acknowledged(); };
       acknowledgements.forEach(box => { box.onchange = refreshFill; });
       refreshFill();
       fill.onclick = async () => {
         if (modeBlocked()) return;
+        if (filling || [...rows.values()].some(row => row.checkingDraft)) return;
         if (!acknowledged()) return;
         fill.disabled = true;
-        const locked = [...rows.values()].flatMap(row => [row.checkbox, row.answer, row.overwrite]).concat(mappingChoosers, select, clear, groupSelect, close, sponsorBox);
+        const locked = [...rows.values()].flatMap(row => [row.checkbox, row.answer, row.overwrite, ...(row.checkDraft ? [row.checkDraft] : [])]).concat(mappingChoosers, select, clear, groupSelect, close, sponsorBox);
         const initialDisabled = locked.map(node => node.disabled);
         try {
           if (!matchPage.checked) throw new Error("Confirm the page belongs to this posting before filling.");
           const selected = [...rows.values()].filter(row => row.checkbox.checked && !row.checkbox.disabled);
           if (!selected.length) throw new Error("Select at least one field.");
           locked.forEach(node => {node.disabled = true;});
+          filling = true;
           options.onFillState?.(true);
           let attachment = null;
           if (selected.some(row => row.field.type === "file")) attachment = await api(`/api/sessions/${session.id}/attachment`);
-          const selections = selected.map(row => ({id: row.field.id, value: row.answer.value, overwrite: row.overwrite.checked}));
-          const fillOptions = {attachment, manualIds: [...forcedManual]};
+          const selections = selected.map(row => ({id: row.field.id, value: row.answer.value, overwrite: row.overwrite.checked,
+            ...(row.longform ? {longformReviewed: row.draftChecked === true} : {})}));
+          const fillOptions = {attachment, manualIds: [...forcedManual],
+            ...(!options.transport ? {validateLongform: body => api(`/api/sessions/${session.id}/longform`, body)} : {})};
           const results = await (options.transport ? options.transport.fill(selections, fillOptions) : PortalEngine.fill(selections, fillOptions));
           results.forEach(result => {
             const row = rows.get(result.id);
@@ -377,7 +430,7 @@
           await save();
           api(`/api/sessions/${session.id}/record`, {page: portalPage("partially_filled")}).catch(() => {});
         } catch (error) { status.textContent = error.message; }
-        finally { locked.forEach((node, index) => {node.disabled = initialDisabled[index];}); refreshFill(); options.onFillState?.(false); }
+        finally { filling = false; locked.forEach((node, index) => {node.disabled = initialDisabled[index];}); refreshFill(); options.onFillState?.(false); }
       };
     } catch (error) { status.textContent = error.message; }
     return host;

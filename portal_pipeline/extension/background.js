@@ -51,10 +51,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         throw new Error("Invalid application mode response.");
       return latest === true || applicationRestrictions.has(key) ? {...mode, mode: "answer_sheet_only", reason: "captcha"} : mode;
     }
+    if (message.type === "portal-longform") {
+      if (!sender.tab || sender.frameId !== 0 || sender.id !== chrome.runtime.id) throw new Error("Draft checks require a top-level extension content script.");
+      if (!/^[a-f0-9]{32}$/.test(message.sessionId || "")) throw new Error("Invalid draft session.");
+      const {server, token} = await paired();
+      const session = await request(server, token, "/api/current");
+      const target = new URL(sender.url || sender.tab.url);
+      if (session?.id !== message.sessionId || !session.url || new URL(session.url).origin !== target.origin)
+        throw new Error("The selected application changed. Rescan before checking a draft.");
+      if (session.mode !== "audited_import" && !(target.hostname === "127.0.0.1" && target.pathname === "/fixture"))
+        throw new Error("Draft filling requires an audited application.");
+      const result = await request(server, token, `/api/sessions/${message.sessionId}/longform`, message.body);
+      const latest = await request(server, token, "/api/current");
+      if (latest?.id !== session.id || latest?.application_id !== session.application_id || latest?.mode !== session.mode
+          || latest?.url !== session.url) throw new Error("The selected application changed during draft checks.");
+      return result;
+    }
     if (message.type !== "portal-api") throw new Error("Unknown extension request.");
-    if (!/^\/api\/(profile|current|config|corpus|sessions\/[a-f0-9]{32}\/(attachment|profile|preflight|answer-sheet|override|record|reported-submitted|sponsorship-mode|fill-mode))$/.test(message.path)) throw new Error("API path is not allowed.");
+    if (!/^\/api\/(profile|current|config|corpus|sessions\/[a-f0-9]{32}\/(attachment|profile|preflight|answer-sheet|override|record|reported-submitted|sponsorship-mode|fill-mode|longform))$/.test(message.path)) throw new Error("API path is not allowed.");
     const {server, token} = await paired();
-    const post = /^\/api\/(corpus|sessions\/[a-f0-9]{32}\/(preflight|answer-sheet|override|record|reported-submitted|sponsorship-mode))$/.test(message.path);
+    const post = /^\/api\/(corpus|sessions\/[a-f0-9]{32}\/(preflight|answer-sheet|override|record|reported-submitted|sponsorship-mode|longform))$/.test(message.path);
     if (message.path.endsWith("/fill-mode") && message.body !== undefined) throw new Error("Use application mode restriction for mode changes.");
     const preflight = message.path.endsWith("/preflight");
     const response = await fetch(server + message.path, post ? {method: "POST", headers: {"X-Portal-Token": token, "Content-Type": "application/json"}, body: JSON.stringify(preflight ? {fields: message.body?.fields ?? null} : message.body ?? {})}

@@ -20,6 +20,7 @@ from urllib.parse import urlsplit
 
 import answer_sheet
 import application_mode
+import longform
 import portal_record
 import question_corpus
 from portal_profile import hard_fact_errors, load_sponsorship_mode, resolve_for_application, resolve_profile, save_override, save_sponsorship_mode
@@ -397,6 +398,27 @@ def make_server(pipeline, port=8766, token=None):
                         if not session or session.get("id") != match[1]:
                             raise ValueError("Preflight applies to the current session only.")
                         return self.send(200, run_preflight(pipeline.source, {key: value for key, value in session.items() if key != "content"}, fields))
+                    match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/longform", path)
+                    if match:
+                        if set(body) != {"question", "draft", "limit"}:
+                            raise ValueError("Send a question, draft, and portal limit only.")
+                        question, draft, limit = body["question"], body["draft"], body["limit"]
+                        if not isinstance(question, str) or not question.strip() or len(question) > 2000:
+                            raise ValueError("Question must be a nonempty bounded string.")
+                        if not isinstance(draft, str) or len(draft) > 20000:
+                            raise ValueError("Draft must be a bounded string.")
+                        if type(limit) is not int or not 0 < limit <= 20000:
+                            raise ValueError("Portal limit must be a positive bounded integer.")
+                        session = pipeline.current()
+                        if not session or session.get("id") != match[1]:
+                            raise ValueError("Draft checks apply to the current session only.")
+                        evidence = longform.evidence_for(question, pipeline.source)
+                        fit = longform.fit(draft, limit)
+                        unsupported = longform.check_numbers(draft, evidence)
+                        return self.send(200, {"status": "draft_needs_review" if evidence else "pending",
+                            "selectable": bool(evidence and draft.strip() and fit["ok"] and not unsupported),
+                            "evidence": evidence, "count": fit["count"], "limit": limit,
+                            "fit": fit, "unsupported_numbers": unsupported})
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/(build|approve-upload)", path)
                     if match:
                         method = pipeline.build if match[2] == "build" else pipeline.approve_upload

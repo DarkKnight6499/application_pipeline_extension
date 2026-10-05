@@ -405,7 +405,8 @@
         if (checkApplication?.required) await checkApplication();
         checkCollateral();
         checkCurrent(control);
-        if (element.maxLength > 0 && expected.length > element.maxLength) throw new Error("Answer exceeds the portal's length limit.");
+        const characterCount = isLongform(field) ? expected.replace(/\r\n|\r|\n/g, "\r\n").length : expected.length;
+        if (element.maxLength > 0 && characterCount > element.maxLength) throw new Error("Answer exceeds the portal's length limit.");
         setNative(element, expected);
       }
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -427,7 +428,12 @@
     }
   }
 
-  async function fillSelected(selections, {overwrite = false, attachment = null, manualIds = []} = {}) {
+  function isLongform(field) {
+    return field?.type === "textarea" && !field.blocked && !/^(employment|education)\./.test(field.key || "")
+      && /\b(projects?|experience|work|background|roles?|duties|responsibilities|contributions?|achievements?|accomplishments?|challenges?|impact|initiative|why|company|employer|organization|organisation|interested|interest|motivation|join|fit)\b/i.test(field.label);
+  }
+
+  async function fillSelected(selections, {overwrite = false, attachment = null, manualIds = [], validateLongform = null} = {}) {
     if (!Array.isArray(manualIds) || manualIds.some(id => typeof id !== "string")) throw new Error("Manual field IDs must be an array of strings.");
     const manualFields = new Set(manualIds);
     const adapter = route();
@@ -494,6 +500,20 @@
         continue;
       }
       const control = controls.get(selection.id);
+      if (isLongform(control?.field)) {
+        try {
+          if (selection.longformReviewed !== true || typeof validateLongform !== "function") throw new Error("Check and review this draft before selecting it.");
+          const limit = control.element.maxLength;
+          if (!Number.isSafeInteger(limit) || limit <= 0) throw new Error("No verified portal character limit. Complete this draft manually.");
+          const report = await validateLongform({question: control.field.label, draft: String(selection.value ?? ""), limit});
+          if (report?.selectable !== true || report.status !== "draft_needs_review" || report.fit?.ok !== true
+              || report.limit !== limit || control.element.maxLength !== limit || !Array.isArray(report.unsupported_numbers) || report.unsupported_numbers.length
+              || !Array.isArray(report.evidence) || !report.evidence.length) throw new Error("Draft lacks valid evidence or exceeds the portal limit.");
+          if (adapter?.humanGate(document)) throw new Error("A human gate appeared. Complete it yourself, then rescan.");
+          checkCollateral();
+          checkCurrent(control);
+        } catch (error) { results.push(refused(selection, error.message)); continue; }
+      }
       const checkApplication = async () => {
         if (adapter?.requiresApplicationMode === true) {
           if (!globalThis.PortalApplicationMode) throw new Error("Application mode guard is unavailable.");
@@ -529,5 +549,5 @@
 
   // Adapters delegate to these legacy bodies, which stay otherwise private to the engine closure.
   const core = {scan: scanCore, propose: proposeCore, fill: fillField, verify: verifyCore};
-  globalThis.PortalEngine = {scan, fill, optionMatch, inspect, profileRecords, core};
+  globalThis.PortalEngine = {scan, fill, optionMatch, inspect, profileRecords, core, isLongform};
 })();

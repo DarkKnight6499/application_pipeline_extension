@@ -51,7 +51,15 @@
           PortalApplicationMode.bind(message.applicationContext);
           await PortalApplicationMode.check(adapter);
         }
-        return PortalEngine.fill(message.selections, message.options);
+        const validateLongform = async body => {
+          const targetUrl = location.href;
+          const result = await chrome.runtime.sendMessage({type: "portal-longform", body,
+            sessionId: message.applicationContext?.sessionId});
+          if (location.href !== targetUrl) throw new Error("Application page changed during draft checks. Rescan.");
+          if (!result?.ok) throw new Error(result?.error || "Draft checks could not be completed.");
+          return result.value;
+        };
+        return PortalEngine.fill(message.selections, {...message.options, validateLongform});
       };
       action().then(value => sendResponse({ok: true, value}))
         .catch(error => sendResponse({ok: false, error: error.message}));
