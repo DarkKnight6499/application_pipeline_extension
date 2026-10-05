@@ -101,6 +101,7 @@
 
   async function guardedNext(adapter = null) {
     if (settings.allowGuardedNext !== true) return refuse("guarded_next_off");
+    if (adapter?.mode === "answer_sheet_only") return refuse("answer_sheet_only");
     if (adapter?.humanGate(document)) return refuse("human_gate");
     if (detectFinalReview(document, adapter).final) return refuse("final_review");
     const sweep = await requiredSweep(adapter);
@@ -114,6 +115,7 @@
     if (detectFinalReview(document, adapter).final) return refuse("final_review");
     if (!node || node.matches("button[type=submit],input[type=submit],input[type=image]")
         || DENY.some(term => normalize(labelOf(node)).includes(term))) return refuse("next_unresolved");
+    if (adapter?.mode === "answer_sheet_only") return refuse("answer_sheet_only");
     nextActions++;
     node.click();
     return {status: "clicked", ref: next.ref, label: next.label, message: "Next clicked once."};
