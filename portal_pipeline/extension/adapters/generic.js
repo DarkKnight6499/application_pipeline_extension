@@ -1,4 +1,4 @@
-/* Generic adapter wraps the engine's legacy field logic; workday reuses it unchanged. */
+/* Generic adapter wraps the engine's legacy field logic. */
 (() => {
   if (!globalThis.PortalAdapters || globalThis.PortalAdapters.list().some(item => item.id === "generic")) return;
   // Passwords are protected per control, never gated page-wide; mfa and email_code kinds are reserved for adapters.
@@ -40,5 +40,4 @@
     detectFinalReview: doc => globalThis.PortalProgress ? PortalProgress.detectFinalReview(doc || document) : {final: false, reasons: []}
   };
   PortalAdapters.register(generic);
-  PortalAdapters.register({...generic, id: "workday", hosts: [/(^|\.)myworkdayjobs\.com$/]});
 })();
