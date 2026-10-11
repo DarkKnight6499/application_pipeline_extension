@@ -14,6 +14,8 @@ A Manifest V3 extension and a local Python helper that review and fill only the 
 
 ## Done so far
 
+**October 11, 2026 browser-free question reader, fabricated input only.** `question_reader.py` converts a saved Greenhouse-shaped posting response into an export-shaped report that passes export validation and drafts fixtures. It has no network code, counts demographic and compliance blocks without listing them, and supports Greenhouse only. Nine tests pass. No live call was made or authorized. See QUESTION_READER.md.
+
 **October 11, 2026 date range hardening, synthetic only.** Profile date ranges now tolerate unspaced en and em dashes, a spaced hyphen, Sept, and abbreviation periods, while Present, year-only, reversed, and three-part ranges stay pending. Four new tests plus the existing profile tests pass. The Workday-side en dash import risk remains UNVERIFIED. Workday listbox buttons and add-row flows were not changed: they need a real export.
 
 **October 11, 2026 adapter invariants and export intake, synthetic only.** A new invariants test fails if any adapter file is unclassified, an unrouted adapter gains hosts, the manifest permissions change, or an unrouted adapter enters the unconditional injection lists. The offline `export_intake.py` validates Inspect exports for leaks and drafts a contract and fixtures from them (ten unit tests and a browser round trip). A first full PUBLIC run on the frame fill commit exposed one wrong wiring assertion in my own handoff test; it is fixed. See EXPORT_INTAKE.md.
