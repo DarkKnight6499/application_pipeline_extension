@@ -69,7 +69,7 @@
         if (coverage?.reason_codes.length) panel.append(element("p", `Incomplete inspection: ${coverage.visible_iframes} visible iframe(s), ${coverage.visible_open_shadow_hosts} visible open shadow host(s), and ${coverage.unsupported_spinbuttons} unsupported spinbutton(s). Inspect those surfaces manually.`, {class: "note"}));
         if (!report.fields.length) panel.append(element("p", "No application fields found. This may be a posting, login page, or unsupported form. Inspect the next application page after manual navigation.", {class: "note"}));
         if (report.portal_manual_reason) panel.append(element("p", report.portal_manual_reason, {class: "note"}));
-        for (const field of report.fields) {
+        const renderField = field => {
           const card = element("div", "", {class: "field"});
           card.append(element("h3", field.label || "Unlabelled control"));
           card.append(element("p", `${field.type}, ${field.section}${field.required ? ", required" : ""}${field.disabled ? ", disabled" : ""}. ${field.option_count} options.`, {class: "source"}));
@@ -77,6 +77,11 @@
           if (field.dropdown_state && !field.dropdown_state.options_observed) card.append(element("p", "Choices have not been inspected. Open this dropdown manually and rescan to inspect its structure.", {class: "source"}));
           if (field.manual_reason) card.append(element("p", field.manual_reason, {class: "source"}));
           panel.append(card);
+        };
+        report.fields.forEach(renderField);
+        for (const frame of report.frame_reports || []) {
+          panel.append(element("h3", `Frame ${frame.frame_id} (${frame.host}): ${frame.fields.length} visible, unprotected controls. Read only.`));
+          frame.fields.forEach(renderField);
         }
       } catch (error) {status.textContent = error.message;}
       return host;
