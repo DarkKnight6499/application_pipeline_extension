@@ -14,7 +14,7 @@
     }
     if (message.type !== "portal-inspect" && reviewUrl.searchParams.get("tab") !== String(message.tabId)) return;
     if (message.type === "portal-inspect") {
-      try { sendResponse({ok: true, value: PortalEngine.inspect()}); }
+      try { sendResponse({ok: true, value: {...PortalEngine.inspect(), handoff: globalThis.PortalHandoff ? PortalHandoff.scan(document) : []}}); }
       catch (error) { sendResponse({ok: false, error: error.message}); }
     } else if (message.type === "portal-scan") {
       try { sendResponse({ok: true, value: PortalEngine.scan(message.profile, {bindings: message.bindings || {}})}); }

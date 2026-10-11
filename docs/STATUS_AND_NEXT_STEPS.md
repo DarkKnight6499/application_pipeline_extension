@@ -14,6 +14,8 @@ A Manifest V3 extension and a local Python helper that review and fill only the 
 
 ## Done so far
 
+**October 11, 2026 handoff resolution (PF14), synthetic only.** Inspection mode lists visible apply links with the ATS and support level their host maps to, without following them. Five tests, including a loaded-extension test, pass. This completes the PF1 to PF14 preparation list at the synthetic level; every unrouted adapter still needs a real export before any host is registered. See HANDOFF_RESOLUTION.md.
+
 **October 11, 2026 SmartRecruiters (PF13) and BrassRing (PF11) preparation, synthetic only.** Both are unrouted answer-sheet-only adapters with `hosts: []` and refusing writers; BrassRing also gates on a visible password field. Eight and nine new tests pass. Both structures are UNVERIFIED pending exports. See contracts/SMARTRECRUITERS_CONTRACT.md and contracts/BRASSRING_CONTRACT.md. No live employer action occurred.
 
 **October 11, 2026 read-only same-origin frame inspection (iCIMS preparation), synthetic only.** Inspection mode now injects a read-only bridge into accessible frames and lists their controls under the panel and in the export. Top-level commands target frameId 0. Fill, answer sheet and application mode in frames are not implemented. Two tests, including a loaded-extension test on the paired loopback origin, pass. See FRAME_INSPECTION.md.

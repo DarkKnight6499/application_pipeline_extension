@@ -79,6 +79,10 @@
           panel.append(card);
         };
         report.fields.forEach(renderField);
+        if (report.handoff?.length) {
+          panel.append(element("h3", "Apply links on this page (not followed)"));
+          for (const link of report.handoff) panel.append(element("p", `"${link.label}" goes to ${link.host}: ${link.ats === "unknown" ? "unrecognized ATS" : link.ats}, ${link.support}. Open it yourself, then inspect that page.`, {class: "source"}));
+        }
         for (const frame of report.frame_reports || []) {
           panel.append(element("h3", `Frame ${frame.frame_id} (${frame.host}): ${frame.fields.length} visible, unprotected controls. Read only.`));
           frame.fields.forEach(renderField);
