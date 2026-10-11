@@ -134,6 +134,23 @@ Open http://127.0.0.1:8766 in Edge. Use this exact loopback address.
 3. In the extension's Application record, enter any employer reference and choose I submitted this myself. The extension prints the tracker command and does not update the tracker.
 4. Run that command through the existing Resume workflow only after confirming submission. It uses --id for Application ID and --employer-ref for the employer reference when supplied.
 
+## Minimal first trial (go and no-go)
+
+Use this for the first live Greenhouse check. Record results in a private copy of `LIVE_VALIDATION_EVIDENCE_TEMPLATE.md` under `portal_pipeline/data/exports/greenhouse/`, never in Git.
+
+Go only if all of these hold:
+
+- The branch SHA you loaded is recorded, and PUBLIC and FULL passed on that SHA.
+- The helper runs on `127.0.0.1` and is paired, and the audited folder import passed with its `.application_id`.
+- The posting is hosted on `job-boards.greenhouse.io`. An embedded board on an employer domain is no-go for fill.
+- You cleared login and any CAPTCHA by hand and no challenge is visible.
+- The panel names Greenhouse, not the fallback.
+- You select at most two native text fields, both empty, with Replace existing off.
+
+Stop immediately if an unselected field changes, a value reverts after blur, a validation error appears, a CAPTCHA appears, or you reach Next, Review, or Submit. Never click those during this trial.
+
+Record privately: hostname, SHA, time, labels and types of the selected fields, readback match, unselected fields unchanged, value still present after one manual blur and scroll, export filename, a screenshot with values masked, and confirmation that nothing was submitted, signed, or attested. Send only pass or fail per row back to the repository, never values.
+
 ## Unverified items
 
 - Sponsorship toggle and the extension's printed tracker command are implemented and synthetically tested. Employer retention of the reviewed fields remains unverified.
