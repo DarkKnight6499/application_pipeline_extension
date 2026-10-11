@@ -1,0 +1,8 @@
+{
+  "author": "Yazad Madan",
+  "evidence": "synthetic_only",
+  "cases": [
+    {"name": "ashby_form", "page": "page_1.html", "gate": null},
+    {"name": "ashby_hcaptcha_form", "page": "hcaptcha_form.html", "gate": "captcha"}
+  ]
+}
