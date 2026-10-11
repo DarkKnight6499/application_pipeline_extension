@@ -55,3 +55,5 @@ The top-level `portal` value in the export reports only `greenhouse` or `generic
 - `portal_pipeline/extension/page-bridge.js`: inspection mode rejects scan and fill commands.
 - `portal_pipeline/INSPECTION.md` and `docs/LIVE_TEST_RUNBOOK.md`: current human workflow and existing runbook constraints.
 - `portal_pipeline/HANDOFF.md`: live compatibility status and remaining limits.
+
+After capture, run `python export_intake.py validate` on the exports before sharing, and `draft` to produce a contract skeleton and fixtures. See EXPORT_INTAKE.md.

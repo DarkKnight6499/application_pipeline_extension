@@ -14,6 +14,8 @@ A Manifest V3 extension and a local Python helper that review and fill only the 
 
 ## Done so far
 
+**October 11, 2026 adapter invariants and export intake, synthetic only.** A new invariants test fails if any adapter file is unclassified, an unrouted adapter gains hosts, the manifest permissions change, or an unrouted adapter enters the unconditional injection lists. The offline `export_intake.py` validates Inspect exports for leaks and drafts a contract and fixtures from them (ten unit tests and a browser round trip). A first full PUBLIC run on the frame fill commit exposed one wrong wiring assertion in my own handoff test; it is fixed. See EXPORT_INTAKE.md.
+
 **October 11, 2026 iCIMS frame fill (PF7), synthetic only.** The page bridge now runs in accessible frames and serves scan and fill only for an adapter marked frameFill (the unrouted iCIMS adapter). The review page picks a frame only when the top page has no visible fields and one frameFill frame has fields; frame URL and same-origin checks gate each command; progression is refused in frames; the earlier read-only frame-bridge.js was folded into page-bridge.js. Ten mocked-API tests and two loaded-extension tests pass. No real iCIMS host is registered. See FRAME_SUPPORT.md.
 
 **October 11, 2026 handoff resolution (PF14), synthetic only.** Inspection mode lists visible apply links with the ATS and support level their host maps to, without following them. Five tests, including a loaded-extension test, pass. This completes the PF1 to PF14 preparation list at the synthetic level; every unrouted adapter still needs a real export before any host is registered. See HANDOFF_RESOLUTION.md.
