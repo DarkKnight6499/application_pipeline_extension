@@ -73,8 +73,9 @@ class PublicHandoffTests(SyntheticBrowserTest):
         for name in ("popup.js", "review.js"):
             text = (EXTENSION / name).read_text(encoding="utf-8")
             self.assertLess(text.index("adapters/generic.js"), text.index("handoff.js"), name)
-            self.assertLess(text.index("handoff.js"), text.index("page-bridge.js"), name)
-        self.assertNotIn("handoff", (EXTENSION / "frame-bridge.js").read_text(encoding="utf-8"))
+            self.assertLess(text.index("handoff.js"), text.rindex("page-bridge.js"), name)
+        frame_line = next(line for line in (EXTENSION / "review.js").read_text(encoding="utf-8").splitlines() if line.startswith("const FRAME_FILES"))
+        self.assertNotIn("handoff", frame_line)
 
     def test_loaded_review_lists_apply_links_without_following(self):
         origin_url = "http://127.0.0.1:18766"
