@@ -1,0 +1,38 @@
+# Author: Yazad Madan
+# Runs the PUBLIC synthetic suite on Linux. FULL needs the private Resume checkout and stays local.
+name: public-tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  public:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: portal_pipeline/requirements-dev.txt
+      - name: Install dependencies
+        run: pip install -r portal_pipeline/requirements-dev.txt
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Syntax checks
+        run: |
+          for file in portal_pipeline/extension/*.js portal_pipeline/extension/adapters/*.js; do node --check "$file"; done
+          python -m compileall -q portal_pipeline
+      - name: PUBLIC suite
+        working-directory: portal_pipeline/tests
+        run: python -m unittest discover -s . -p "test_public_*.py"
