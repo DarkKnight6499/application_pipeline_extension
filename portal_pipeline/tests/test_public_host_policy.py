@@ -11,7 +11,7 @@ UNSUPPORTED_URL = PAIRING_ORIGIN + "/not-the-paired-fixture"
 POLICY_ERROR = "Development is limited to Workday, Greenhouse, or the paired local fixture."
 POLICY_CASES = [
     ("https://tenant.myworkdayjobs.com/apply", None, True),
-    ("http://myworkdayjobs.com/apply", None, True),
+    ("http://myworkdayjobs.com/apply", None, False),
     ("https://job-boards.greenhouse.io/jobs/123", None, True),
     ("https://greenhouse.io/", None, True),
     ("https://myworkdayjobs.com.evil.invalid/", None, False),

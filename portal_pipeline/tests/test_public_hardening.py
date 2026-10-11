@@ -62,6 +62,19 @@ class HandoffWorkdaySiteTests(SyntheticBrowserTest):
         self.assertEqual(self.page.evaluate("PortalHandoff.resolve('https://evilmyworkdaysite.com/x').ats"), "unknown")
 
 
+class HttpPolicyTests(SyntheticBrowserTest):
+    def test_plain_http_is_never_an_employer_host(self):
+        self.open_markup("<h1>x</h1>", URL)
+        self.page.add_script_tag(path=str(EXTENSION / "host-policy.js"))
+        for url, expected in (("http://acme.myworkdayjobs.com/x", False), ("http://job-boards.greenhouse.io/x", False),
+                              ("http://greenhouse.io/", False), ("https://acme.myworkdayjobs.com/x", True),
+                              ("https://job-boards.greenhouse.io/x", True)):
+            with self.subTest(url=url):
+                self.assertEqual(self.page.evaluate("url => PortalHostPolicy.supported(url, null)", url), expected)
+        self.assertEqual(self.page.evaluate("PortalHostPolicy.supported('http://127.0.0.1:18766/fixture', 'http://127.0.0.1:18766')"), True)
+        self.assertIsNone(self.page.evaluate("PortalHostPolicy.mode('http://acme.myworkdayjobs.com/x', null)"))
+
+
 class ExportIntakeOutDirTests(unittest.TestCase):
     def test_tracked_repo_paths_are_refused(self):
         root = export_intake.REPO_ROOT

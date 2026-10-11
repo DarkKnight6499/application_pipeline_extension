@@ -667,7 +667,7 @@ class BrowserTests(unittest.TestCase):
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             # Opening popup.html in a test tab does not grant activeTab. Give only
             # routed synthetic hosts test permissions; production stays unchanged.
-            manifest["host_permissions"] += ["https://inspection-fixture.myworkdayjobs.com/*", "https://job-boards.greenhouse.io/*", "https://jobs.lever.co/*"]
+            manifest["host_permissions"] += ["https://inspection-fixture.myworkdayjobs.com/*", "https://job-boards.greenhouse.io/*", "https://jobs.lever.co/*", "http://jobs.lever.co/*"]
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
             context = self.playwright.chromium.launch_persistent_context(str(Path(browser_profile) / "profile"), channel="chromium", headless=True,
                 args=[f"--disable-extensions-except={extension}", f"--load-extension={extension}"])
@@ -751,8 +751,8 @@ class BrowserTests(unittest.TestCase):
                 self.assertEqual(page.locator("#resume").evaluate("node => node.files.length"), 0)
                 self.assertFalse(any("/api/" in url for url in requests))
                 # Other portal families remain outside this first-portal run.
-                context.route("https://jobs.lever.co/fixture", lambda route: route.fulfill(body="Other portal"))
-                page.goto("https://jobs.lever.co/fixture")
+                context.route("http://jobs.lever.co/fixture", lambda route: route.fulfill(body="Other portal"))
+                page.goto("http://jobs.lever.co/fixture")
                 popup = context.new_page()
                 popup.goto(f"chrome-extension://{extension_id}/popup.html")
                 page.bring_to_front()

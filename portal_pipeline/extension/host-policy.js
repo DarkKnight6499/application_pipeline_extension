@@ -8,7 +8,8 @@
       // Registered non-generic adapters define the supported hosts; the literal pattern covers pages without the registry.
       const adapter = globalThis.PortalAdapters?.forLocation(targetUrl);
       const hosted = adapter ? adapter.id !== "generic" : /(^|\.)(myworkdayjobs\.com|greenhouse\.io)$/.test(url.hostname);
-      return localFixture || hosted;
+      // Employer hosts must be https; plain http is accepted only for the paired loopback fixture.
+      return localFixture || (hosted && url.protocol === "https:");
     } catch { return false; }
   }
 
