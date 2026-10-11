@@ -1,0 +1,22 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="author" content="Yazad Madan"><title>Synthetic Eightfold form</title></head><body>
+<h1>Application</h1>
+<form id="synthetic-eightfold" novalidate>
+<label>First name<input id="first-name" name="firstName" required></label>
+<div id="relocate" role="combobox" tabindex="0" aria-label="Are you willing to relocate?" aria-controls="relocate-list" aria-expanded="false" aria-haspopup="listbox" aria-valuetext="" style="display:block;border:1px solid #888;padding:4px;width:200px">Select</div>
+<div id="relocate-list" role="listbox" style="display:none"><div role="option" id="relocate-yes">Yes</div><div role="option" id="relocate-no">No</div></div>
+<button type="button" id="next">Next</button>
+</form>
+<script>
+  const combo = document.getElementById("relocate"), list = document.getElementById("relocate-list");
+  combo.addEventListener("click", () => {
+    const open = combo.getAttribute("aria-expanded") === "true";
+    combo.setAttribute("aria-expanded", String(!open));
+    list.style.display = open ? "none" : "block";
+  });
+  list.querySelectorAll("[role=option]").forEach(option => option.addEventListener("click", () => {
+    combo.setAttribute("aria-valuetext", option.textContent);
+    combo.setAttribute("aria-expanded", "false");
+    list.style.display = "none";
+  }));
+</script>
+</body></html>

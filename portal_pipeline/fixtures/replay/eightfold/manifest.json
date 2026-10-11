@@ -1,0 +1,8 @@
+{
+  "author": "Yazad Madan",
+  "evidence": "synthetic_only",
+  "cases": [
+    {"name": "eightfold_form", "page": "page_1.html", "gate": null},
+    {"name": "eightfold_cookie_banner", "page": "cookie_banner.html", "gate": "cookie_banner"}
+  ]
+}
