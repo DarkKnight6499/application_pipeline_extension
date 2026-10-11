@@ -14,13 +14,13 @@ FRAME = '<label>Frame name<input id="frame-name" value="Frame untouched"></label
 class PublicFrameInspectTests(SyntheticBrowserTest):
     def test_static_wiring(self):
         review = (EXTENSION / "review.js").read_text(encoding="utf-8")
-        self.assertIn("{frameId: 0}", review)
-        self.assertIn("if (inspectionOnly) await injectFrames()", review)
-        bridge = (EXTENSION / "frame-bridge.js").read_text(encoding="utf-8")
-        for forbidden in ("portal-fill", "portal-scan", "portal-mode", "portal-progress", "PortalEngine.fill"):
-            self.assertNotIn(forbidden, bridge)
+        self.assertIn("const send = (frameId, message)", review)
+        self.assertIn("await injectFrames();", review)
+        self.assertFalse((EXTENSION / "frame-bridge.js").exists())
+        bridge = (EXTENSION / "page-bridge.js").read_text(encoding="utf-8")
+        self.assertIn('frameAdapter?.frameFill !== true', bridge)
         popup = (EXTENSION / "popup.js").read_text(encoding="utf-8")
-        self.assertNotIn("frame-bridge", popup)
+        self.assertNotIn("adapters/icims.js", popup)
 
     def test_loaded_review_inspects_same_origin_frame_read_only(self):
         with tempfile.TemporaryDirectory() as profile:

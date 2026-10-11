@@ -14,11 +14,13 @@ A Manifest V3 extension and a local Python helper that review and fill only the 
 
 ## Done so far
 
+**October 11, 2026 iCIMS frame fill (PF7), synthetic only.** The page bridge now runs in accessible frames and serves scan and fill only for an adapter marked frameFill (the unrouted iCIMS adapter). The review page picks a frame only when the top page has no visible fields and one frameFill frame has fields; frame URL and same-origin checks gate each command; progression is refused in frames; the earlier read-only frame-bridge.js was folded into page-bridge.js. Ten mocked-API tests and two loaded-extension tests pass. No real iCIMS host is registered. See FRAME_SUPPORT.md.
+
 **October 11, 2026 handoff resolution (PF14), synthetic only.** Inspection mode lists visible apply links with the ATS and support level their host maps to, without following them. Five tests, including a loaded-extension test, pass. This completes the PF1 to PF14 preparation list at the synthetic level; every unrouted adapter still needs a real export before any host is registered. See HANDOFF_RESOLUTION.md.
 
 **October 11, 2026 SmartRecruiters (PF13) and BrassRing (PF11) preparation, synthetic only.** Both are unrouted answer-sheet-only adapters with `hosts: []` and refusing writers; BrassRing also gates on a visible password field. Eight and nine new tests pass. Both structures are UNVERIFIED pending exports. See contracts/SMARTRECRUITERS_CONTRACT.md and contracts/BRASSRING_CONTRACT.md. No live employer action occurred.
 
-**October 11, 2026 read-only same-origin frame inspection (iCIMS preparation), synthetic only.** Inspection mode now injects a read-only bridge into accessible frames and lists their controls under the panel and in the export. Top-level commands target frameId 0. Fill, answer sheet and application mode in frames are not implemented. Two tests, including a loaded-extension test on the paired loopback origin, pass. See FRAME_INSPECTION.md.
+**October 11, 2026 read-only same-origin frame inspection (iCIMS preparation), synthetic only.** Inspection mode now injects a read-only bridge into accessible frames and lists their controls under the panel and in the export. Top-level commands target frameId 0. Fill, answer sheet and application mode in frames are not implemented. Two tests, including a loaded-extension test on the paired loopback origin, pass. See FRAME_SUPPORT.md.
 
 **October 11, 2026 answer-sheet fallback for unrouted hosts, synthetic only.** Public https hosts without an adapter now receive an injected answer-sheet-only adapter through the popup and review panel; fill, upload and Next are refused and no manifest permission changed. Nine new tests pass; host policy, Phenom, Oracle, replay, and application-mode MV3 tests still pass. A loaded-extension check was not possible because the harness cannot grant activeTab. See ANSWER_SHEET_FALLBACK.md.
 
