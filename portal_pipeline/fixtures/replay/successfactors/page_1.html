@@ -1,0 +1,21 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="author" content="Yazad Madan"><title>Synthetic SuccessFactors form</title></head><body>
+<h1>Application</h1>
+<form id="synthetic-sf" novalidate>
+<section><h2>Contact</h2>
+<label>First name<input id="first-name" name="firstName" required></label>
+<label>Country<select id="country" name="country"><option value="">Select</option><option value="US">United States</option><option value="CA">Canada</option></select></label>
+<div id="relocate" role="combobox" tabindex="0" aria-label="Are you willing to relocate?" aria-controls="relocate-list" aria-expanded="false" aria-haspopup="listbox" aria-valuetext="">Select</div>
+<div id="relocate-list" role="listbox" style="display:none"><div role="option">Yes</div><div role="option">No</div></div>
+</section>
+<section><h2>Parsed profile preview</h2>
+<label>Parsed name<input id="parsed-name" value="Synthetic Parsed"></label>
+<label>Parsed city<input id="parsed-city" value="Fabricated City"></label>
+</section>
+<button type="button" id="next">Next</button>
+</form>
+<script>
+  const combo = document.getElementById("relocate"), list = document.getElementById("relocate-list");
+  combo.addEventListener("click", () => { const open = combo.getAttribute("aria-expanded") === "true"; combo.setAttribute("aria-expanded", String(!open)); list.style.display = open ? "none" : "block"; });
+  list.querySelectorAll("[role=option]").forEach(o => o.addEventListener("click", () => { combo.setAttribute("aria-valuetext", o.textContent); combo.setAttribute("aria-expanded", "false"); list.style.display = "none"; }));
+</script>
+</body></html>

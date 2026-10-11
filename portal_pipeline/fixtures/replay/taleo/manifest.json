@@ -1,0 +1,5 @@
+{"author": "Yazad Madan", "evidence": "synthetic_only", "cases": [
+  {"name": "taleo_sign_in", "page": "sign_in.html", "kind": "sign_in", "gate": "sign_in"},
+  {"name": "taleo_form", "page": "page_1.html", "kind": "form", "gate": null},
+  {"name": "taleo_review", "page": "review.html", "kind": "review", "gate": null}
+]}

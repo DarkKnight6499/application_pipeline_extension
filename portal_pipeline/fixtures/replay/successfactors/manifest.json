@@ -1,0 +1,4 @@
+{"author": "Yazad Madan", "evidence": "synthetic_only", "cases": [
+  {"name": "successfactors_form", "page": "page_1.html", "preview_rows": 2},
+  {"name": "successfactors_sign_in", "page": "sign_in.html", "preview_rows": 0}
+]}
