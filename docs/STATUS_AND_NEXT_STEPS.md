@@ -14,6 +14,8 @@ A Manifest V3 extension and a local Python helper that review and fill only the 
 
 ## Done so far
 
+**October 11, 2026 date range hardening, synthetic only.** Profile date ranges now tolerate unspaced en and em dashes, a spaced hyphen, Sept, and abbreviation periods, while Present, year-only, reversed, and three-part ranges stay pending. Four new tests plus the existing profile tests pass. The Workday-side en dash import risk remains UNVERIFIED. Workday listbox buttons and add-row flows were not changed: they need a real export.
+
 **October 11, 2026 adapter invariants and export intake, synthetic only.** A new invariants test fails if any adapter file is unclassified, an unrouted adapter gains hosts, the manifest permissions change, or an unrouted adapter enters the unconditional injection lists. The offline `export_intake.py` validates Inspect exports for leaks and drafts a contract and fixtures from them (ten unit tests and a browser round trip). A first full PUBLIC run on the frame fill commit exposed one wrong wiring assertion in my own handoff test; it is fixed. See EXPORT_INTAKE.md.
 
 **October 11, 2026 iCIMS frame fill (PF7), synthetic only.** The page bridge now runs in accessible frames and serves scan and fill only for an adapter marked frameFill (the unrouted iCIMS adapter). The review page picks a frame only when the top page has no visible fields and one frameFill frame has fields; frame URL and same-origin checks gate each command; progression is refused in frames; the earlier read-only frame-bridge.js was folded into page-bridge.js. Ten mocked-API tests and two loaded-extension tests pass. No real iCIMS host is registered. See FRAME_SUPPORT.md.

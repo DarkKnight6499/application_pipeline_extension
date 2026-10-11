@@ -50,3 +50,7 @@ The shared engine recognizes existing `data-automation-id` values beginning with
 - Collect Inspect-only structure exports for each page after the human completes login. Confirm all selectors, required markers, listbox ownership, row grouping, upload shape, navigation labels, and final review.
 - Check whether actual Workday pages revert native setter writes. The synthetic reversion case reports failure. Any live reversion needs human review before changing fill strategy.
 - Check en-dash date import only through a human-operated throwaway account. No master date change belongs to this phase.
+
+## Date range parsing (October 11, 2026)
+
+The profile builder now splits an employment date range on an en or em dash with or without spaces, a spaced hyphen, or "to", and reads Sept and abbreviated months with periods. An unspaced hyphen is not a separator, so ISO dates are never split. An unreadable side such as Present stays pending while a readable side keeps its own fact, a reversed range clears both, and nothing is guessed. This covers only our own parsing of the master resume. Whether the Workday resume import drops dates joined by an en dash is still UNVERIFIED and needs the throwaway-account check above. Tests: `test_public_date_ranges.py`.

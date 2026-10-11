@@ -54,8 +54,14 @@ def plain(value: str) -> str:
     return value.replace("**", "").replace("\u2014", ",").strip()
 
 
+# A date range splits on an en or em dash with or without spaces, a spaced hyphen, or "to".
+# An unspaced hyphen is not a separator, so ISO dates such as 2020-01 are never split.
+RANGE_SEPARATOR = re.compile(r"\s*[\u2013\u2014]\s*|\s+-\s+|\s+to\s+", re.I)
+
+
 def month(value: str) -> str | None:
     import datetime
+    value = re.sub(r"\bsept\b", "Sep", value.replace(".", ""), flags=re.I)
     for pattern in ("%B %Y", "%b %Y"):
         try:
             return datetime.datetime.strptime(value.strip(), pattern).strftime("%Y-%m")
@@ -156,7 +162,7 @@ def resolve_profile(root: Path) -> dict:
     heading_lines = {line[4:].rstrip(): number for number, line in enumerate(boiler.splitlines(), 1) if line.startswith("### ")}
     employment = []
     for employer in master["experience"]:
-        date_parts = re.split(r"\s+[\u2013\u2014]\s+|\s+to\s+", employer["dateRange"])
+        date_parts = RANGE_SEPARATOR.split(employer["dateRange"].strip())
         for role in employer["roles"]:
             index = len(employment)
             prefix = f"employment.{index}."
