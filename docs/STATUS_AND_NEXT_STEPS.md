@@ -14,6 +14,8 @@ A Manifest V3 extension and a local Python helper that review and fill only the 
 
 ## Done so far
 
+**October 11, 2026 Lever preparation (PF8), synthetic only.** Unrouted `lever` adapter with `hosts: []`. Fill is limited to text-like fields; checkbox, radio, select and file scan as manual only and their writers refuse; uploads refuse; outside labels are read for display. Nine new tests pass. No manifest, host policy, injection list, or inherited test changed. See contracts/LEVER_CONTRACT.md. No live employer action occurred.
+
 **October 11, 2026 Ashby preparation (PF6), synthetic only.** Unrouted `ashby` adapter with `hosts: []`, fixed `answer_sheet_only` mode, refusing text and upload writers, honeypot filtering, and two fabricated replay pages. Eight new tests pass in Chromium (playwright 1.56 here, since only that browser build is installed). No manifest, host policy, injection list, or inherited test changed. Full FULL and PUBLIC suites were not rerun in this Linux container. See contracts/ASHBY_CONTRACT.md. No live employer action occurred.
 
 **October 5, 2026 live preparation, deferred by the user.** No exports were present in the extension checkouts and the browser connector returned an empty inventory. The validated 0.11.0 helper started locally and its dashboard returned HTTP 200, then was stopped when the user deferred the trial. No employer URL or audited folder was supplied, and no live employer page was opened, filled, or uploaded to. The runbook now points to the current live_prep checkout and distinguishes file-input assignment from employer upload completion and attachment persistence. A private-use evidence template is ready. Resume live work only when the user requests it and provides the selected URL and audited folder.
