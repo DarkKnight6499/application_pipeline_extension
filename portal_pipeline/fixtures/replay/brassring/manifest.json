@@ -1,0 +1,21 @@
+{
+  "author": "Yazad Madan",
+  "evidence": "synthetic_only",
+  "cases": [
+    {
+      "name": "brassring_form",
+      "page": "page_1.html",
+      "gate": null
+    },
+    {
+      "name": "brassring_hcaptcha_form",
+      "page": "hcaptcha_form.html",
+      "gate": "captcha"
+    },
+    {
+      "name": "brassring_sign_in",
+      "page": "sign_in.html",
+      "gate": "sign_in"
+    }
+  ]
+}

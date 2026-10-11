@@ -1,0 +1,8 @@
+{
+  "author": "Yazad Madan",
+  "evidence": "synthetic_only",
+  "cases": [
+    {"name": "smartrecruiters_form", "page": "page_1.html", "gate": null},
+    {"name": "smartrecruiters_hcaptcha_form", "page": "hcaptcha_form.html", "gate": "captcha"}
+  ]
+}
