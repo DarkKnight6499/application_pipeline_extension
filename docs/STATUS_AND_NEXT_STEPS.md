@@ -1,7 +1,7 @@
 ---
 author: Yazad Madan
-updated: 2026-10-05
-status: Version 0.11.0 validated: FULL 453 and PUBLIC 371 OK with 2 skips each; replay 4 OK
+updated: 2026-10-11
+status: Version 0.11.0 plus October 11 synthetic additions; PUBLIC 461 tests OK with 17 environment skips (PORTAL_SOURCE absent in the cloud); FULL last passed 453 before them and must be rerun locally
 ---
 
 # Status and next steps
@@ -13,6 +13,8 @@ This replaces the earlier probe reports and the two-prototype review. Their find
 A Manifest V3 extension and a local Python helper that review and fill only the fields the user selects. The human logs in, navigates and submits. The tool never submits, signs, attests, or handles passwords or CAPTCHAs. Sponsorship now and sponsorship in the future stay separate answers, and unknown answers stay pending.
 
 ## Done so far
+
+**October 11, 2026 advisor-reviewed hardening, synthetic only.** Four of the advisor's findings were reproduced in source and fixed with tests: helper `portal-api` requests are accepted only from the extension's own pages; a top-page human gate blocks frame fill; the handoff list no longer calls myworkdaysite.com routed (it gets the fallback); and `export_intake.py draft` refuses to write into a tracked repository path. **Decision needed from Yazad:** `host-policy.js` still accepts `http:` for routed hosts, but the inherited test `test_public_host_policy.py` explicitly expects `http://myworkdayjobs.com/apply` to be supported, so changing it means editing an inherited assertion. Not changed. Also open: the persistent CAPTCHA restriction covers only answer-sheet adapters, a restriction cannot be cleared, and Phenom's `[data-sitekey]` gate ignores visibility.
 
 **October 11, 2026 browser-free question reader, fabricated input only.** `question_reader.py` converts a saved Greenhouse-shaped posting response into an export-shaped report that passes export validation and drafts fixtures. It has no network code, counts demographic and compliance blocks without listing them, and supports Greenhouse only. Nine tests pass. No live call was made or authorized. See QUESTION_READER.md.
 

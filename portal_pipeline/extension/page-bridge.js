@@ -16,6 +16,13 @@
       if (frameAdapter?.frameFill !== true) return;
       if (message.type === "portal-progress") { sendResponse({ok: false, error: "Page progression is not available inside a frame."}); return; }
       if (!sameOriginAsTop() || message.frameUrl !== location.href) { sendResponse({ok: false, error: "The frame changed. Scan the current page again."}); return; }
+      // A challenge on the top page must stop frame writes too; the top document is readable because the frame is same-origin.
+      const topGate = message.type === "portal-fill" ? frameAdapter.humanGate(window.top.document) : null;
+      if (topGate) {
+        const reason = `A ${topGate.kind} step on the main page needs you. Nothing was written. Complete it yourself, then rescan.`;
+        sendResponse({ok: true, value: (message.selections || []).map(selection => ({id: selection.id, ok: false, status: "blocked_by_human_gate", actual: null, reason, message: reason}))});
+        return;
+      }
     }
     if (new URL(sender.url).searchParams.get("mode") === "inspect" && message.type !== "portal-inspect") {
       sendResponse({ok: false, error: "Inspection mode cannot scan candidate answers or fill fields."});

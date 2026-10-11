@@ -67,6 +67,16 @@ class PublicFrameFillTests(SyntheticBrowserTest):
         self.assertEqual(self.frame.locator("#secret").input_value(), "SYNTHETIC_SECRET")
         self.assertEqual(self.frame.evaluate("syntheticSubmits"), 0)
 
+    def test_top_page_captcha_blocks_frame_fill(self):
+        self.open_frame()
+        self.page.evaluate("""() => document.body.insertAdjacentHTML('beforeend', '<iframe title="hCaptcha" src="https://hcaptcha.example.invalid/c" style="width:100px;height:80px"></iframe>')""")
+        scan = self.send("portal-scan", profile={"values": {}}, bindings={})
+        first = next(f for f in scan["value"] if f["structure"]["dom_id"] == "first-name")
+        fill = self.send("portal-fill", selections=[{"id": first["id"], "value": "Synthetic"}], options={})
+        self.assertTrue(fill["ok"])
+        self.assertEqual(fill["value"][0]["status"], "blocked_by_human_gate")
+        self.assertEqual(self.frame.locator("#first-name").input_value(), "")
+
     def test_frame_overwrite_off_preserves(self):
         self.open_frame()
         self.frame.locator("#first-name").evaluate("node => node.value = 'Existing'")

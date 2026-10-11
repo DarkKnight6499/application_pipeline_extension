@@ -68,6 +68,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return result;
     }
     if (message.type !== "portal-api") throw new Error("Unknown extension request.");
+    // Content scripts run in employer pages and frames, so helper routes are served to the extension's own pages only.
+    if (sender.id !== chrome.runtime.id || typeof sender.url !== "string" || !sender.url.startsWith(chrome.runtime.getURL(""))) throw new Error("Helper requests are limited to the extension's own pages.");
     if (!/^\/api\/(profile|current|config|corpus|sessions\/[a-f0-9]{32}\/(attachment|profile|preflight|answer-sheet|override|record|reported-submitted|sponsorship-mode|fill-mode|longform))$/.test(message.path)) throw new Error("API path is not allowed.");
     const {server, token} = await paired();
     const post = /^\/api\/(corpus|sessions\/[a-f0-9]{32}\/(preflight|answer-sheet|override|record|reported-submitted|sponsorship-mode|longform))$/.test(message.path);

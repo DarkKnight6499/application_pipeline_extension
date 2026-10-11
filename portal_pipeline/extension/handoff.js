@@ -4,7 +4,9 @@
   // ats ids match the adapter ids. support: routed (adapter on real hosts), prepared (synthetic unrouted adapter),
   // inspect_only (frame inspection, no adapter), fallback (answer sheet fallback only). Host lists are UNVERIFIED except where routed.
   const RULES = [
-    [/(^|\.)(myworkdayjobs|myworkdaysite)\.com$/, "workday", "routed"],
+    [/(^|\.)myworkdayjobs\.com$/, "workday", "routed"],
+    // The Workday adapter does not route myworkdaysite.com, so that host only gets the answer-sheet fallback.
+    [/(^|\.)myworkdaysite\.com$/, "workday", "fallback"],
     [/(^|\.)greenhouse\.io$/, "greenhouse", "routed"],
     [/^careers\.(marsh|franklintempleton)\.com$/, "phenom", "routed"],
     [/(^|\.)lever\.co$/, "lever", "prepared"],

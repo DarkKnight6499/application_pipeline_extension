@@ -18,6 +18,7 @@ Guards, all enforced in the frame bridge:
 
 - The frame must be same-origin with the top page, and the command must carry the frame URL seen at selection; a navigated frame is refused until rescan.
 - Selected-fields-only fill, overwrite off by default, password and protected controls, and the CAPTCHA gate all come from the shared engine. Submit counters stay at zero in tests.
+- A CAPTCHA or other human gate on the same-origin top page blocks frame fill too, checked from the frame against the top document before each fill.
 - Page progression (guarded Next) is refused inside a frame.
 - The iCIMS adapter does not require application mode, so no application mode, restriction persistence, or long-form broker call runs from a frame; the background still accepts those only from the top frame. A frame fills without long-form drafts.
 - Every top-level command still targets `frameId: 0` or the chosen frame explicitly, never a broadcast.
@@ -25,4 +26,4 @@ Guards, all enforced in the frame bridge:
 
 ## Not done
 
-Answer sheet export from a frame and per-application CAPTCHA restriction persistence for frame-hosted forms. The iCIMS email capture step before the form is not modelled. Which frame holds the real form, and whether it is same-origin, is UNVERIFIED until a real export exists. Register a real iCIMS host only after that export and a reviewed contract.
+Per-application CAPTCHA restriction persistence still does not apply to frame fill, so a challenge that appears and then disappears is gated only while visible. Answer sheet export from a frame and per-application CAPTCHA restriction persistence for frame-hosted forms. The iCIMS email capture step before the form is not modelled. Which frame holds the real form, and whether it is same-origin, is UNVERIFIED until a real export exists. Register a real iCIMS host only after that export and a reviewed contract.

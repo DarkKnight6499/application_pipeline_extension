@@ -23,6 +23,8 @@ EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 PHONE = re.compile(r"(?<!\d)(?:\+?\d[\s().-]{0,2}){9,15}(?!\d)")
 TOKEN = re.compile(r"\b[A-Za-z0-9_-]{32,}\b")
 MAX_STRING = 200
+REPO_ROOT = Path(__file__).resolve().parents[1]
+IGNORED_DIRS = (Path(__file__).resolve().parent / "data", Path(__file__).resolve().parent / "test-results")
 TEXT_TYPES = {"text", "email", "tel", "url", "number", "search", "date", "password"}
 
 
@@ -179,6 +181,13 @@ def draft_fixture(report, keep_labels=False):
             + "\n".join(body) + '\n<button type="button">Next</button>\n</form>\n</body></html>\n')
 
 
+def out_dir_allowed(out_dir):
+    """Drafts may go outside the repository or into an ignored folder; never into a tracked path."""
+    resolved = Path(out_dir).resolve()
+    inside_repo = resolved == REPO_ROOT or REPO_ROOT in resolved.parents
+    return not inside_repo or any(resolved == ignored or ignored in resolved.parents for ignored in IGNORED_DIRS)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -212,6 +221,9 @@ def main(argv=None):
     if args.command == "validate":
         print(f"{len(reports)} export(s) passed.")
         return 0
+    if not out_dir_allowed(args.out_dir):
+        print(f"Refusing to write drafts into a tracked repository path. Use a folder outside the repository or under {IGNORED_DIRS[0]}.")
+        return 1
     args.out_dir.mkdir(parents=True, exist_ok=True)
     slug = re.sub(r"[^a-z0-9]+", "_", args.portal.lower()).strip("_") or "portal"
     (args.out_dir / f"{slug.upper()}_CONTRACT_DRAFT.md").write_text(draft_contract(reports, args.portal), encoding="utf-8")
