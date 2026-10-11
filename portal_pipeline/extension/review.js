@@ -22,8 +22,8 @@ async function rescan() {
     const tab = await chrome.tabs.get(tabId);
     if (!/^https?:/.test(tab.url || "")) throw new Error("The target page is not available.");
     const {server: pairedServer} = await chrome.storage.local.get("server");
-    PortalHostPolicy.assertSupported(tab.url, pairedServer);
-    await chrome.scripting.executeScript({target: {tabId}, files: ["adapters/registry.js", "adapters/generic.js", "adapters/workday.js", "adapters/aria-listbox.js", "adapters/greenhouse.js", "adapters/greenhouse-select.js", "adapters/phenom.js", "classifier.js", "application-mode.js", "engine.js", "progress.js", "page-bridge.js"]});
+    const routing = PortalHostPolicy.assertAllowed(tab.url, pairedServer);
+    await chrome.scripting.executeScript({target: {tabId}, files: ["adapters/registry.js", "adapters/generic.js", "adapters/workday.js", "adapters/aria-listbox.js", "adapters/greenhouse.js", "adapters/greenhouse-select.js", "adapters/phenom.js", "classifier.js", "application-mode.js", "engine.js", "progress.js", "page-bridge.js"].concat(routing === "fallback" ? ["adapters/fallback.js"] : [])});
     await PortalPanel.open(api, storage, {extensionPage: true, targetUrl: tab.url, inspectionOnly,
       onFillState: busy => {document.getElementById("rescan").disabled = busy;},
       transport: {bindSession: session => {boundContext = {sessionId: session.id, applicationId: session.application_id, targetUrl: tab.url};},

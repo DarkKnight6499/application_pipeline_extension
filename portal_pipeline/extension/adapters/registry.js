@@ -20,7 +20,9 @@
     let host = "";
     try { host = new URL(url).hostname; } catch { host = ""; }
     const match = host && adapters.find(adapter => adapter.id !== "generic" && adapter.hosts.some(pattern => pattern.test(host)));
-    return match || adapters.find(adapter => adapter.id === "generic") || null;
+    // The answer-sheet fallback is chosen only on pages where the popup injected it for an unrouted host.
+    const fallback = !match && globalThis.PortalFallbackActive === true && adapters.find(adapter => adapter.id === "fallback");
+    return match || fallback || adapters.find(adapter => adapter.id === "generic") || null;
   }
 
   const list = () => adapters.map(({id, version, mode, hosts}) => ({id, version, mode, hosts: hosts.map(host => host.source)}));

@@ -14,6 +14,8 @@ A Manifest V3 extension and a local Python helper that review and fill only the 
 
 ## Done so far
 
+**October 11, 2026 answer-sheet fallback for unrouted hosts, synthetic only.** Public https hosts without an adapter now receive an injected answer-sheet-only adapter through the popup and review panel; fill, upload and Next are refused and no manifest permission changed. Nine new tests pass; host policy, Phenom, Oracle, replay, and application-mode MV3 tests still pass. A loaded-extension check was not possible because the harness cannot grant activeTab. See ANSWER_SHEET_FALLBACK.md.
+
 **October 11, 2026 SuccessFactors (PF9) and Taleo (PF10) preparation, synthetic only.** Both adapters are unrouted with `hosts: []`. SuccessFactors adds a read-only parsed profile preview list; Taleo adds a sign-in gate and strict page kind detection. Seven tests each pass. PUBLIC discovery in the cloud container passed 397 tests with 17 skips, all in test_public_preflight and all SKIPPED-BY-ENVIRONMENT because PORTAL_SOURCE (the private workflow) is absent there; the two Windows symlink skips do not occur on Linux. FULL is not run in the cloud. iCIMS (PF7) is deferred because it needs all_frames injection, a manifest permission change. See contracts/SUCCESSFACTORS_CONTRACT.md and contracts/TALEO_CONTRACT.md. No live employer action occurred.
 
 **October 11, 2026 Eightfold preparation (PF12), synthetic only.** Unrouted `eightfold` adapter with `hosts: []`, reusing the shared listbox adapter for dropdowns and adding a cookie banner human gate that is never clicked. Nine new tests pass. No manifest, host policy, injection list, or inherited test changed. See contracts/EIGHTFOLD_CONTRACT.md. No live employer action occurred.
