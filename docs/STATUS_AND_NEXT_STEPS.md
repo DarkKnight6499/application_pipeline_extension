@@ -1,7 +1,7 @@
 ---
 author: Yazad Madan
 updated: 2026-10-20
-status: Code f183c90 has recorded laptop FULL 573 and PUBLIC 491 passes; October 18 Workday live inspection found gaps; extension live filling remains unverified
+status: October 20 main consolidation passes FULL 573 and PUBLIC 491; live Workday gaps remain; extension live filling remains unverified
 ---
 
 # Status and next steps
@@ -14,7 +14,9 @@ A Manifest V3 extension and a local Python helper that review and fill only the 
 
 ## Done so far
 
-**October 20, 2026 contributor handoff for the October 18 live trial.** [Workday handoff](LIVE_WORKDAY_HANDOFF.md) records real Citi inspection, native UI entry of sourced contact/history/education, advancement to Application Questions 1 of 2, missing button menus and upload detection, searchable-picker misclassification, date and row-attribution limits, and an export-intake structural-ID false positive. Native UI entry is not extension fill acceptance. No resume upload or final submission occurred. Private answers and raw exports remain ignored. Continue from this branch based on `154d6e0`, since `origin/main` lacks the October 11 preparation. Other portals take priority over Greenhouse. Five owner-confirmed pending question responses still need entry; recheck browser state before continuing.
+**October 20, 2026 main consolidation.** All 84 audited local and fetched origin refs are included in the consolidated history. Superseded branches retain ancestry without replacing newer validated guards. Historical review and backend audit documents are preserved. Fresh Edge FULL passes 573 tests in 497.933 seconds with two Windows symlink skips; PUBLIC passes 491 in 367.451 seconds with 19 skips, including 17 source-environment skips. All 28 JavaScript and 80 Python syntax checks pass. Dirty worktrees remain untouched. See [branch audit](BRANCH_CONSOLIDATION_2026-10-20.md).
+
+**October 20, 2026 contributor handoff for the October 18 live trial.** [Workday handoff](LIVE_WORKDAY_HANDOFF.md) records real Citi inspection, native UI entry of sourced contact/history/education, advancement to Application Questions 1 of 2, missing button menus and upload detection, searchable-picker misclassification, date and row-attribution limits, and an export-intake structural-ID false positive. Native UI entry is not extension fill acceptance. No resume upload or final submission occurred. Private answers and raw exports remain ignored. The October 20 main consolidation includes the October 11 preparation and this handoff. Continue contributor work from main. Other portals take priority over Greenhouse. Five owner-confirmed pending question responses still need entry; recheck browser state before continuing.
 
 **October 11, 2026 laptop validation on f183c90 (Windows, Edge).** FULL with PORTAL_SOURCE set: 573 tests, 213.1 s, OK, 2 skips (`test_public_paths` symlink tests, WinError 1314). PUBLIC without PORTAL_SOURCE: 491 tests, 155.9 s, OK, 19 skips (17 `test_public_preflight` environment skips plus the same 2 symlink skips). The repaired `test_real_extension_inspects_pages_without_pairing_or_candidate_data` passes alone in 4.6 s. All 28 extension scripts pass `node --check` and `compileall` passes. Cloud CI covers PUBLIC only; FULL stays a laptop check for changes to host policy or the popup. No live employer action occurred. The first live Greenhouse trial is unblocked pending a posting choice and capture exports.
 

@@ -8,7 +8,7 @@ status: Live inspection and native UI observations; extension filling remains un
 
 ## Start here
 
-Use this branch, based on `154d6e0`, rather than `origin/main`. Main still points to `bcdea7f` and lacks the October 11 preparation. This publication adds documentation only. The code baseline is `f183c90`; `154d6e0` records its laptop validation.
+The October 20 main consolidation includes this handoff and the October 11 preparation. Use main for new contributor work. The code baseline is `f183c90`; `154d6e0` records its earlier laptop validation. See [branch consolidation](BRANCH_CONSOLIDATION_2026-10-20.md) for the fresh merge checks.
 
 The owner requested other portals before Greenhouse. Workday is the current live target. Continue one employer at a time. Read `AGENTS.md` and the existing phased plan before development.
 

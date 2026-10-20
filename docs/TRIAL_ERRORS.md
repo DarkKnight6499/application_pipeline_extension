@@ -236,3 +236,7 @@ Author: Yazad Madan. Contributor handoff published October 20, 2026.
 - Native UI entry advanced contact and experience pages, but the extension stayed Inspect-only. No extension live-fill, upload, or final-review acceptance is claimed.
 
 See [the contributor handoff](LIVE_WORKDAY_HANDOFF.md) for evidence counts, source precedence, private artifact locations, pending questions, and ordered next work. Earlier trial entries remain historical.
+
+## October 20, 2026: branch consolidation validation
+
+Author: Yazad Madan. The historical handoff merge conflicted; resolution preserved the current handoff and retained the old review separately. Patch-equivalent or superseded branch ancestry was consolidated without reverting runtime behavior. FULL 573 and PUBLIC 491 finish with zero failures or errors, with two and 19 documented skips respectively. Export-intake rejection messages are expected negative-test output. No live scanner gap was repaired by this merge. See [branch consolidation](BRANCH_CONSOLIDATION_2026-10-20.md).
