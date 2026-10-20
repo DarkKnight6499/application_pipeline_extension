@@ -62,6 +62,8 @@ Nine new synthetic Edge browser tests pass. A control replaced after scanning is
 
 ## Acceptance still pending
 
+The independent review of stacked PRs #1 through #3 found a source-format compatibility regression and two stale integration assertions. At the reviewed PR #3 head, 168 tests produced 160 passes, 5 failures, 1 error, and 2 skips. No PR was merged. See [the detailed review](PR_STACK_REVIEW_2026-10-03.md). These results concern the proposed stack, not the production version 0.4.0 live-trial browser.
+
 DOM readback does not prove remote saving. A file input's filename does not prove remote upload completion. Neither Workday nor Greenhouse has a real employer application validated through final review. Final submission stays manual.
 
 ## Independent synthetic probe, October 3, 2026
