@@ -1,6 +1,6 @@
 ---
 author: Yazad Madan
-updated: 2026-10-04
+updated: 2026-10-20
 ---
 
 # Trial failures and remaining work
@@ -222,3 +222,15 @@ An incorrect Git line-ending override produced a false whole-file trailing-white
 These checks screen numeric expressions and length, not truth or role attribution. Human review remains required. Cover letters stay in the existing Resume builder; current Resume generation remains independent. Next: structure exports, reviewed Oracle inspection access, actual upload/remote field evidence, and the 50 approved pending question wordings required before P9.
 
 Final combined acceptance: FULL 453 in 249.239 seconds and PUBLIC 371 in 188.060 seconds, each OK with only the two expected Windows symlink skips; replay 4 in 5.988 seconds OK. JSCHECK, PYCHECK, and normal Git diff check pass. Four monitored tracker/reference hashes match their pre-validation values.
+
+## October 18, 2026: live Citi Workday inspection gaps
+
+Author: Yazad Madan. Contributor handoff published October 20, 2026.
+
+- Contact export omits required Country, State, and Phone Device Type button menus. Referral source and phone country code search dialogs appear as ordinary text inputs with no adapter.
+- Added employment/education export records 55 controls, including 24 date components represented as text and no attributed records. Required degree menus and the visible resume picker are absent. Zero unsupported-spinbutton warnings do not establish date support.
+- Intake rejects long mixed-case structural IDs as token-like. Raw exports stay private; no validator weakening or production fix was made.
+- Native coordinate selection chose a neighboring country during correction. Fresh exact accessibility selection and readback corrected country and dependent phone code before saving. One earlier unexpected country change has no established cause.
+- Native UI entry advanced contact and experience pages, but the extension stayed Inspect-only. No extension live-fill, upload, or final-review acceptance is claimed.
+
+See [the contributor handoff](LIVE_WORKDAY_HANDOFF.md) for evidence counts, source precedence, private artifact locations, pending questions, and ordered next work. Earlier trial entries remain historical.

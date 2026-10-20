@@ -1,6 +1,6 @@
 ---
 author: Yazad Madan
-status: Synthetic only
+status: Synthetic adapter evidence; October 18 live inspection gaps recorded separately
 ---
 
 # Workday contract
@@ -11,7 +11,7 @@ The adapter retains the existing `myworkdayjobs.com` host pattern. `myworkdaysit
 
 ## Evidence
 
-The hand-built fixtures under `portal_pipeline/fixtures/replay/workday/` and the fabricated cases in `test_public_workday.py` are the only page evidence. Every Workday-specific selector or control shape below is **UNVERIFIED** against a real application. The existing `data-automation-id` row grouping comes from the shared engine and synthetic tests, not a new live observation.
+The hand-built fixtures under `portal_pipeline/fixtures/replay/workday/` and the fabricated cases in `test_public_workday.py` remain the automated adapter evidence. [October 18 live observations](../LIVE_WORKDAY_HANDOFF.md) now establish a real tenant's visible controls and native UI behavior, with concrete scanner omissions. They do not validate extension-selected filling, popup ownership, repeated-row attribution, or upload completion. The existing `data-automation-id` row grouping still comes from the shared engine and synthetic tests.
 
 ## Page sequence
 

@@ -1,5 +1,13 @@
 # Portal development handoff
 
+## October 20, 2026: live Workday contributor checkpoint
+
+Author: Yazad Madan.
+
+Read [LIVE_WORKDAY_HANDOFF.md](../docs/LIVE_WORKDAY_HANDOFF.md) first. The October 18 Citi trial reached Application Questions 1 of 2 through native UI actions, while the extension remained in Inspect-only mode. Five employment and two education records were entered from confirmed sources. Extension fill compatibility, uploads, final review, and remote persistence remain unverified. The owner supplied five missing question responses after the last browser observation; their entry is pending. Recheck the browser before resuming.
+
+This documentation branch is based on `154d6e0`, ahead of the older main branch. Raw exports, reusable sourced answers, and the Simplify answer review are local ignored artifacts, not public repository inputs or an implemented extension reuse feature. Known scanner gaps and the raw-export validation failure are detailed in the handoff. No candidate facts, credentials, resume, or tracker changes are included. Greenhouse is the lowest-priority portal under the latest owner direction.
+
 ## October 5, 2026: live trial intentionally deferred
 
 Author: Yazad Madan.

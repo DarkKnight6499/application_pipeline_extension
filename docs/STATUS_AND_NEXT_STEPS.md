@@ -1,7 +1,7 @@
 ---
 author: Yazad Madan
-updated: 2026-10-11
-status: Version 0.11.0 plus October 11 synthetic additions; PUBLIC 461 tests OK with 17 environment skips (PORTAL_SOURCE absent in the cloud); FULL last passed 453 before them and must be rerun locally
+updated: 2026-10-20
+status: Code f183c90 has recorded laptop FULL 573 and PUBLIC 491 passes; October 18 Workday live inspection found gaps; extension live filling remains unverified
 ---
 
 # Status and next steps
@@ -13,6 +13,8 @@ This replaces the earlier probe reports and the two-prototype review. Their find
 A Manifest V3 extension and a local Python helper that review and fill only the fields the user selects. The human logs in, navigates and submits. The tool never submits, signs, attests, or handles passwords or CAPTCHAs. Sponsorship now and sponsorship in the future stay separate answers, and unknown answers stay pending.
 
 ## Done so far
+
+**October 20, 2026 contributor handoff for the October 18 live trial.** [Workday handoff](LIVE_WORKDAY_HANDOFF.md) records real Citi inspection, native UI entry of sourced contact/history/education, advancement to Application Questions 1 of 2, missing button menus and upload detection, searchable-picker misclassification, date and row-attribution limits, and an export-intake structural-ID false positive. Native UI entry is not extension fill acceptance. No resume upload or final submission occurred. Private answers and raw exports remain ignored. Continue from this branch based on `154d6e0`, since `origin/main` lacks the October 11 preparation. Other portals take priority over Greenhouse. Five owner-confirmed pending question responses still need entry; recheck browser state before continuing.
 
 **October 11, 2026 laptop validation on f183c90 (Windows, Edge).** FULL with PORTAL_SOURCE set: 573 tests, 213.1 s, OK, 2 skips (`test_public_paths` symlink tests, WinError 1314). PUBLIC without PORTAL_SOURCE: 491 tests, 155.9 s, OK, 19 skips (17 `test_public_preflight` environment skips plus the same 2 symlink skips). The repaired `test_real_extension_inspects_pages_without_pairing_or_candidate_data` passes alone in 4.6 s. All 28 extension scripts pass `node --check` and `compileall` passes. Cloud CI covers PUBLIC only; FULL stays a laptop check for changes to host policy or the popup. No live employer action occurred. The first live Greenhouse trial is unblocked pending a posting choice and capture exports.
 
