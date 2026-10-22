@@ -6,6 +6,8 @@ The working path is: prepare an application through the current workflow, import
 
 ## Start the helper
 
+For a self-contained dummy application, follow [CONTRIBUTING.md](../CONTRIBUTING.md) and run `python -B portal_pipeline/demo.py` with the configured environment. The production helper below still requires the private Resume checkout. Install `portal_pipeline/requirements.txt` into the Python environment used to start it.
+
 From this repository:
 
 ```powershell

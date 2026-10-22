@@ -1,5 +1,15 @@
 # Portal development handoff
 
+## October 22, 2026: contributor setup and private-free demo
+
+Author: Yazad Madan. Start with [CONTRIBUTING.md](../CONTRIBUTING.md). Runtime and development dependencies are declared separately; development includes runtime requirements. A fresh Python 3.13 environment installed all nine resolved packages, passed pip check, and used Playwright Chromium. The actual unpacked extension paired with the standalone dummy helper, filled one selected field, attached a generated synthetic Word document, and recorded zero submit events. No private Resume checkout or existing employer browser session was used for that exercise.
+
+`demo.py` copies invented profile, employment, education, and boilerplate into a temporary directory. Unknown answers stay pending. The attachment is explicitly synthetic and preapproved only for the loopback fixture. Real imports and new sessions are refused; production builder, audit, tracker, and eligibility acceptance are not emulated. Four new HTTP/browser checks cover local fill/upload, metadata, separate sponsorship facts, unknowns, authentication, and refusal after a changed application origin. The existing Resume workflow is unchanged.
+
+The first new test run exposed a missing test import path, then the inherited browser harness blocked loopback until the new test explicitly allowed its local origin. A later timeout came from using the extension rescan control on the built-in fixture, which removes its panel during navigation. The new test now reopens the fixture panel. These were corrected in the new test only; all four targeted tests pass. No inherited assertion changed. Fresh acceptance: Edge FULL 577 in 339.595 seconds, two expected symlink skips; isolated-environment Chromium PUBLIC 495 in 165.848 seconds, 19 skips (17 source-environment and two symlink cases). No failures or errors. Syntax, documentation link, and whitespace checks pass. See STATUS_AND_NEXT_STEPS.md.
+
+Next: follow the public work queue in CONTRIBUTING.md, starting with a narrow structural-ID intake regression. Workday button/search controls, dates, record attribution, omitted upload controls, and real persistence remain unresolved. Greenhouse stays last. Private inputs are needed only for authorized real application work and FULL integration, not synthetic development.
+
 ## October 20, 2026: main consolidation
 
 Author: Yazad Madan. All audited branch histories are integrated, retaining current runtime behavior and historical review evidence. Fresh FULL 573 and PUBLIC 491 are OK with two and 19 explicit skips respectively. Syntax and whitespace checks pass. Dirty development worktrees remain intact. See [branch consolidation](../docs/BRANCH_CONSOLIDATION_2026-10-20.md). Continue new contributor work from main. Live limits below still apply.

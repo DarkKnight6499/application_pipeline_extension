@@ -1,5 +1,4 @@
-# Public discovery needs these imports without the private workflow.
+# Author: Yazad Madan
+-r requirements.txt
 playwright==1.63.0
-python-docx==1.2.0
-openpyxl==3.1.5
 Pillow==12.3.0

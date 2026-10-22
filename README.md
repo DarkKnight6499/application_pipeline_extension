@@ -10,6 +10,8 @@ The prototype imports one audited application, displays sourced answers, preserv
 
 ## Run locally
 
+New contributor: start with [CONTRIBUTING.md](CONTRIBUTING.md) for dependencies, a self-contained dummy demo, test commands, and the ordered work queue. No private Resume access is needed for that path.
+
 The existing Resume checkout supplies the master profile, reference scripts, resume builder, and installed dependencies. Configure its path explicitly:
 
 ```powershell
@@ -23,7 +25,7 @@ Public synthetic tests run without the source checkout:
 ```powershell
 py -3 -m pip install -r portal_pipeline\requirements-dev.txt
 py -3 -m playwright install chromium
-py -3 -B -m unittest discover -s portal_pipeline\tests -v
+py -3 -B -m unittest discover -s portal_pipeline\tests -p "test_public_*.py" -v
 ```
 
 To use installed Edge instead of packaged Chromium, set `$env:PORTAL_TEST_BROWSER = 'msedge'`. For a visible synthetic browser trial, also set `$env:PORTAL_TEST_HEADFUL = '1'` and run `py -3 -B -m unittest discover -s portal_pipeline\tests -p test_public_trial.py -v`. Trial screenshots are saved in the ignored `portal_pipeline/test-results/` folder. The synthetic helper uses an explicitly fabricated session and attachment stub; this does not validate resume building or auditing.

@@ -1,6 +1,7 @@
 **/__pycache__/
 **/.pytest_cache/
 **/node_modules/
+.venv/
 portal_pipeline/data/
 portal_pipeline/test-results/
 Portal_Trial/out/

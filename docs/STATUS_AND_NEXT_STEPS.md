@@ -1,7 +1,7 @@
 ---
 author: Yazad Madan
 updated: 2026-10-20
-status: October 20 main consolidation passes FULL 573 and PUBLIC 491; live Workday gaps remain; extension live filling remains unverified
+status: October 22 contributor demo passes FULL 577 and fresh-environment PUBLIC 495; live Workday gaps remain
 ---
 
 # Status and next steps
@@ -13,6 +13,8 @@ This replaces the earlier probe reports and the two-prototype review. Their find
 A Manifest V3 extension and a local Python helper that review and fill only the fields the user selects. The human logs in, navigates and submits. The tool never submits, signs, attests, or handles passwords or CAPTCHAs. Sponsorship now and sponsorship in the future stay separate answers, and unknown answers stay pending.
 
 ## Done so far
+
+**October 22, 2026 contributor onboarding.** [CONTRIBUTING.md](../CONTRIBUTING.md) gives clean installation commands, dummy demo usage, extension setup, and the current public work queue. `requirements.txt` declares runtime dependencies and `requirements-dev.txt` includes them. The standalone `demo.py` uses invented identity, employment, education, boilerplate, and a generated synthetic DOCX in a temporary directory. No private Resume files are required for this path. Fresh Python 3.13 installation and pip check pass; the actual unpacked extension pairs, fills a selected dummy field, and attaches the local dummy DOCX with zero submits. Fresh-environment Chromium PUBLIC passes 495 tests in 165.848 seconds with 19 explicit skips. Source-enabled Edge FULL passes 577 tests in 339.595 seconds with two expected Windows symlink skips. All 28 extension scripts pass syntax checks; all 83 Python files compile. Documentation links, metadata, and Git whitespace checks pass. Live Workday gaps are unchanged.
 
 **October 20, 2026 main consolidation.** All 84 audited local and fetched origin refs are included in the consolidated history. Superseded branches retain ancestry without replacing newer validated guards. Historical review and backend audit documents are preserved. Fresh Edge FULL passes 573 tests in 497.933 seconds with two Windows symlink skips; PUBLIC passes 491 in 367.451 seconds with 19 skips, including 17 source-environment skips. All 28 JavaScript and 80 Python syntax checks pass. Dirty worktrees remain untouched. See [branch audit](BRANCH_CONSOLIDATION_2026-10-20.md).
 

@@ -13,5 +13,6 @@ Author: Yazad Madan.
 - Workday, Greenhouse, and synthetic-only Phenom are within the authorized development scope. Further portal work must follow the active handoff and phased plan; synthetic coverage is not live compatibility.
 - Do not spawn sub-agents unless explicitly requested.
 - Phase order lives in D:\Code\Resume\_Reference\Portal_Phased_Execution_Plan.md. Follow it instead of any other next-step list.
+- Contributors without the private plan should use CONTRIBUTING.md for the current public work queue, setup, and dummy demo. Private files are not prerequisites for synthetic development. The owner's latest direction takes precedence.
 
 - Keep all extension repositories, worktrees, and experiments under D:\Code\application_pipeline. Create future worktrees in its worktrees folder, never directly under D:\Code.

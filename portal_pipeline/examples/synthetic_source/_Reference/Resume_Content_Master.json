@@ -1,0 +1,29 @@
+{
+  "fixture_notice": "Invented development data only. Never use for a real application.",
+  "author": "Yazad Madan",
+  "header": {
+    "name": "Example Candidate",
+    "contact": "candidate@example.invalid | 202-555-0100 | Example City, ZZ",
+    "linkedin": "https://example.invalid/profile",
+    "github": "https://example.invalid/code"
+  },
+  "experience": [
+    {
+      "company": "Example Research Company",
+      "location": "Example City, ZZ",
+      "dateRange": "Jan 2022 to Dec 2023",
+      "roles": [{"title": "Example Analyst", "bullets": ["Reviewed 12 invented sample records."]}]
+    },
+    {
+      "company": "Example Services Company",
+      "location": "Example City, ZZ",
+      "dateRange": "Jan 2024 to Dec 2025",
+      "roles": [{"title": "Example Associate", "bullets": ["Prepared fictional monthly reports."]}]
+    }
+  ],
+  "education": [
+    {"school": "Example University", "degree": "Example Bachelor of Science", "location": "Example City, ZZ", "date": "May 2021"},
+    {"school": "Example Graduate School", "degree": "Example Master of Science", "location": "Example City, ZZ", "date": "May 2022"}
+  ],
+  "certifications": []
+}
