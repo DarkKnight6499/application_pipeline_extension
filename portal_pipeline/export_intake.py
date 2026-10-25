@@ -22,10 +22,17 @@ FORBIDDEN_KEYS = {"value", "proposal", "current", "answer", "password", "token",
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 PHONE = re.compile(r"(?<!\d)(?:\+?\d[\s().-]{0,2}){9,15}(?!\d)")
 TOKEN = re.compile(r"\b[A-Za-z0-9_-]{32,}\b")
+# Workday-style DOM ids: separator-joined words and short counters, never mixed letter-digit runs.
+STRUCTURAL_SEGMENT = re.compile(r"[A-Za-z]{1,40}|[0-9]{1,6}")
+STRUCTURAL_KEYS = {"dom_id", "automation_id", "name", "controls", "popup"}
 MAX_STRING = 200
 REPO_ROOT = Path(__file__).resolve().parents[1]
 IGNORED_DIRS = (Path(__file__).resolve().parent / "data", Path(__file__).resolve().parent / "test-results")
 TEXT_TYPES = {"text", "email", "tel", "url", "number", "search", "date", "password"}
+
+
+def _structural_id(match):
+    return all(not part or STRUCTURAL_SEGMENT.fullmatch(part) for part in re.split(r"[-_]", match))
 
 
 def _walk(node, path=""):
@@ -93,7 +100,7 @@ def validate(report):
             if PHONE.search(value):
                 errors.append(f"{path}: looks like a phone number.")
             for match in TOKEN.findall(value):
-                secret = re.fullmatch(r"[0-9a-fA-F]{32,}", match) or (re.search(r"\d", match) and re.search(r"[a-z]", match) and re.search(r"[A-Z]", match))
+                secret = re.fullmatch(r"[0-9a-fA-F]{32,}", match) or (not (key in STRUCTURAL_KEYS and _structural_id(match)) and re.search(r"\d", match) and re.search(r"[a-z]", match) and re.search(r"[A-Z]", match))
                 (errors if secret else warnings).append(f"{path}: looks like a {'token' if secret else 'long identifier'}.")
             if "?" in value and re.search(r"https?://", value):
                 errors.append(f"{path}: URL with a query string.")
@@ -197,9 +204,14 @@ def main(argv=None):
     draft.add_argument("exports", nargs="+", type=Path)
     draft.add_argument("--portal", required=True)
     draft.add_argument("--out-dir", required=True, type=Path)
+    draft.add_argument("--local", action="store_true", help="Downgrade validator errors to warnings. Only allowed when --out-dir is under the ignored data folder.")
     draft.add_argument("--keep-labels", action="store_true", help="Reuse real labels in fixtures. Review them first.")
     args = parser.parse_args(argv)
 
+    local = args.command == "draft" and args.local
+    if local and not (IGNORED_DIRS[0] == args.out_dir.resolve() or IGNORED_DIRS[0] in args.out_dir.resolve().parents):
+        print(f"--local needs --out-dir under {IGNORED_DIRS[0]}. Repo-bound drafts always enforce the validator.")
+        return 1
     reports, failed = [], False
     for path in args.exports:
         try:
@@ -210,10 +222,10 @@ def main(argv=None):
             continue
         result = validate(report)
         for message in result["errors"]:
-            print(f"{path.name}: ERROR {message}")
+            print(f"{path.name}: {'warning (local)' if local else 'ERROR'} {message}")
         for message in result["warnings"]:
             print(f"{path.name}: warning {message}")
-        failed = failed or bool(result["errors"])
+        failed = failed or (bool(result["errors"]) and not local)
         reports.append(report)
     if failed:
         print("Not safe to share or draft from. Fix or recapture the flagged exports.")
