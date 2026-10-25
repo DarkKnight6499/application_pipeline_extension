@@ -28,6 +28,7 @@ APPLY_CLICK = {
     "workday": ['[data-automation-id="adventureButton"]', '[data-automation-id="applyManually"]'],
     "oracle": ['a:has-text("Apply Now"), button:has-text("Apply Now")'],
 }
+ICIMS_APPLY_TEXT = "apply for this job"
 PAGE_WAIT_MS = 6000
 CLICK_WAIT_MS = 3000
 
@@ -77,6 +78,17 @@ def driver_args(job):
     return args
 
 
+def click_icims_apply(page):
+    """The iCIMS Apply link sits in the job iframe and needs a logged-in candidate."""
+    for frame in page.frames:
+        link = frame.locator("a", has_text=ICIMS_APPLY_TEXT)
+        if link.count() == 1:
+            link.click()
+            page.wait_for_timeout(CLICK_WAIT_MS)
+            return "clicked iCIMS Apply for this job"
+    return "iCIMS Apply link not found (log in first); click Apply yourself."
+
+
 def open_job(job):
     """Open the job link in the attached browser and click through to the form; returns notes for the report."""
     notes = []
@@ -86,6 +98,8 @@ def open_job(job):
         page = browser.contexts[0].new_page()
         page.goto(url, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(PAGE_WAIT_MS)
+        if job["portal"] == "icims":
+            notes.append(click_icims_apply(page))
         for selector in APPLY_CLICK.get(job["portal"], []):
             target = page.locator(selector)
             if target.count() < 1:
