@@ -161,11 +161,23 @@
     return latest?.textContent || "";
   }
 
+  // Demographic questions are filled only from an answer the person already gave to the identical question.
+  let knownAnswers = null, knownConsents = new Set();
+  // A consent box counts only for the host and the exact question where the person ticked it.
+  const consentRecorded = element => element.type === "checkbox" && knownConsents.has(`${location.hostname.toLowerCase()}|${labelKey(labelFor(element))}`);
+  function hasStoredAnswer(element) {
+    if (!knownAnswers) return false;
+    const legend = element.closest("fieldset")?.querySelector("legend")?.textContent;
+    const labels = [labelFor(element), legend, isMenu(element) ? PortalWorkdayMenu.question(element) : ""];
+    return labels.some(label => label && Object.hasOwn(knownAnswers, labelKey(label)));
+  }
+
   function protectedControl(element) {
     const text = `${labelFor(element)} ${element.name || ""} ${element.id || ""} ${element.getAttribute("data-automation-id") || ""} ${element.closest("fieldset")?.querySelector("legend")?.textContent || ""}`;
     const attestationContext = `${text} ${protectionHeading(element)}`;
-    return element.type === "password" || honeypotTerms.test(text) || !!element.closest(demographicContainers) || protectedTerms.test(text)
-      || !!globalThis.PortalClassifier?.hasAttestationText(attestationContext) || demographicTerms.test(text) || !!globalThis.PortalGreenhouse?.protectedField(element);
+    const demographic = (!!element.closest(demographicContainers) || demographicTerms.test(text)) && !hasStoredAnswer(element);
+    return element.type === "password" || honeypotTerms.test(text) || (protectedTerms.test(text) && !consentRecorded(element))
+      || (!!globalThis.PortalClassifier?.hasAttestationText(attestationContext) && !consentRecorded(element)) || demographic || !!globalThis.PortalGreenhouse?.protectedField(element);
   }
 
   function radioMembers(element) {
@@ -173,7 +185,7 @@
   }
 
   function unavailable(element) {
-    return element.matches(":disabled") || !!element.readOnly || !!element.closest('[aria-disabled="true"],[aria-readonly="true"]');
+    return element.matches(":disabled") || !!element.readOnly || !!element.closest('[aria-disabled="true"],[aria-readonly="true"]:not([role="grid"],[role="listbox"],[role="list"],[role="tree"])');
   }
 
   function optionDisabled(option) {
@@ -206,8 +218,10 @@
   // Same normalization as answer_memory.normalize_label, so stored answers match only an identical question.
   const labelKey = value => String(value ?? "").toLowerCase().replace(/['\u2019]/g, "").replace(/[^a-z0-9+#\s-]+/g, " ").replace(/\s+/g, " ").trim();
 
-  function storedFact(profile, field, options) {
-    if (field.blocked || !field.label || !profile.answers) return null;
+  function storedFact(profile, field, options, element) {
+    if (field.blocked || !field.label) return null;
+    if (field.type === "checkbox" && element && consentRecorded(element)) return {value: "Yes", source: "Recorded consent (this site, exact question)", basis: "consent_memory", truth: null};
+    if (!profile.answers) return null;
     const answer = profile.answers[labelKey(field.label)];
     if (typeof answer !== "string" || !answer.trim()) return null;
     if (field.type === "checkbox" && !/^(yes|no)$/i.test(answer.trim())) return null;
@@ -216,7 +230,7 @@
   }
 
   function proposeCore(field, profile, {element, options = field.options || []} = {}) {
-    const fact = storedFact(profile, field, options) || (field.key ? datePartFact(profile, field.key, element, options) : null);
+    const fact = storedFact(profile, field, options, element) || (field.key ? datePartFact(profile, field.key, element, options) : null);
     const derived = /^(employment|education)\.\d+\.(start|end)_(month|year)$/.test(field.key || "");
     return {key: field.key, value: fact?.value ?? "", source: fact?.source || "Manual answer required",
       status: field.blocked ? "manual_only" : !fact && field.type !== "file" ? "pending" : "prepared", basis: fact?.basis || (derived ? "derived" : "exact_alias"), truth: fact?.truth || null};
@@ -224,6 +238,8 @@
 
   function scanCore(profile, {register = true, bindings = {}} = {}) {
     if (register && filling) throw new Error("A fill is running. Wait for its results before rescanning.");
+    knownAnswers = profile.answers && typeof profile.answers === "object" ? profile.answers : null;
+    knownConsents = new Set(Array.isArray(profile.consents) ? profile.consents : []);
     if (register) controls = new Map();
     const fields = [], counts = new Map(), seenRadio = new Set();
     const contexts = historyContexts(), records = new Map(), usage = new Map();
@@ -267,7 +283,7 @@
       const datePart = !blocked && !key && record ? datePartName(element) : null;
       if (datePart) key = `${record.group}.${datePart}`;
       const required = element.required || element.getAttribute("aria-required") === "true";
-      if (!blocked && type === "checkbox" && PortalClassifier.isAttestationCheckbox({type, label, key, required, checked: element.checked})) { blocked = true; key = null; }
+      if (!blocked && type === "checkbox" && PortalClassifier.isAttestationCheckbox({type, label, key, required, checked: element.checked}) && !consentRecorded(element)) { blocked = true; key = null; }
       if (key?.includes(".")) {
         const [group, name] = key.split(".");
         key = Number.isInteger(record?.index) ? `${group}.${record.index}.${name}` : null;

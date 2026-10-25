@@ -18,6 +18,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import answer_memory
 import answer_sheet
 import application_mode
 import longform
@@ -254,6 +255,11 @@ class Pipeline:
         return data
 
 
+def memory_profile():
+    data = answer_memory.load_memory()
+    return {"answers": answer_memory.profile_answers(data), "consents": answer_memory.profile_consents(data)}
+
+
 def make_server(pipeline, port=8766, token=None):
     token = token or secrets.token_urlsafe(32)
 
@@ -303,7 +309,7 @@ def make_server(pipeline, port=8766, token=None):
                         return self.send(200, pipeline.current())
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/profile", path)
                     if match:
-                        return self.send(200, resolve_for_application(pipeline.source, pipeline.folder(match[1])))
+                        return self.send(200, {**resolve_for_application(pipeline.source, pipeline.folder(match[1])), **memory_profile()})
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/record", path)
                     if match:
                         return self.send(200, {"record": pipeline.record_for(match[1])[1]})

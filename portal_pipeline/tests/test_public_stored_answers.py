@@ -61,3 +61,57 @@ class StoredAnswerTests(SyntheticBrowserTest):
         result = self.fill([{"id": fields["white"]["id"], "value": "No"}])[0]
         self.assertIn(result["status"], {"filled", "preserved"})
         self.assertFalse(self.page.locator("#white").is_checked())
+
+
+class DemographicAndGridTests(SyntheticBrowserTest):
+    PAGE = '''<form>
+<label for="gender">Gender</label><select id="gender"><option value="">Select</option><option value="m">Male</option></select>
+<label for="eth">Ethnicity</label><select id="eth"><option value="">Select</option><option value="a">Asian</option></select>
+<div role="grid" aria-readonly="true"><label><input type="checkbox" id="grid-box"> Asian (United States of America)</label></div>
+<label><input type="checkbox" id="consent"> I certify and consent to the above.*</label>
+</form>'''
+
+    def scan(self, answers):
+        self.open_markup(self.PAGE)
+        return {f["structure"]["dom_id"]: f for f in self.page.evaluate("profile => PortalEngine.scan(profile)", {"values": {}, "answers": answers})}
+
+    def test_demographic_field_stays_manual_without_a_stored_answer(self):
+        fields = self.scan({})
+        self.assertTrue(fields["gender"]["blocked"])
+
+    def test_demographic_field_with_exact_stored_answer_is_proposed(self):
+        fields = self.scan({"gender": "Male"})
+        self.assertEqual((fields["gender"]["blocked"], fields["gender"]["proposal"]), (False, "Male"))
+        self.assertTrue(fields["eth"]["blocked"])
+
+    def test_attestation_stays_blocked_even_with_stored_answer(self):
+        self.assertTrue(self.scan({"i certify and consent to the above": "Yes"})["consent"]["blocked"])
+
+    def test_checkbox_inside_readonly_grid_is_available(self):
+        self.assertFalse(self.scan({})["grid-box"]["disabled"])
+
+
+class ConsentTests(SyntheticBrowserTest):
+    PAGE = '''<form><label><input type="checkbox" id="consent"> Yes, I have read and consent to the above.*</label>
+<label><input type="checkbox" id="other"> I certify that all statements are true.*</label></form>'''
+    HOST = "workday.synthetic.test"
+
+    def scan(self, consents):
+        self.open_markup(self.PAGE)
+        host = self.page.evaluate("location.hostname")
+        keys = [f"{host}|{k}" for k in consents]
+        return {f["structure"]["dom_id"]: f for f in self.page.evaluate("profile => PortalEngine.scan(profile)", {"values": {}, "answers": {}, "consents": keys})}
+
+    def test_recorded_consent_for_this_host_and_label_is_proposed_and_filled(self):
+        fields = self.scan(["yes i have read and consent to the above"])
+        self.assertEqual((fields["consent"]["blocked"], fields["consent"]["proposal"]), (False, "Yes"))
+        self.assertEqual(self.fill([{"id": fields["consent"]["id"], "value": "Yes"}])[0]["status"], "filled")
+        self.assertTrue(self.page.locator("#consent").is_checked())
+
+    def test_other_attestations_stay_manual(self):
+        self.assertTrue(self.scan(["yes i have read and consent to the above"])["other"]["blocked"])
+
+    def test_consent_for_another_host_is_ignored(self):
+        self.open_markup(self.PAGE)
+        fields = {f["structure"]["dom_id"]: f for f in self.page.evaluate("profile => PortalEngine.scan(profile)", {"values": {}, "answers": {}, "consents": ["other.example|yes i have read and consent to the above"]})}
+        self.assertTrue(fields["consent"]["blocked"] and fields["other"]["blocked"])

@@ -77,6 +77,11 @@ def record_consent(data, host, label, now=None):
     return True
 
 
+def profile_consents(data):
+    """Recorded host|question consent keys, the shape the extension reads from profile.consents."""
+    return list(data.get("consents", {}))
+
+
 def has_consent(data, host, label):
     return consent_key(host, label) in data.get("consents", {})
 
@@ -100,6 +105,11 @@ def start_date(today=None):
 def lookup(data, label):
     entry = data["answers"].get(normalize_label(label))
     return entry["answer"] if entry else None
+
+
+def profile_answers(data):
+    """Normalized question to answer, the shape the extension reads from profile.answers."""
+    return {key: entry["answer"] for key, entry in data["answers"].items()}
 
 
 def gaps(data, fields):

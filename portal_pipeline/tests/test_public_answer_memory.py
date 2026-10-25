@@ -86,3 +86,17 @@ class AnswerMemoryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ProfileAnswersTests(unittest.TestCase):
+    def test_profile_answers_maps_normalized_label_to_answer_only(self):
+        data = memory.load_memory(tempfile.mkdtemp())
+        memory.remember(data, "Are you at least 18 years of age?*", "Yes")
+        self.assertEqual(memory.profile_answers(data), {"are you at least 18 years of age": "Yes"})
+
+
+class ProfileConsentsTests(unittest.TestCase):
+    def test_profile_consents_lists_recorded_keys(self):
+        data = memory.load_memory(tempfile.mkdtemp())
+        memory.record_consent(data, "Citi.WD5.example", "Yes, I have read and consent to the above.*")
+        self.assertEqual(memory.profile_consents(data), ["citi.wd5.example|yes i have read and consent to the above"])
