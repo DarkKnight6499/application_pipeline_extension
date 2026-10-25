@@ -203,8 +203,20 @@
 
   const route = () => globalThis.PortalAdapters?.forLocation(location.href) || null;
 
+  // Same normalization as answer_memory.normalize_label, so stored answers match only an identical question.
+  const labelKey = value => String(value ?? "").toLowerCase().replace(/['\u2019]/g, "").replace(/[^a-z0-9+#\s-]+/g, " ").replace(/\s+/g, " ").trim();
+
+  function storedFact(profile, field, options) {
+    if (field.blocked || !field.label || !profile.answers) return null;
+    const answer = profile.answers[labelKey(field.label)];
+    if (typeof answer !== "string" || !answer.trim()) return null;
+    if (field.type === "checkbox" && !/^(yes|no)$/i.test(answer.trim())) return null;
+    if ((field.type === "radio" || options.length) && field.type !== "combobox" && !optionMatch(options, answer)) return null;
+    return {value: answer.trim(), source: "Stored answer (exact question match)", basis: "answer_memory", truth: null};
+  }
+
   function proposeCore(field, profile, {element, options = field.options || []} = {}) {
-    const fact = field.key ? datePartFact(profile, field.key, element, options) : null;
+    const fact = storedFact(profile, field, options) || (field.key ? datePartFact(profile, field.key, element, options) : null);
     const derived = /^(employment|education)\.\d+\.(start|end)_(month|year)$/.test(field.key || "");
     return {key: field.key, value: fact?.value ?? "", source: fact?.source || "Manual answer required",
       status: field.blocked ? "manual_only" : !fact && field.type !== "file" ? "pending" : "prepared", basis: fact?.basis || (derived ? "derived" : "exact_alias"), truth: fact?.truth || null};
@@ -269,7 +281,7 @@
         : type === "checkbox" ? element.checked : type === "file" ? [...element.files].map(file => file.name).join(", ") : element.value || "";
       const options = custom ? customInfo.options : element.tagName === "SELECT" ? [...element.options].map(option => ({value: option.value, label: option.textContent.trim(), disabled: optionDisabled(option)}))
         : type === "radio" ? members.map(item => ({value: item.value, label: labelFor(item), disabled: unavailable(item) || !visible(item)})) : [];
-      const proposal = proposeCore({key, blocked, type, options}, profile, {element, options});
+      const proposal = proposeCore({key, blocked, type, options, label}, profile, {element, options});
       const field = {id, label, key, section: key?.split(".")[0] || section, type, current, options, record,
                      required: element.required || element.getAttribute("aria-required") === "true" || globalThis.PortalGreenhouse?.uploadGroup(element)?.getAttribute("aria-required") === "true",
                      blocked, disabled: unavailable(element),
@@ -363,7 +375,7 @@
 
   function verifyCore(control, expected) {
     const {element, members, field} = control;
-    const actual = field.type === "combobox" ? read(control) : field.type === "file" ? element.files[0]?.name : field.type === "radio" ? members.find(item => item.checked)?.value : element.value;
+    const actual = field.type === "combobox" ? read(control) : field.type === "file" ? element.files[0]?.name : field.type === "radio" ? members.find(item => item.checked)?.value : field.type === "checkbox" ? element.checked : element.value;
     const flagged = element.isConnected ? validationText(control) : "";
     if (actual !== expected) return {ok: false, actual, reason: "reverted after blur", failure_kind: "reverted", validation_error: flagged,
       message: "Portal did not retain the value (reverted after blur). Review this field manually."};
@@ -466,7 +478,14 @@
           if (controlIdentity(element) !== control.identity) throw new Error("The dropdown question changed while opening. Rescan before filling.");
         });
       } else if (field.type === "checkbox") {
-        throw new Error("Checkboxes require manual review in this prototype.");
+        if (!/^(yes|no)$/i.test(String(expected ?? "").trim())) throw new Error("A checkbox needs a Yes or No answer.");
+        const wanted = answerKey(expected) === "yes";
+        if (members.some(protectedControl)) throw new Error("This checkbox is manual only.");
+        if (checkApplication?.required) await checkApplication();
+        checkCollateral();
+        checkCurrent(control);
+        if (element.checked !== wanted) element.click();
+        expected = wanted;
       } else {
         expected = String(expected ?? "");
         if (!expected.trim()) throw new Error("Provide an answer before selecting this field.");
