@@ -25,9 +25,14 @@ class AnswerMemoryTests(unittest.TestCase):
 
     def test_protected_questions_are_refused(self):
         data = self.fresh()
-        for label in ("Gender", "Do you have a disability?", "I certify this is true", "Veteran status"):
+        for label in ("I certify this is true", "Password", "I agree to the privacy policy", "Signature"):
             self.assertFalse(memory.remember(data, label, "x"), label)
         self.assertEqual(data["answers"], {})
+
+    def test_demographic_self_id_answers_are_stored(self):
+        data = self.fresh()
+        for label in ("What is your gender?", "Do you have a disability?", "Are you a veteran?", "What is your ethnicity?"):
+            self.assertTrue(memory.remember(data, label, "No"), label)
 
     def test_empty_and_oversized_are_refused(self):
         data = self.fresh()
@@ -38,7 +43,7 @@ class AnswerMemoryTests(unittest.TestCase):
     def test_gaps_lists_unanswered_unprotected_once(self):
         data = self.fresh()
         memory.remember(data, "Notice period", "2 weeks")
-        fields = [{"label": "Notice period"}, {"label": "Why us?"}, {"label": "why us"}, {"label": "Gender"}, {"label": ""}]
+        fields = [{"label": "Notice period"}, {"label": "Why us?"}, {"label": "why us"}, {"label": "I agree to the terms"}, {"label": ""}]
         self.assertEqual(memory.gaps(data, fields), ["Why us?"])
 
     def test_save_and_load_round_trip(self):

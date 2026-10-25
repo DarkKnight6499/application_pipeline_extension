@@ -5,7 +5,9 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from question_corpus import is_protected, normalize_label
+import re
+
+from question_corpus import normalize_label
 
 # Config
 DATA_DIR = Path(__file__).resolve().parent / "data"
@@ -15,6 +17,12 @@ LABEL_COLUMN = "label"
 TYPE_COLUMN = "type"
 FIELDS_COLUMN = "fields"
 MAX_ANSWER = 2000
+# Demographic self-ID answers are allowed (user decision 2026-10-25); credentials, attestations and signatures never are.
+NEVER_STORE = re.compile(r"\b(password|passcode|captcha|one.?time|otp|ssn|social security|credit card|bank account|routing number|signature|attest|certify|certification of|consent|agree|accept terms|privacy policy|declaration)\b", re.I)
+
+
+def is_protected(field):
+    return bool(field.get("protected")) or str(field.get(TYPE_COLUMN, "")).lower() in {"password", "file", "signature"} or bool(NEVER_STORE.search(str(field.get(LABEL_COLUMN, ""))))
 
 
 def memory_path(data_dir=DATA_DIR):

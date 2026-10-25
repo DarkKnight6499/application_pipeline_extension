@@ -10,7 +10,7 @@ SCHEMA_VERSION = 1
 MAX_LABEL = 300
 MAX_OPTIONS = 50
 MAX_OPTION = 200
-PROTECTED_TERMS = re.compile(r"\b(password|passcode|captcha|one.?time|otp|ssn|social security|credit card|bank account|routing number|signature|attest|certify|certification of|consent|agree|accept terms|privacy policy|declaration|gender|race|ethnicity|veteran|disability|sexual orientation)\b", re.I)
+PROTECTED_TERMS = re.compile(r"\b(password|passcode|captcha|one.?time|otp|ssn|social security|credit card|bank account|routing number|signature|attest|certify|certification of|consent|agree|accept terms|privacy policy|declaration|gender|race|ethnicity|veteran|disability|sexual orientation|lgbtq|transgender)\b", re.I)
 PROTECTED_TYPES = {"password", "file", "signature"}
 
 
