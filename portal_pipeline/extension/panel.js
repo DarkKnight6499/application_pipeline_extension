@@ -66,7 +66,7 @@
         status.textContent = `${report.host}: ${report.fields.length} visible, unprotected controls. Inspection only. No candidate profile loaded and no fields filled.`;
         panel.append(element("p", "This is a current-page snapshot of visible controls in the main document. Hidden sections, future pages, and closed shadow roots remain uninspected. Navigate manually and export each page. Reports omit entered answers and option text; review labels before sharing.", {class: "source"}));
         const coverage = report.coverage;
-        if (coverage?.reason_codes.length) panel.append(element("p", `Incomplete inspection: ${coverage.visible_iframes} visible iframe(s), ${coverage.visible_open_shadow_hosts} visible open shadow host(s), and ${coverage.unsupported_spinbuttons} unsupported spinbutton(s). Inspect those surfaces manually.`, {class: "note"}));
+        if (coverage?.reason_codes.length) panel.append(element("p", `Incomplete inspection: ${coverage.visible_iframes} visible iframe(s), ${coverage.visible_open_shadow_hosts} visible open shadow host(s), ${coverage.unsupported_spinbuttons} unsupported spinbutton(s), and ${coverage.unsupported_button_menus || 0} unsupported button menu(s). Inspect those surfaces manually.`, {class: "note"}));
         if (!report.fields.length) panel.append(element("p", "No application fields found. This may be a posting, login page, or unsupported form. Inspect the next application page after manual navigation.", {class: "note"}));
         if (report.portal_manual_reason) panel.append(element("p", report.portal_manual_reason, {class: "note"}));
         const renderField = field => {

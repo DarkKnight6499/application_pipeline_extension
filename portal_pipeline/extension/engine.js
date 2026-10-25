@@ -248,13 +248,16 @@
     const frames = [...document.querySelectorAll("iframe")].filter(outsidePanel).length;
     const shadowHosts = [...document.querySelectorAll("*")].filter(node => node.shadowRoot && outsidePanel(node)).length;
     const spinbuttons = [...document.querySelectorAll('[role="spinbutton"]')].filter(node => !node.matches("input,select,textarea") && outsidePanel(node)).length;
-    const reasonCodes = [frames && "iframe_uninspected", shadowHosts && "open_shadow_uninspected", spinbuttons && "spinbutton_unsupported"].filter(Boolean);
+    // Button menus are not scanned or filled; their attributes (no text) show what a later contract must cover.
+    const buttonMenus = [...document.querySelectorAll('button[aria-haspopup]:not([aria-haspopup="false"]),[role="button"][aria-haspopup]:not([aria-haspopup="false"])')].filter(outsidePanel);
+    const buttonMenuSamples = buttonMenus.slice(0, 40).map(node => ({tag: node.tagName.toLowerCase(), automation_id: node.getAttribute("data-automation-id") || "", haspopup: node.getAttribute("aria-haspopup"), expanded: node.getAttribute("aria-expanded"), controls: node.getAttribute("aria-controls") ? "present" : "", required: node.getAttribute("aria-required") === "true" || /required/i.test(node.getAttribute("aria-label") || "")}));
+    const reasonCodes = [frames && "iframe_uninspected", shadowHosts && "open_shadow_uninspected", spinbuttons && "spinbutton_unsupported", buttonMenus.length && "button_menu_unsupported"].filter(Boolean);
     return {schema_version: 1, host: location.hostname, inspected_at: new Date().toISOString(),
       portal: globalThis.PortalGreenhouse?.active() ? "greenhouse" : "generic",
       portal_manual_reason: globalThis.PortalGreenhouse?.active() && !PortalGreenhouse.form() ? "No unique supported Greenhouse application form found. Inspect the employer page manually." : "",
       protected_fields_omitted: fields.filter(field => field.blocked).length,
       coverage: {scope: "visible_light_dom_current_page", visible_iframes: frames, visible_open_shadow_hosts: shadowHosts,
-        unsupported_spinbuttons: spinbuttons, reason_codes: reasonCodes},
+        unsupported_spinbuttons: spinbuttons, unsupported_button_menus: buttonMenus.length, button_menu_samples: buttonMenuSamples, reason_codes: reasonCodes},
       fields: fields.filter(field => !field.blocked).map(field => ({label: field.label, type: field.type,
         required: field.required, disabled: field.disabled, section: field.section, adapter: field.adapter,
         record: field.record ? {id: field.record.id, group: field.record.group, label: field.record.label} : null,
