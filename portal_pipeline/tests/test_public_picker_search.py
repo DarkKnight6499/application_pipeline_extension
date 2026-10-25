@@ -3,7 +3,7 @@ from pathlib import Path
 
 from browser_test_support import SyntheticBrowserTest
 
-SCRIPT = Path(__file__).resolve().parents[1] / "extension" / "adapters" / "picker-search.js"
+SCRIPT = Path(__file__).resolve().parents[1] / "extension" / "picker-search.js"
 PAGE = '''<input id="box"><div id="results"></div>
 <script>
 const catalog = ["Rutgers University - Newark", "Rutgers University - New Brunswick", "Rutgers Business School", "Newark College"];

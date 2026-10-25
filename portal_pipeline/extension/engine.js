@@ -285,13 +285,21 @@
         haspopup: node.getAttribute("aria-haspopup"), expanded: node.getAttribute("aria-expanded"), controls: node.getAttribute("aria-controls") || "",
         required: node.getAttribute("aria-required") === "true" || /\*|required/i.test(label)};
     });
+    // File inputs are usually hidden behind a drop zone, so list them regardless of visibility, including open shadow roots; names of chosen files are never read.
+    const roots = [document, ...[...document.querySelectorAll("*")].map(node => node.shadowRoot).filter(Boolean)];
+    const fileInputs = roots.flatMap(root => [...root.querySelectorAll('input[type="file"]')].map(node => ({node, inShadow: root !== document}))).filter(({node}) => !node.closest("#portal-panel-host"));
+    const dropZones = [...document.querySelectorAll('[data-automation-id*="drop" i],[data-automation-id*="upload" i]')].filter(node => node.matches("div,section,span") && outsidePanel(node));
+    const uploadSamples = [
+      ...fileInputs.slice(0, 20).map(({node, inShadow}) => ({tag: "input", automation_id: node.getAttribute("data-automation-id") || "", dom_id: node.id || "", name: node.getAttribute("name") || "",
+        accept: node.getAttribute("accept") || "", multiple: node.multiple, visible: visible(node), in_shadow: inShadow, required: node.required})),
+      ...dropZones.slice(0, 10).map(node => ({tag: node.tagName.toLowerCase(), automation_id: node.getAttribute("data-automation-id") || "", dom_id: node.id || "", visible: true}))];
     const reasonCodes = [frames && "iframe_uninspected", shadowHosts && "open_shadow_uninspected", spinbuttons && "spinbutton_unsupported", buttonMenus.length && "button_menu_unsupported"].filter(Boolean);
     return {schema_version: 1, host: location.hostname, inspected_at: new Date().toISOString(),
       portal: globalThis.PortalGreenhouse?.active() ? "greenhouse" : "generic",
       portal_manual_reason: globalThis.PortalGreenhouse?.active() && !PortalGreenhouse.form() ? "No unique supported Greenhouse application form found. Inspect the employer page manually." : "",
       protected_fields_omitted: fields.filter(field => field.blocked).length,
       coverage: {scope: "visible_light_dom_current_page", visible_iframes: frames, visible_open_shadow_hosts: shadowHosts,
-        unsupported_spinbuttons: spinbuttons, unsupported_button_menus: buttonMenus.length, button_menu_samples: buttonMenuSamples, visible_listboxes: listboxes.length, listbox_samples: listboxSamples, reason_codes: reasonCodes},
+        unsupported_spinbuttons: spinbuttons, unsupported_button_menus: buttonMenus.length, button_menu_samples: buttonMenuSamples, upload_controls: fileInputs.length, upload_samples: uploadSamples, visible_listboxes: listboxes.length, listbox_samples: listboxSamples, reason_codes: reasonCodes},
       fields: fields.filter(field => !field.blocked).map(field => ({label: field.label, type: field.type,
         required: field.required, disabled: field.disabled, section: field.section, adapter: field.adapter,
         record: field.record ? {id: field.record.id, group: field.record.group, label: field.record.label} : null,
