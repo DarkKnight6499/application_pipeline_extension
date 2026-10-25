@@ -64,6 +64,12 @@ class AnswerMemoryTests(unittest.TestCase):
         for label in ("I agree and sign below", "Signature", "Initials", "Favorite color"):
             self.assertFalse(memory.record_consent(data, "a.example.com", label), label)
 
+    def test_salary_uses_lower_band_else_default(self):
+        self.assertEqual(memory.salary_expectation(109000), 109000)
+        self.assertEqual(memory.salary_expectation(None), 50000)
+        self.assertEqual(memory.salary_expectation("n/a"), 50000)
+        self.assertEqual(memory.salary_expectation(0), 50000)
+
     def test_save_and_load_round_trip(self):
         with tempfile.TemporaryDirectory() as folder:
             data = memory.load_memory(folder)

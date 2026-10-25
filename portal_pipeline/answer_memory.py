@@ -17,6 +17,7 @@ LABEL_COLUMN = "label"
 TYPE_COLUMN = "type"
 FIELDS_COLUMN = "fields"
 MAX_ANSWER = 2000
+DEFAULT_SALARY = 50000  # per year, used when a posting shows no band (user rule 2026-10-25)
 # Demographic self-ID answers are allowed (user decision 2026-10-25); credentials, attestations and signatures never are.
 NEVER_STORE = re.compile(r"\b(password|passcode|captcha|one.?time|otp|ssn|social security|credit card|bank account|routing number|signature|attest|certify|certification of|consent|agree|accept terms|privacy policy|declaration)\b", re.I)
 
@@ -77,6 +78,15 @@ def record_consent(data, host, label, now=None):
 
 def has_consent(data, host, label):
     return consent_key(host, label) in data.get("consents", {})
+
+
+def salary_expectation(band_low=None):
+    """Salary answer: the posting's lower band when known, else the default."""
+    try:
+        low = int(band_low)
+    except (TypeError, ValueError):
+        return DEFAULT_SALARY
+    return low if low > 0 else DEFAULT_SALARY
 
 
 def lookup(data, label):
