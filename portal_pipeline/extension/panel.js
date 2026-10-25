@@ -46,12 +46,13 @@
     top.append(close);
     panel.append(top);
     const exportReport = element("button", "Export field structure", {type: "button"});
-    panel.append(exportReport);
+    const exportDelayed = element("button", "Export in 5 seconds", {type: "button"});
+    panel.append(exportReport, exportDelayed);
     const status = element("p", "Loading approved profile...", {class: "note", role: "status"});
     panel.append(status);
     shadow.append(panel);
     document.body.append(host);
-    exportReport.onclick = async () => {
+    const runExport = async () => {
       try {
         const report = await (options.transport ? options.transport.inspect() : PortalEngine.inspect());
         const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], {type: "application/json"}));
@@ -59,6 +60,18 @@
         setTimeout(() => URL.revokeObjectURL(url), 1000);
         status.textContent = "Field structure exported. Entered answers, proposals, and protected fields are omitted. Review labels before sharing.";
       } catch (error) {status.textContent = error.message;}
+    };
+    exportReport.onclick = runExport;
+    // Clicking the panel closes an open dropdown, so this lets the user open one after the click and before the snapshot.
+    exportDelayed.onclick = () => {
+      exportDelayed.disabled = true;
+      let left = 5;
+      const tick = () => {
+        if (left > 0) { status.textContent = `Open the dropdown now. Exporting in ${left}...`; left -= 1; setTimeout(tick, 1000); return; }
+        exportDelayed.disabled = false;
+        runExport();
+      };
+      tick();
     };
     if (options.inspectionOnly) {
       try {
