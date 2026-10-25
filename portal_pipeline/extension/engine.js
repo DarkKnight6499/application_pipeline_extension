@@ -248,16 +248,27 @@
     const frames = [...document.querySelectorAll("iframe")].filter(outsidePanel).length;
     const shadowHosts = [...document.querySelectorAll("*")].filter(node => node.shadowRoot && outsidePanel(node)).length;
     const spinbuttons = [...document.querySelectorAll('[role="spinbutton"]')].filter(node => !node.matches("input,select,textarea") && outsidePanel(node)).length;
-    // Button menus are not scanned or filled; their attributes (no text) show what a later contract must cover.
-    const buttonMenus = [...document.querySelectorAll('button[aria-haspopup]:not([aria-haspopup="false"]),[role="button"][aria-haspopup]:not([aria-haspopup="false"])')].filter(outsidePanel);
-    const buttonMenuSamples = buttonMenus.slice(0, 40).map(node => ({tag: node.tagName.toLowerCase(), automation_id: node.getAttribute("data-automation-id") || "", haspopup: node.getAttribute("aria-haspopup"), expanded: node.getAttribute("aria-expanded"), controls: node.getAttribute("aria-controls") ? "present" : "", required: node.getAttribute("aria-required") === "true" || /required/i.test(node.getAttribute("aria-label") || "")}));
+    // Button menus are not scanned or filled; labels and ids here show what a later contract must cover.
+    const buttonMenus = [...document.querySelectorAll('button[aria-haspopup]:not([aria-haspopup="false"]),[role="button"][aria-haspopup]:not([aria-haspopup="false"])')].filter(node => outsidePanel(node) && node.getAttribute("data-automation-id") !== "utilityMenuButton");
+    // A menu's popup lives outside its button, so record visible listboxes by structure only (option text never leaves the page).
+    const listboxes = [...document.querySelectorAll('[role="listbox"]')].filter(outsidePanel);
+    const listboxSamples = listboxes.slice(0, 20).map(node => ({tag: node.tagName.toLowerCase(), dom_id: node.id || "", automation_id: node.getAttribute("data-automation-id") || "",
+      container_automation_id: node.closest("[data-automation-id]:not([role=listbox])")?.getAttribute("data-automation-id") || "", option_count: node.querySelectorAll('[role="option"]').length,
+      multiselectable: node.getAttribute("aria-multiselectable") === "true",
+      labelled_by_text: (node.getAttribute("aria-labelledby") || "").split(/\s+/).filter(Boolean).map(id => document.getElementById(id)?.textContent || "").join(" ").replace(/\s+/g, " ").trim().slice(0, 80)}));
+    const buttonMenuSamples = buttonMenus.slice(0, 40).map(node => {
+      const label = labelFor(node).replace(/\s+/g, " ").trim().slice(0, 80);
+      return {tag: node.tagName.toLowerCase(), automation_id: node.getAttribute("data-automation-id") || "", dom_id: node.id || "", name: node.getAttribute("name") || "", label,
+        haspopup: node.getAttribute("aria-haspopup"), expanded: node.getAttribute("aria-expanded"), controls: node.getAttribute("aria-controls") || "",
+        required: node.getAttribute("aria-required") === "true" || /\*|required/i.test(label)};
+    });
     const reasonCodes = [frames && "iframe_uninspected", shadowHosts && "open_shadow_uninspected", spinbuttons && "spinbutton_unsupported", buttonMenus.length && "button_menu_unsupported"].filter(Boolean);
     return {schema_version: 1, host: location.hostname, inspected_at: new Date().toISOString(),
       portal: globalThis.PortalGreenhouse?.active() ? "greenhouse" : "generic",
       portal_manual_reason: globalThis.PortalGreenhouse?.active() && !PortalGreenhouse.form() ? "No unique supported Greenhouse application form found. Inspect the employer page manually." : "",
       protected_fields_omitted: fields.filter(field => field.blocked).length,
       coverage: {scope: "visible_light_dom_current_page", visible_iframes: frames, visible_open_shadow_hosts: shadowHosts,
-        unsupported_spinbuttons: spinbuttons, unsupported_button_menus: buttonMenus.length, button_menu_samples: buttonMenuSamples, reason_codes: reasonCodes},
+        unsupported_spinbuttons: spinbuttons, unsupported_button_menus: buttonMenus.length, button_menu_samples: buttonMenuSamples, visible_listboxes: listboxes.length, listbox_samples: listboxSamples, reason_codes: reasonCodes},
       fields: fields.filter(field => !field.blocked).map(field => ({label: field.label, type: field.type,
         required: field.required, disabled: field.disabled, section: field.section, adapter: field.adapter,
         record: field.record ? {id: field.record.id, group: field.record.group, label: field.record.label} : null,

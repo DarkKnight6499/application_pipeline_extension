@@ -54,3 +54,16 @@ The shared engine recognizes existing `data-automation-id` values beginning with
 ## Date range parsing (October 11, 2026)
 
 The profile builder now splits an employment date range on an en or em dash with or without spaces, a spaced hyphen, or "to", and reads Sept and abbreviated months with periods. An unspaced hyphen is not a separator, so ISO dates are never split. An unreadable side such as Present stays pending while a readable side keeps its own fact, a reversed range clears both, and nothing is guessed. This covers only our own parsing of the master resume. Whether the Workday resume import drops dates joined by an en dash is still UNVERIFIED and needs the throwaway-account check above. Tests: `test_public_date_ranges.py`.
+
+## Button menus and search pickers (October 25, 2026 live Inspect exports)
+
+Source: four Inspect-only exports of the Citi My Information page (tenant `citi.wd5.myworkdayjobs.com`), with no answers entered and no menu option selected. Raw files stay in the ignored exports folder. Native fill through the extension remains **UNVERIFIED**.
+
+| Control | Observed structure |
+|---|---|
+| Country, State, Phone Device Type | `button` with `aria-haspopup="listbox"`, ids `country--country`, `address--countryRegion`, `phoneNumber--phoneType`, label ends with `*`. Closed: no `aria-expanded`, no `aria-controls`. Open: `aria-expanded="true"` and `aria-controls` set. |
+| Open menu popup (Country, State) | One `ul role="listbox"` with a generated id (`t4hix`, `t4hiz`), no automation id, container or label, and 250 and 61 `role="option"` items. Generated ids change between captures, so a selector must come from the button's `aria-controls` and never from a fixed id. |
+| Page chrome | `utilityMenuButton` buttons (`languageSelectorButton`, `settingsSelectorButton`, `accountSettingsButton`) are not application controls and are excluded from the unsupported menu count. |
+| How Did You Hear About Us, Country Phone Code | Export as text inputs (`source--source`, `phoneNumber--countryPhoneCode`) with no popup attributes. Each sits beside a `ul role="listbox"` with `data-automation-id="selectedItemList"` inside `multiselectInputContainer`. Search dialog contents are not captured. |
+
+Still **UNVERIFIED**: that `aria-controls` names the popup (the export records only that it is set; later exports record its value), how an option is committed, and whether unselected options render off screen. The October 18 notes record that off-screen options could not be clicked and that Country once changed unexpectedly, so any adapter must scroll an exact option into view, select only one exact label match, and read the button text back.
