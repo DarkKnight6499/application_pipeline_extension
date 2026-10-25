@@ -9,6 +9,8 @@ import re
 import sys
 import time
 from pathlib import Path
+
+import oracle_attach
 from urllib.parse import urlsplit
 
 from playwright.sync_api import sync_playwright
@@ -251,6 +253,8 @@ def wait_for_person(page, profile):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--resume", type=Path, help="Reviewed resume file to attach on the upload step.")
+    parser.add_argument("--cover", type=Path, help="Oracle: cover letter to attach, replacing a different one.")
+    parser.add_argument("--no-cover", action="store_true", help="Oracle: remove any attached cover letter.")
     parser.add_argument("--portal", choices=["workday", "oracle"], default="workday")
     parser.add_argument("--dry", action="store_true", help="Scan and print proposals only; write and click nothing.")
     args = parser.parse_args(argv)
@@ -274,7 +278,10 @@ def main(argv=None):
                 print("  A fill failed. Stopping so you can check the page.")
                 break
             if not args.dry:
-                note = upload_resume(page, args.resume)
+                if PORTAL["oracle"]:
+                    for line in oracle_attach.apply(page, args.resume, args.cover, args.no_cover):
+                        print("  attach:", line)
+                note = None if PORTAL["oracle"] else upload_resume(page, args.resume)
                 if note:
                     print("  upload:", note)
             if args.dry or FINAL_STEP_PATTERN.search(title):
