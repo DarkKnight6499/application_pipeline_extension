@@ -4,6 +4,6 @@
   const base = PortalOracleAdapter;
   const generic = PortalAdapters.forLocation("");
   // Application-mode brokering needs a backend application id, which this local run never allocates.
-  PortalAdapters.register({...base, id: "oracle-jpmc", version: "live-1", hosts: [/(^|\.)oraclecloud\.com$/], mode: "fill", requiresApplicationMode: false,
+  PortalAdapters.register({...base, id: "oracle-jpmc", version: "live-1", hosts: [/^jpmc\.fa\.oraclecloud\.com$/], mode: "fill", requiresApplicationMode: false,
     fill: generic.fill, upload: generic.upload});
 })();

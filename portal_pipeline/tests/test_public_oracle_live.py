@@ -4,7 +4,7 @@ from pathlib import Path
 from browser_test_support import SyntheticBrowserTest
 
 EXT = Path(__file__).resolve().parents[1] / "extension"
-URL = "https://example-employer.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/1/apply/section/1"
+URL = "https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/1/apply/section/1"
 PAGE = '''<form>
 <label for="firstName-1">First Name</label><input id="firstName-1" name="firstName" value="">
 <label for="honey-1">honeypot</label><input id="honey-1" name="honey-pot" value="">

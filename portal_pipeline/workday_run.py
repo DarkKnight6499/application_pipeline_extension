@@ -70,7 +70,17 @@ def inject(page):
         page.add_script_tag(path=str(EXTENSION / name))
 
 
+ORACLE_NEXT_SELECTOR = 'button[data-qa="applyFlowPaginationNextButton"]'
+ORACLE_TITLE_JS = "() => { const heading = [...document.querySelectorAll('h1,h2')].find(n => n.getClientRects().length); return (location.pathname.split('/apply/')[1] || '') + ' ' + (heading ? heading.textContent : ''); }"
+
+
+def next_selector():
+    return ORACLE_NEXT_SELECTOR if PORTAL["oracle"] else NEXT_SELECTOR
+
+
 def step_title(page):
+    if PORTAL["oracle"]:
+        return " ".join(page.evaluate(ORACLE_TITLE_JS).split())
     return page.evaluate("(sel) => (document.querySelector(sel)?.textContent || '').replace(/\\s+/g, ' ').trim()", STEP_SELECTOR)
 
 
@@ -120,6 +130,10 @@ HISTORY_SECTIONS = {"employment": "Work Experience", "education": "Education"}
 ROW_SETTLE_SECONDS = 1.5
 
 
+def has_heading(page, heading):
+    return page.evaluate("text => [...document.querySelectorAll('h1,h2,h3,h4')].some(node => node.textContent.trim() === text)", heading)
+
+
 def click_add(page, heading):
     """Click the one Add button under a section heading; False when there is not exactly one."""
     return page.evaluate(CLICK_ADD_JS, heading)
@@ -137,8 +151,12 @@ def row_ids(fields, group):
 
 def ensure_rows(page, profile):
     """Add history rows until each group has as many as the profile has records; returns False if an Add button is missing."""
+    if PORTAL["oracle"]:
+        return True  # Oracle history sections have no Workday Add buttons
     for group, heading in HISTORY_SECTIONS.items():
         needed = len(profile.get(group, []))
+        if not has_heading(page, heading):
+            continue
         for _ in range(needed + 1):
             if len(row_ids(scan(page, profile), group)) >= needed:
                 break
@@ -170,7 +188,10 @@ def unanswered(fields):
 
 def learnable(fields):
     """Fields whose typed value may be remembered by exact question; history row fields differ per row, so never."""
-    return [f for f in fields if not f["blocked"] and f["current"] not in ("", False) and f["proposal"] == "" and f["type"] != "checkbox" and not f["record"]]
+    counts = {}
+    for f in fields:
+        counts[f["label"]] = counts.get(f["label"], 0) + 1
+    return [f for f in fields if not f["blocked"] and f["current"] not in ("", False) and f["proposal"] == "" and f["type"] != "checkbox" and not f["record"] and counts[f["label"]] == 1]
 
 
 def learn(page, profile, fields):
@@ -264,7 +285,7 @@ def main(argv=None):
             learned = learn(page, profile, fields)
             if learned:
                 print(f"  learned {learned} answer(s)")
-            button = page.locator(NEXT_SELECTOR)
+            button = page.locator(next_selector())
             if button.count() != 1 or not is_next_label(button.inner_text()):
                 print("  No single Save and Continue button. Stopping.")
                 break

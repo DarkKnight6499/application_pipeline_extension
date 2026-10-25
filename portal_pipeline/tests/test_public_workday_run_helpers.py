@@ -43,3 +43,14 @@ class DialogTests(SyntheticBrowserTest):
         self.assertFalse(workday_run.dialog_open(self.page))
         self.page.evaluate("document.body.insertAdjacentHTML('beforeend', '<div role=dialog>shown</div>')")
         self.assertTrue(workday_run.dialog_open(self.page))
+
+
+class HistorySectionTests(SyntheticBrowserTest):
+    def test_page_without_history_headings_is_reported_as_having_none(self):
+        self.open_markup("<h2>Contact</h2><button>Next</button>")
+        self.assertFalse(workday_run.has_heading(self.page, "Work Experience"))
+
+    def test_heading_text_must_match_exactly(self):
+        self.open_markup("<h3>Work Experience</h3><h3>Work Experience Summary</h3>")
+        self.assertTrue(workday_run.has_heading(self.page, "Work Experience"))
+        self.assertFalse(workday_run.has_heading(self.page, "Education"))

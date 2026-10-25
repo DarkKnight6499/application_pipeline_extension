@@ -43,3 +43,11 @@ class PortalHostTests(unittest.TestCase):
             self.assertFalse(workday_run.is_workday_url("https://evil.example/?u=oraclecloud.com"))
         finally:
             workday_run.PORTAL["oracle"] = False
+
+
+class LearnableDuplicateTests(unittest.TestCase):
+    def test_a_label_that_appears_twice_is_never_learned(self):
+        code = field(current="+1", label="Phone Number", type="combobox")
+        number = field(current="(862) 452-0144", label="Phone Number")
+        other = field(current="Yes", label="Are you over 18?")
+        self.assertEqual([f["label"] for f in workday_run.learnable([code, number, other])], ["Are you over 18?"])
