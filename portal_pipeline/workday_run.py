@@ -34,7 +34,7 @@ GREENHOUSE_HOST_MARK = "greenhouse.io"
 GREENHOUSE_EXTRA_SCRIPTS = ["adapters/greenhouse.js", "adapters/greenhouse-select.js"]
 GREENHOUSE_GLOBALS = ["PortalGreenhouse", "PortalGreenhouseSelect"]
 GREENHOUSE_UPLOAD_SELECTORS = {"resume": "form#application-form input#resume", "cover": "form#application-form input#cover_letter"}
-SINGLE_PAGE_HOSTS = {"greenhouse": "greenhouse.io", "lever": "lever.co", "ashby": "ashbyhq.com"}
+SINGLE_PAGE_HOSTS = {"greenhouse": "greenhouse.io", "lever": "lever.co", "ashby": "ashbyhq.com", "smartrecruiters": "smartrecruiters.com", "eightfold": "eightfold.ai"}
 LEVER_EXTRA_SCRIPTS = ["adapters/lever.js", "lever-live.js"]
 LEVER_GLOBALS = ["PortalLeverAdapter"]
 PORTAL = {"oracle": False, "greenhouse": False, "lever": False, "single": False, "host": ""}
@@ -61,7 +61,7 @@ def is_workday_url(url):
 
 
 def dialog_open(page):
-    return page.evaluate("[...document.querySelectorAll('[role=dialog],[role=alertdialog],dialog[open]')].some(node => node.getClientRects().length > 0 && !/cookie/i.test(node.innerText))")
+    return page.evaluate("[...document.querySelectorAll('[role=dialog],[role=alertdialog],dialog[open]')].some(node => node.getClientRects().length > 0 && node.innerText.trim() !== '' && !/cookie/i.test(node.innerText))")
 
 
 def is_next_label(text):
