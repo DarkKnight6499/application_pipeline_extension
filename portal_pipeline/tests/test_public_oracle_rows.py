@@ -14,3 +14,8 @@ class NativeDialogTests(SyntheticBrowserTest):
     def test_native_open_dialog_counts(self):
         self.open_markup("<dialog open><p>Sure?</p></dialog>")
         self.assertTrue(w.dialog_open(self.page))
+
+
+def test_us_state_location_maps_to_united_states():
+    import oracle_history as h
+    assert h.plan(["x"], {"education": [{"school": "Rutgers", "location": "Newark, NJ"}]}) == [("education", 0)]

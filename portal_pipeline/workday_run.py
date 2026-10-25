@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 
 import oracle_attach
+import oracle_history
 from urllib.parse import urlsplit
 
 from playwright.sync_api import sync_playwright
@@ -28,7 +29,11 @@ HOST_MARK = "myworkdayjobs.com"
 ORACLE_HOST_MARK = "oraclecloud.com"
 ORACLE_EXTRA_SCRIPTS = ["oracle-grid.js", "adapters/oracle.js", "oracle-live.js"]
 ORACLE_GLOBALS = ["PortalOracleGrid", "PortalOracleAdapter"]
-PORTAL = {"oracle": False}
+GREENHOUSE_HOST_MARK = "greenhouse.io"
+GREENHOUSE_EXTRA_SCRIPTS = ["adapters/greenhouse.js", "adapters/greenhouse-select.js"]
+GREENHOUSE_GLOBALS = ["PortalGreenhouse", "PortalGreenhouseSelect"]
+GREENHOUSE_UPLOAD_SELECTORS = {"resume": "form#application-form input#resume", "cover": "form#application-form input#cover_letter"}
+PORTAL = {"oracle": False, "greenhouse": False}
 NEXT_LABELS = {"save and continue", "next"}
 SCRIPTS = ["adapters/registry.js", "adapters/generic.js", "adapters/workday.js", "adapters/aria-listbox.js", "workday-menu.js",
            "classifier.js", "picker-search.js", "workday-upload.js", "workday-date.js", "workday-picker.js", "engine.js"]
@@ -47,7 +52,7 @@ STEP_PATTERN = re.compile(r"step (\d+) of (\d+)")
 
 def is_workday_url(url):
     host = urlsplit(url).hostname or ""
-    mark = ORACLE_HOST_MARK if PORTAL["oracle"] else HOST_MARK
+    mark = GREENHOUSE_HOST_MARK if PORTAL["greenhouse"] else ORACLE_HOST_MARK if PORTAL["oracle"] else HOST_MARK
     return host == mark or host.endswith("." + mark)
 
 
@@ -67,8 +72,8 @@ def page_of(browser):
 
 
 def inject(page):
-    page.evaluate("names => names.forEach(name => { delete globalThis[name]; })", GLOBALS + ORACLE_GLOBALS)
-    for name in SCRIPTS + (ORACLE_EXTRA_SCRIPTS if PORTAL["oracle"] else []):
+    page.evaluate("names => names.forEach(name => { delete globalThis[name]; })", GLOBALS + ORACLE_GLOBALS + GREENHOUSE_GLOBALS)
+    for name in SCRIPTS + (ORACLE_EXTRA_SCRIPTS if PORTAL["oracle"] else []) + (GREENHOUSE_EXTRA_SCRIPTS if PORTAL["greenhouse"] else []):
         page.add_script_tag(path=str(EXTENSION / name))
 
 
@@ -81,6 +86,8 @@ def next_selector():
 
 
 def step_title(page):
+    if PORTAL["greenhouse"]:
+        return "greenhouse application form"
     if PORTAL["oracle"]:
         return " ".join(page.evaluate(ORACLE_TITLE_JS).split())
     return page.evaluate("(sel) => (document.querySelector(sel)?.textContent || '').replace(/\\s+/g, ' ').trim()", STEP_SELECTOR)
@@ -100,6 +107,19 @@ def attachment_for(path):
     data = path.read_bytes()
     mime = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
     return {"name": path.name, "mime": mime, "base64": base64.b64encode(data).decode("ascii"), "sha256": hashlib.sha256(data).hexdigest()}
+
+
+def greenhouse_upload(page, slot, path):
+    """Attach a file to the one Greenhouse input for the slot when it is empty; returns a status line or None."""
+    if not path:
+        return None
+    locator = page.locator(GREENHOUSE_UPLOAD_SELECTORS[slot])
+    if locator.count() != 1:
+        return f"{slot}: upload input not found exactly once; attach it yourself."
+    if page.evaluate("el => el.files.length", locator.element_handle()):
+        return f"{slot}: a file is already attached; left alone."
+    locator.set_input_files(str(path))
+    return f"{slot}: attached {Path(path).name}"
 
 
 def upload_resume(page, resume):
@@ -255,10 +275,11 @@ def main(argv=None):
     parser.add_argument("--resume", type=Path, help="Reviewed resume file to attach on the upload step.")
     parser.add_argument("--cover", type=Path, help="Oracle: cover letter to attach, replacing a different one.")
     parser.add_argument("--no-cover", action="store_true", help="Oracle: remove any attached cover letter.")
-    parser.add_argument("--portal", choices=["workday", "oracle"], default="workday")
+    parser.add_argument("--portal", choices=["workday", "oracle", "greenhouse"], default="workday")
     parser.add_argument("--dry", action="store_true", help="Scan and print proposals only; write and click nothing.")
     args = parser.parse_args(argv)
     PORTAL["oracle"] = args.portal == "oracle"
+    PORTAL["greenhouse"] = args.portal == "greenhouse"
     with sync_playwright() as p:
         browser = p.chromium.connect_over_cdp(CDP_URL)
         page = page_of(browser)
@@ -273,6 +294,9 @@ def main(argv=None):
                 print("  Review page reached. Nothing is filled here. Check it and submit yourself.")
                 break
             profile = build_profile()
+            if PORTAL["oracle"] and not args.dry and "section/3" in title:
+                for line in oracle_history.apply(page, profile):
+                    print("  history:", line)
             fields = run_page(page, profile, args.dry)
             if FAILED.get("count"):
                 print("  A fill failed. Stopping so you can check the page.")
@@ -281,10 +305,16 @@ def main(argv=None):
                 if PORTAL["oracle"]:
                     for line in oracle_attach.apply(page, args.resume, args.cover, args.no_cover):
                         print("  attach:", line)
-                note = None if PORTAL["oracle"] else upload_resume(page, args.resume)
+                if PORTAL["greenhouse"]:
+                    for line in (greenhouse_upload(page, "resume", args.resume), greenhouse_upload(page, "cover", args.cover)):
+                        if line:
+                            print("  upload:", line)
+                note = None if PORTAL["oracle"] or PORTAL["greenhouse"] else upload_resume(page, args.resume)
                 if note:
                     print("  upload:", note)
-            if args.dry or FINAL_STEP_PATTERN.search(title):
+            if args.dry or FINAL_STEP_PATTERN.search(title) or PORTAL["greenhouse"]:
+                if PORTAL["greenhouse"] and not args.dry and wait_for_person(page, profile):
+                    print(f"  learned {learn(page, profile, fields)} answer(s)")
                 break
             if not wait_for_person(page, profile):
                 print("  Required answers are still missing. Stopping here for you.")
