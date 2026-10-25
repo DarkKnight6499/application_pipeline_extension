@@ -51,3 +51,11 @@ class LearnableDuplicateTests(unittest.TestCase):
         number = field(current="(862) 452-0144", label="Phone Number")
         other = field(current="Yes", label="Are you over 18?")
         self.assertEqual([f["label"] for f in workday_run.learnable([code, number, other])], ["Are you over 18?"])
+
+
+def test_learnable_skips_option_ids_and_account_fields():
+    base = {"blocked": False, "proposal": "", "record": None, "required": False}
+    fields = [dict(base, label="Type", type="select-one", current="15145"),
+              dict(base, label="Login", type="text", current="a@b.c"),
+              dict(base, label="Zip/Postal Code", type="text", current="07029")]
+    assert [f["label"] for f in workday_run.learnable(fields)] == ["Zip/Postal Code"]

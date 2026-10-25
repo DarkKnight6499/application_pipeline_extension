@@ -40,7 +40,9 @@ LEVER_GLOBALS = ["PortalLeverAdapter"]
 FRAME_PORTALS = {"icims"}
 FORM_FRAME_JS = "() => [...document.querySelectorAll('input,select,textarea')].filter(i => i.type !== 'hidden' && i.getClientRects().length).length"
 PORTAL = {"frame": False, "oracle": False, "greenhouse": False, "lever": False, "single": False, "host": ""}
-NEXT_LABELS = {"save and continue", "next"}
+NEXT_LABELS = {"save and continue", "next", "update profile"}
+ICIMS_NEXT_SELECTOR = "input#cp_form_submit_i, input.iCIMS_PrimaryButton[value='Next']"
+ICIMS_TITLE_JS = "() => [...document.querySelectorAll('h1,h2,h3')].filter(n => n.getClientRects().length).slice(0, 4).map(n => n.textContent.trim()).join(' / ')"
 SCRIPTS = ["adapters/registry.js", "adapters/generic.js", "adapters/workday.js", "adapters/aria-listbox.js", "workday-menu.js",
            "classifier.js", "picker-search.js", "workday-upload.js", "workday-date.js", "workday-picker.js", "engine.js"]
 NEXT_SELECTOR = '[data-automation-id="pageFooterNextButton"]'
@@ -97,10 +99,14 @@ ORACLE_TITLE_JS = "() => { const heading = [...document.querySelectorAll('h1,h2'
 
 
 def next_selector():
+    if PORTAL["frame"]:
+        return ICIMS_NEXT_SELECTOR
     return ORACLE_NEXT_SELECTOR if PORTAL["oracle"] else NEXT_SELECTOR
 
 
 def step_title(page):
+    if PORTAL["frame"]:
+        return " ".join(page.evaluate(ICIMS_TITLE_JS).split())
     if PORTAL["single"]:
         return "single page application form"
     if PORTAL["oracle"]:
@@ -108,6 +114,7 @@ def step_title(page):
     return page.evaluate("(sel) => (document.querySelector(sel)?.textContent || '').replace(/\\s+/g, ' ').trim()", STEP_SELECTOR)
 
 
+UNLEARNABLE_LABELS = {"login", "type", "number", "username", "user name"}  # account fields and bare option ids are not reusable answers
 SPONSORSHIP_KEYS = ("sponsorship_now", "sponsorship_future", "sponsorship_now_or_future")
 SPONSORSHIP_SOURCE = "User rule 2026-10-25: every sponsorship question is answered No"
 
@@ -234,7 +241,7 @@ def learnable(fields):
     counts = {}
     for f in fields:
         counts[f["label"]] = counts.get(f["label"], 0) + 1
-    return [f for f in fields if not f["blocked"] and f["current"] not in ("", False) and f["proposal"] == "" and f["type"] != "checkbox" and not f["record"] and counts[f["label"]] == 1]
+    return [f for f in fields if not f["blocked"] and f["current"] not in ("", False) and f["proposal"] == "" and f["type"] != "checkbox" and not f["record"] and counts[f["label"]] == 1 and not (f["type"] == "select-one" and str(f["current"]).isdigit()) and f["type"] != "password" and f["label"].strip().lower() not in UNLEARNABLE_LABELS]
 
 
 def learn(page, profile, fields):
@@ -304,7 +311,7 @@ def main(argv=None):
     PORTAL["greenhouse"] = args.portal == "greenhouse"
     PORTAL["lever"] = args.portal == "lever"
     PORTAL["frame"] = args.portal in FRAME_PORTALS
-    PORTAL["single"] = args.portal in SINGLE_PAGE_HOSTS
+    PORTAL["single"] = args.portal in SINGLE_PAGE_HOSTS and args.portal not in FRAME_PORTALS
     PORTAL["host"] = SINGLE_PAGE_HOSTS.get(args.portal, "")
     with sync_playwright() as p:
         browser = p.chromium.connect_over_cdp(CDP_URL)
@@ -352,7 +359,8 @@ def main(argv=None):
                 print("  A dialog appeared while filling. Stopping before Next.")
                 break
             button = page.locator(next_selector())
-            if button.count() != 1 or not is_next_label(button.inner_text()):
+            label = button.get_attribute("value") if PORTAL["frame"] else button.inner_text()
+            if button.count() != 1 or not is_next_label(label):
                 print("  No single Save and Continue button. Stopping.")
                 break
             button.click()
