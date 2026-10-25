@@ -25,9 +25,9 @@ def is_protected(field):
     return bool(field.get("protected")) or str(field.get(TYPE_COLUMN, "")).lower() in {"password", "file", "signature"} or bool(NEVER_STORE.search(str(field.get(LABEL_COLUMN, ""))))
 
 
-# Consent boxes (terms, privacy, agree) are auto-tickable only after one manual acceptance; truthfulness attestations and signatures never are.
-CONSENT_TERMS = re.compile(r"\b(agree|consent|accept|terms|privacy)\b", re.I)
-ATTEST_TERMS = re.compile(r"\b(certify|attest|attestation|true and (correct|accurate)|signature|sign)\b", re.I)
+# Consent and attestation boxes are auto-tickable only after one manual tick on that host (user decision 2026-10-25); signatures never are.
+CONSENT_TERMS = re.compile(r"\b(agree|consent|accept|terms|privacy|certify|attest|attestation|acknowledge|declare|true and (correct|accurate)|truthful)\b", re.I)
+SIGNATURE_TERMS = re.compile(r"\b(signature|sign|signed|initials)\b", re.I)
 
 
 def memory_path(data_dir=DATA_DIR):
@@ -67,9 +67,9 @@ def consent_key(host, label):
 
 
 def record_consent(data, host, label, now=None):
-    """Remembers a consent box the user ticked manually; returns False for attestations and non-consent labels."""
+    """Remembers a consent box the user ticked manually; returns False for signatures and non-consent labels."""
     text = str(label or "")
-    if not str(host).strip() or not normalize_label(text) or ATTEST_TERMS.search(text) or not CONSENT_TERMS.search(text):
+    if not str(host).strip() or not normalize_label(text) or SIGNATURE_TERMS.search(text) or not CONSENT_TERMS.search(text):
         return False
     data.setdefault("consents", {})[consent_key(host, text)] = {"label": text.strip()[:300], "accepted": now or date.today().isoformat()}
     return True

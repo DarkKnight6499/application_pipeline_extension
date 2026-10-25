@@ -53,9 +53,15 @@ class AnswerMemoryTests(unittest.TestCase):
         self.assertFalse(memory.has_consent(data, "other.example.com", "I agree to the Privacy Policy"))
         self.assertFalse(memory.has_consent(data, "citi.wd5.myworkdayjobs.com", "I agree to the Terms"))
 
-    def test_attestations_never_become_consents(self):
+    def test_attestation_boxes_are_remembered_after_manual_tick(self):
         data = self.fresh()
-        for label in ("I certify that the information is true and correct", "I agree and sign below", "Signature", "Favorite color"):
+        label = "I certify that the information is true and correct"
+        self.assertTrue(memory.record_consent(data, "a.example.com", label))
+        self.assertTrue(memory.has_consent(data, "a.example.com", label))
+
+    def test_signatures_and_unrelated_labels_never_become_consents(self):
+        data = self.fresh()
+        for label in ("I agree and sign below", "Signature", "Initials", "Favorite color"):
             self.assertFalse(memory.record_consent(data, "a.example.com", label), label)
 
     def test_save_and_load_round_trip(self):
