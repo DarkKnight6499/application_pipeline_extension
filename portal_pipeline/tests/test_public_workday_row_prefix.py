@@ -82,3 +82,19 @@ class WorkdayDatePartTests(SyntheticBrowserTest):
         got = self.proposals(bind=False)
         self.assertIsNone(got["workExperience-9--startDate-dateSectionYear-input"][0])
         self.assertIsNone(got["education-4--lastYearAttended-dateSectionYear-input"][0])
+
+
+class RowContainerWithoutBoxTests(SyntheticBrowserTest):
+    PAGE = '''<div style="display: contents"><label for="workExperience-5--jobTitle">Job Title*</label><input id="workExperience-5--jobTitle"></div>
+    <div style="display: contents"><label for="workExperience-6--jobTitle">Job Title*</label><input id="workExperience-6--jobTitle"></div>'''
+
+    def test_rows_group_even_when_container_has_no_box(self):
+        self.open_markup(self.PAGE)
+        fields = [f for f in self.page.evaluate("PortalEngine.inspect()")["fields"] if f["structure"]["dom_id"].startswith("workExperience")]
+        self.assertEqual([f["section"] for f in fields], ["employment", "employment"])
+        self.assertNotEqual(fields[0]["record"]["id"], fields[1]["record"]["id"])
+
+    def test_row_with_only_hidden_controls_gets_no_record(self):
+        self.open_markup('<div><input id="workExperience-5--jobTitle" style="display:none"></div><input id="other">')
+        fields = self.page.evaluate("PortalEngine.inspect()")["fields"]
+        self.assertTrue(all(f["record"] is None for f in fields))

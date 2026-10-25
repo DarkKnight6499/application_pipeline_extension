@@ -80,3 +80,18 @@ Source: Inspect-only exports of the Citi My Experience and Application Questions
 | Education row | `school` and `fieldOfStudy` text inputs backed by search pickers, `gradeAverage` input, and a `degree` button menu (`education-N--degree`, `aria-haspopup="listbox"`, 23 options once open, popup reachable through `aria-controls`). |
 | Resume/CV | A "Drop files here / Select files" zone is visible, but no file input or upload control appears in the export. **UNVERIFIED** and not yet captured. |
 | Application Questions | Six `button` menus with ids `primaryQuestionnaire--<32 hex>`, all labelled "Select One Required", so question text is not captured. The 32 hex ids trip the export validator, so these files stay private. |
+
+## Outside reference notes (October 25, 2026, Codex read of two public repos)
+
+Source: Codex read the public code of andrewmillercode/Autofill-Jobs (MIT) and ahdibiaymen/workday-application-automation (no licence shown). Nothing was run or copied. Findings below are what their code does, not verified behavior of our target tenants.
+
+- Menus: click the button, then find `ul[role="listbox"][tabindex="-1"]` and click an `li div` by text. Their matching is substring based and global; ours must stay exact and scoped to the popup named by `aria-controls`.
+- Search pickers: type into `monikerSearchBox`, send Enter keydown and keyup, wait, match a result by `aria-label`, click it.
+- Dates: click the month or year input first, then set the value, then wait about 600 ms. One repo finds date inputs through `aria-valuetext` containing MM or YYYY and types digits as keystrokes.
+- Resume: build a `File`, place it in a `DataTransfer`, assign it to the hidden `file-upload-input-ref` input's `files`, and dispatch `change`.
+- Rows: click Add, wait about 1.25 s, then fill by index.
+- Both rely on fixed sleeps and have no retry or read-back, which our adapter adds.
+
+## Menu popup ownership confirmed (October 25, 2026)
+
+An Inspect export taken with the Degree menu open shows the button `education-747--degree` with `aria-expanded="true"` and `aria-controls="t4hi3m"`, and one `ul role="listbox"` whose id is `t4hi3m` with 23 options. So `aria-controls` does name the popup for this tenant (Citi), and the id is generated per open. Option commit, off-screen scrolling and read-back remain **UNVERIFIED**.

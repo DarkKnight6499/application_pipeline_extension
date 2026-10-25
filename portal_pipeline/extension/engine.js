@@ -124,9 +124,11 @@
   }
 
   function visibleControls() {
-    return [...document.querySelectorAll("input,select,textarea,[role=combobox]")].filter(element => {
+    return [...document.querySelectorAll("input,select,textarea,[role=combobox],button[aria-haspopup=listbox]")].filter(element => {
       if (element.closest("#portal-panel-host") || !controlVisible(element)) return false;
       if (globalThis.PortalGreenhouse?.active() && !PortalGreenhouse.formFor(element)) return false;
+      if (isMenu(element)) return true;
+      if (element.tagName === "BUTTON") return false;
       const type = element.getAttribute("role") === "combobox" && element.tagName !== "SELECT" ? "combobox" : element.type;
       return !["hidden", "submit", "button", "reset", "image"].includes(type);
     });
@@ -178,10 +180,12 @@
     return unavailable(option) || !!option.closest("optgroup:disabled");
   }
 
-  const dropdown = element => globalThis.PortalGreenhouseSelect?.matches(element) ? PortalGreenhouseSelect : globalThis.PortalListbox;
+  const isMenu = element => !!globalThis.PortalWorkdayMenu?.matches(element);
+  const isCustom = element => (element.getAttribute("role") === "combobox" && element.tagName !== "SELECT") || isMenu(element);
+  const dropdown = element => isMenu(element) ? PortalWorkdayMenu : globalThis.PortalGreenhouseSelect?.matches(element) ? PortalGreenhouseSelect : globalThis.PortalListbox;
 
   function fingerprint(element) {
-    const custom = element.getAttribute("role") === "combobox" && element.tagName !== "SELECT";
+    const custom = isCustom(element);
     const choices = custom ? dropdown(element)?.describe(element).options || []
       : element.tagName === "SELECT" ? [...element.options].map(option => [option.value, option.textContent.trim(), optionDisabled(option)])
       : element.type === "radio" ? radioMembers(element).map(item => [item.value, controlIdentity(item), unavailable(item)]) : [];
@@ -211,7 +215,7 @@
     if (register) controls = new Map();
     const fields = [], counts = new Map(), seenRadio = new Set();
     const contexts = historyContexts(), records = new Map(), usage = new Map();
-    contexts.filter(visible).forEach((context, ordinal) => {
+    contexts.filter(context => visible(context) || (prefixGroups.has(context) && [...context.querySelectorAll("input,select,textarea")].some(controlVisible))).forEach((context, ordinal) => {
       const group = historyGroup(context);
       if (!recordIds.has(context)) recordIds.set(context, `${group}:${crypto.randomUUID()}`);
       const id = recordIds.get(context), chosen = bindings[id];
@@ -229,7 +233,7 @@
     const surface = visibleControls();
     if (register) registeredSurface = surface;
     for (const element of surface) {
-      const custom = element.getAttribute("role") === "combobox" && element.tagName !== "SELECT";
+      const custom = isCustom(element);
       const type = custom ? "combobox" : element.type || element.getAttribute("role") || element.tagName.toLowerCase();
       if (["hidden", "submit", "button", "reset", "image"].includes(type)) continue;
       if (type === "radio") {
@@ -237,6 +241,7 @@
         radioMembers(element).forEach(item => seenRadio.add(item));
       }
       let label = labelFor(element);
+      if (isMenu(element)) label = PortalWorkdayMenu.question(element) || label;
       let members = [element];
       if (type === "radio") {
         members = radioMembers(element);
@@ -268,7 +273,7 @@
       const field = {id, label, key, section: key?.split(".")[0] || section, type, current, options, record,
                      required: element.required || element.getAttribute("aria-required") === "true" || globalThis.PortalGreenhouse?.uploadGroup(element)?.getAttribute("aria-required") === "true",
                      blocked, disabled: unavailable(element),
-                     adapter: customInfo?.supported ? (dropdown(element) === globalThis.PortalGreenhouseSelect ? "greenhouse-select" : "aria-listbox") : null, manual_reason: customInfo?.reason || "",
+                     adapter: customInfo?.supported ? (dropdown(element) === globalThis.PortalGreenhouseSelect ? "greenhouse-select" : isMenu(element) ? "workday-menu" : "aria-listbox") : null, manual_reason: customInfo?.reason || "",
                      dropdown_state: customInfo?.dropdown_state || null,
                      structure: {tag: element.tagName.toLowerCase(), name: element.name || "", automation_id: element.getAttribute("data-automation-id") || "",
                        dom_id: element.id, role: element.getAttribute("role") || "", controls: element.getAttribute("aria-controls") || "", popup: element.getAttribute("aria-haspopup") || "",
@@ -295,11 +300,13 @@
       container_automation_id: node.closest("[data-automation-id]:not([role=listbox])")?.getAttribute("data-automation-id") || "", option_count: node.querySelectorAll('[role="option"]').length,
       multiselectable: node.getAttribute("aria-multiselectable") === "true",
       labelled_by_text: (node.getAttribute("aria-labelledby") || "").split(/\s+/).filter(Boolean).map(id => document.getElementById(id)?.textContent || "").join(" ").replace(/\s+/g, " ").trim().slice(0, 80)}));
+    // Samples use the same question reader as the scan so exports show what the engine will see.
+    const questionFor = node => (isMenu(node) ? PortalWorkdayMenu.question(node) : "");
     const buttonMenuSamples = buttonMenus.slice(0, 40).map(node => {
       const label = labelFor(node).replace(/\s+/g, " ").trim().slice(0, 80);
       return {tag: node.tagName.toLowerCase(), automation_id: node.getAttribute("data-automation-id") || "", dom_id: node.id || "", name: node.getAttribute("name") || "", label,
         haspopup: node.getAttribute("aria-haspopup"), expanded: node.getAttribute("aria-expanded"), controls: node.getAttribute("aria-controls") || "",
-        required: node.getAttribute("aria-required") === "true" || /\*|required/i.test(label)};
+        required: node.getAttribute("aria-required") === "true" || /\*|required/i.test(label), question: questionFor(node)};
     });
     // File inputs are usually hidden behind a drop zone, so list them regardless of visibility, including open shadow roots; names of chosen files are never read.
     const roots = [document, ...[...document.querySelectorAll("*")].map(node => node.shadowRoot).filter(Boolean)];
@@ -310,13 +317,13 @@
         accept: node.getAttribute("accept") || "", multiple: node.multiple, visible: visible(node), in_shadow: inShadow, required: node.required})),
       ...dropZones.slice(0, 10).map(node => ({tag: node.tagName.toLowerCase(), automation_id: node.getAttribute("data-automation-id") || "", dom_id: node.id || "", visible: true}))];
     const rowContexts = prefixContexts().reports;
-    const reasonCodes = [frames && "iframe_uninspected", shadowHosts && "open_shadow_uninspected", spinbuttons && "spinbutton_unsupported", buttonMenus.length && "button_menu_unsupported"].filter(Boolean);
+    const reasonCodes = [frames && "iframe_uninspected", shadowHosts && "open_shadow_uninspected", spinbuttons && "spinbutton_unsupported", buttonMenus.some(node => !isMenu(node)) && "button_menu_unsupported"].filter(Boolean);
     return {schema_version: 1, host: location.hostname, inspected_at: new Date().toISOString(),
       portal: globalThis.PortalGreenhouse?.active() ? "greenhouse" : "generic",
       portal_manual_reason: globalThis.PortalGreenhouse?.active() && !PortalGreenhouse.form() ? "No unique supported Greenhouse application form found. Inspect the employer page manually." : "",
       protected_fields_omitted: fields.filter(field => field.blocked).length,
       coverage: {scope: "visible_light_dom_current_page", visible_iframes: frames, visible_open_shadow_hosts: shadowHosts,
-        unsupported_spinbuttons: spinbuttons, unsupported_button_menus: buttonMenus.length, button_menu_samples: buttonMenuSamples, row_contexts: rowContexts, upload_controls: fileInputs.length, upload_samples: uploadSamples, visible_listboxes: listboxes.length, listbox_samples: listboxSamples, reason_codes: reasonCodes},
+        unsupported_spinbuttons: spinbuttons, unsupported_button_menus: buttonMenus.filter(node => !isMenu(node)).length, button_menu_samples: buttonMenuSamples, row_contexts: rowContexts, upload_controls: fileInputs.length, upload_samples: uploadSamples, visible_listboxes: listboxes.length, listbox_samples: listboxSamples, reason_codes: reasonCodes},
       fields: fields.filter(field => !field.blocked).map(field => ({label: field.label, type: field.type,
         required: field.required, disabled: field.disabled, section: field.section, adapter: field.adapter,
         record: field.record ? {id: field.record.id, group: field.record.group, label: field.record.label} : null,

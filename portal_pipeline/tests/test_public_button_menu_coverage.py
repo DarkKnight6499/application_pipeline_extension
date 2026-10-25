@@ -1,4 +1,6 @@
 """Inspection reports unsupported button menus (Workday style) as coverage, never as fillable fields."""
+from pathlib import Path
+
 from browser_test_support import SyntheticBrowserTest
 
 MENUS = '''<label>First name<input value="VALUE_SENTINEL"></label>
@@ -72,3 +74,26 @@ class OpenListboxCoverageTests(SyntheticBrowserTest):
     def test_no_listbox_reports_zero(self):
         coverage = self.report('<label>Name<input></label>')
         self.assertEqual((coverage["visible_listboxes"], coverage["listbox_samples"]), (0, []))
+
+
+class QuestionTextTests(SyntheticBrowserTest):
+    MENU_SCRIPT = Path(__file__).resolve().parents[1] / "extension" / "workday-menu.js"
+
+    PAGE = '''<form>
+      <div class="q"><div><p>Are you legally authorized to work in the country?<span>*</span></p></div><div><button type="button" id="primaryQuestionnaire--aaa" aria-haspopup="listbox">Select One Required</button></div></div>
+      <div class="q"><div><p>Do you have relatives working here?</p><p>(1) Relatives mean spouses.</p></div><div><button type="button" id="primaryQuestionnaire--bbb" aria-haspopup="listbox">Select One Required</button></div></div>
+    </form>'''
+
+    def test_each_menu_reports_its_own_question_text(self):
+        self.open_markup(self.PAGE)
+        self.page.add_script_tag(path=str(self.MENU_SCRIPT))
+        samples = {s["dom_id"]: s for s in self.page.evaluate("PortalEngine.inspect()")["coverage"]["button_menu_samples"]}
+        self.assertEqual(samples["primaryQuestionnaire--aaa"]["question"], "Are you legally authorized to work in the country?*")
+        self.assertTrue(samples["primaryQuestionnaire--bbb"]["question"].startswith("Do you have relatives working here?"))
+        self.assertNotIn("legally authorized", samples["primaryQuestionnaire--bbb"]["question"])
+        self.assertNotIn("Select One", samples["primaryQuestionnaire--aaa"]["question"])
+
+    def test_menu_without_surrounding_text_reports_empty_question(self):
+        self.open_markup('<button type="button" aria-haspopup="listbox">Select One</button>')
+        self.page.add_script_tag(path=str(self.MENU_SCRIPT))
+        self.assertEqual(self.page.evaluate("PortalEngine.inspect()")["coverage"]["button_menu_samples"][0]["question"], "")
