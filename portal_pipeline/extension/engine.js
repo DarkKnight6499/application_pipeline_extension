@@ -16,7 +16,7 @@
 
   // Workday rows have no container id, only control ids sharing a row prefix; use the smallest ancestor holding exactly one prefix.
   function prefixContexts() {
-    const byPrefix = new Map();
+    const byPrefix = new Map(), reports = [];
     document.querySelectorAll("[id]").forEach(element => {
       const match = element.id.match(ROW_PREFIX);
       if (match) byPrefix.set(match[0], [...(byPrefix.get(match[0]) || []), element]);
@@ -25,11 +25,16 @@
     byPrefix.forEach((elements, prefix) => {
       let node = elements[0].parentElement;
       while (node && !elements.every(element => node.contains(element))) node = node.parentElement;
-      const mixed = node && [...node.querySelectorAll("[id]")].some(element => ROW_PREFIX.test(element.id) && !element.id.startsWith(prefix));
-      if (!node || mixed || !node.matches("fieldset,section,div")) return;
-      prefixGroups.set(node, prefix.startsWith("education") ? "education" : "employment");
+      const mixed = !!node && [...node.querySelectorAll("[id]")].some(element => ROW_PREFIX.test(element.id) && !element.id.startsWith(prefix));
+      const usable = !!node && !mixed && !node.matches("html,body,form,main");
+      const group = prefix.startsWith("education") ? "education" : "employment";
+      reports.push({group, container_tag: node ? node.tagName.toLowerCase() : "", container_automation_id: node?.getAttribute("data-automation-id") || "",
+        container_role: node?.getAttribute("role") || "", controls: elements.length, mixed, used: usable});
+      if (!usable) return;
+      prefixGroups.set(node, group);
       result.push(node);
     });
+    result.reports = reports;
     return result;
   }
 
@@ -293,13 +298,14 @@
       ...fileInputs.slice(0, 20).map(({node, inShadow}) => ({tag: "input", automation_id: node.getAttribute("data-automation-id") || "", dom_id: node.id || "", name: node.getAttribute("name") || "",
         accept: node.getAttribute("accept") || "", multiple: node.multiple, visible: visible(node), in_shadow: inShadow, required: node.required})),
       ...dropZones.slice(0, 10).map(node => ({tag: node.tagName.toLowerCase(), automation_id: node.getAttribute("data-automation-id") || "", dom_id: node.id || "", visible: true}))];
+    const rowContexts = prefixContexts().reports;
     const reasonCodes = [frames && "iframe_uninspected", shadowHosts && "open_shadow_uninspected", spinbuttons && "spinbutton_unsupported", buttonMenus.length && "button_menu_unsupported"].filter(Boolean);
     return {schema_version: 1, host: location.hostname, inspected_at: new Date().toISOString(),
       portal: globalThis.PortalGreenhouse?.active() ? "greenhouse" : "generic",
       portal_manual_reason: globalThis.PortalGreenhouse?.active() && !PortalGreenhouse.form() ? "No unique supported Greenhouse application form found. Inspect the employer page manually." : "",
       protected_fields_omitted: fields.filter(field => field.blocked).length,
       coverage: {scope: "visible_light_dom_current_page", visible_iframes: frames, visible_open_shadow_hosts: shadowHosts,
-        unsupported_spinbuttons: spinbuttons, unsupported_button_menus: buttonMenus.length, button_menu_samples: buttonMenuSamples, upload_controls: fileInputs.length, upload_samples: uploadSamples, visible_listboxes: listboxes.length, listbox_samples: listboxSamples, reason_codes: reasonCodes},
+        unsupported_spinbuttons: spinbuttons, unsupported_button_menus: buttonMenus.length, button_menu_samples: buttonMenuSamples, row_contexts: rowContexts, upload_controls: fileInputs.length, upload_samples: uploadSamples, visible_listboxes: listboxes.length, listbox_samples: listboxSamples, reason_codes: reasonCodes},
       fields: fields.filter(field => !field.blocked).map(field => ({label: field.label, type: field.type,
         required: field.required, disabled: field.disabled, section: field.section, adapter: field.adapter,
         record: field.record ? {id: field.record.id, group: field.record.group, label: field.record.label} : null,

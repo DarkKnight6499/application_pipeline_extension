@@ -28,3 +28,21 @@ class RowPrefixTests(SyntheticBrowserTest):
     def test_unrelated_fields_stay_contact(self):
         other = [f for f in self.fields() if not f["structure"]["dom_id"]]
         self.assertTrue(other and all(f["record"] is None and f["section"] == "contact" for f in other))
+
+
+class RowPrefixShapeTests(SyntheticBrowserTest):
+    LIST = '''<ul><li><label for="workExperience-5--jobTitle">Job Title*</label><input id="workExperience-5--jobTitle"></li>
+    <li><label for="workExperience-6--jobTitle">Job Title*</label><input id="workExperience-6--jobTitle"></li></ul>'''
+
+    def test_non_div_row_containers_still_group(self):
+        self.open_markup(self.LIST)
+        fields = [f for f in self.page.evaluate("PortalEngine.inspect()")["fields"] if f["structure"]["dom_id"].startswith("workExperience")]
+        self.assertEqual([f["section"] for f in fields], ["employment", "employment"])
+        self.assertNotEqual(fields[0]["record"]["id"], fields[1]["record"]["id"])
+
+    def test_row_contexts_are_reported_by_structure(self):
+        self.open_markup(self.LIST)
+        rows = self.page.evaluate("PortalEngine.inspect()")["coverage"]["row_contexts"]
+        self.assertEqual(sorted(row["group"] for row in rows), ["employment", "employment"])
+        self.assertEqual({row["container_tag"] for row in rows}, {"li"})
+        self.assertTrue(all(row["controls"] == 1 and not row["mixed"] for row in rows))
