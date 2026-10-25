@@ -27,3 +27,19 @@ Oracle's own text and upload writers refuse. The engine also refuses adapter ans
 ## Open evidence
 
 The current extension rejects Oracle inspection because Oracle has no verified host policy. First establish the exact apply host and review an Inspect-only access path without bypassing permissions. Then Yazad can capture each page of one application after handling login and email verification himself, following `../EXPORT_CAPTURE_CHECKLIST.md`. Exports must establish the exact host, gate placement, page sequence, controls, repeated rows, upload behavior, and final review markers. If hCaptcha appears inside the application, the application remains in `answer_sheet_only`. Remote persistence, upload completion, and live compatibility remain unverified.
+
+## JPMC contact information page (October 25, 2026 live Inspect export)
+
+Source: one Inspect-only export of `jpmc.fa.oraclecloud.com` (signed in, nothing entered). Raw file stays in the ignored exports folder. Native fill is **UNVERIFIED**.
+
+| Item | Observed structure |
+|---|---|
+| Text fields | Plain inputs with generated numeric suffixes in ids, for example `firstName-24`, `lastName-26`, `addressLine1-31`. The `name` attribute is stable (`firstName`, `middleNames`, `lastName`, `addressLine1`), so match on name, never on id. |
+| Email | `email`, disabled (prefilled from the account). |
+| Comboboxes | Country, City, County, State, Postal Code, Preferred Location, and the phone country code are `input role="combobox"` with `aria-controls="<id>-listbox"`. Country, City, County, State, Postal Code and the phone code report `aria-haspopup="grid"`, not `listbox`, so the existing aria-listbox adapter refuses them. Preferred Location reports `listbox`. Options are not captured. |
+| Labels | Required comboboxes carry the label text with embedded whitespace and a trailing `*`. |
+| Phone | A separate tel input with `maxlength` 30 beside the code combobox. |
+| Resume | One visible `input type="file"`, `accept=".doc,.docx,.odt,.pdf,.txt,.rtf,.htm,.html"`, not multiple, labelled "Import your profile from resume". |
+| Coverage gaps | One visible iframe and four open shadow hosts are not inspected. |
+
+Next capture needed: one combobox open (for example State) to see whether options render as `role="option"` in a grid or a listbox.
