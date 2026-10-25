@@ -12,6 +12,7 @@ ALIASES_FILENAME = "picker_aliases.json"
 SCHEMA_VERSION = 1
 NAMES_COLUMN = "names"
 FALLBACK_COLUMN = "fallback"
+MAX_NAMES = 10  # tried on every site, so one list serves all portals
 ENTITIES_COLUMN = "entities"
 
 
@@ -46,7 +47,18 @@ def set_entity(data, kind, canonical, names, fallback=""):
             ordered.append(text)
     if not ordered:
         return False
+    ordered = ordered[:MAX_NAMES]
     data[ENTITIES_COLUMN].setdefault(kind, {})[normalize_label(canonical)] = {NAMES_COLUMN: ordered, FALLBACK_COLUMN: str(fallback or "").strip()}
+    return True
+
+
+def learn_name(data, kind, canonical, picked_label):
+    """Adds a label a portal actually offered (user picked it once) so later runs try it; returns True if added."""
+    entity = data[ENTITIES_COLUMN].get(kind, {}).get(normalize_label(canonical))
+    key = normalize_label(picked_label)
+    if not entity or not key or len(entity[NAMES_COLUMN]) >= MAX_NAMES or key in {normalize_label(name) for name in entity[NAMES_COLUMN]}:
+        return False
+    entity[NAMES_COLUMN].append(str(picked_label).strip())
     return True
 
 

@@ -31,6 +31,19 @@ class PickerAliasTests(unittest.TestCase):
     def test_empty_is_refused(self):
         self.assertFalse(aliases.set_entity(self.fresh(), "school", "", []))
 
+    def test_list_is_capped_at_ten(self):
+        data = self.fresh()
+        aliases.set_entity(data, "school", "A0", [f"A{i}" for i in range(1, 20)])
+        self.assertEqual(len(aliases.candidates_for(data, "school", "A0")[0]), 10)
+
+    def test_learn_adds_a_portal_label_once(self):
+        data = self.fresh()
+        aliases.set_entity(data, "school", "Rutgers Newark", [])
+        self.assertTrue(aliases.learn_name(data, "school", "Rutgers Newark", "Rutgers U Newark Campus"))
+        self.assertFalse(aliases.learn_name(data, "school", "Rutgers Newark", "rutgers u newark campus"))
+        self.assertFalse(aliases.learn_name(data, "school", "Unknown", "x"))
+        self.assertEqual(aliases.candidates_for(data, "school", "Rutgers Newark")[0][-1], "Rutgers U Newark Campus")
+
     def test_round_trip(self):
         with tempfile.TemporaryDirectory() as folder:
             data = aliases.load_aliases(folder)
