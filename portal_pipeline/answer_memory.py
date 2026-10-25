@@ -25,6 +25,11 @@ def is_protected(field):
     return bool(field.get("protected")) or str(field.get(TYPE_COLUMN, "")).lower() in {"password", "file", "signature"} or bool(NEVER_STORE.search(str(field.get(LABEL_COLUMN, ""))))
 
 
+# Consent boxes (terms, privacy, agree) are auto-tickable only after one manual acceptance; truthfulness attestations and signatures never are.
+CONSENT_TERMS = re.compile(r"\b(agree|consent|accept|terms|privacy)\b", re.I)
+ATTEST_TERMS = re.compile(r"\b(certify|attest|attestation|true and (correct|accurate)|signature|sign)\b", re.I)
+
+
 def memory_path(data_dir=DATA_DIR):
     return Path(data_dir).resolve() / MEMORY_FILENAME
 
@@ -55,6 +60,23 @@ def remember(data, label, answer, source="manual", now=None):
     entry = data["answers"].setdefault(key, {LABEL_COLUMN: str(label).strip()[:300], "first_seen": today, "uses": 0})
     entry.update(answer=text, source=source, last_seen=today)
     return True
+
+
+def consent_key(host, label):
+    return f"{str(host).strip().lower()}|{normalize_label(label)}"
+
+
+def record_consent(data, host, label, now=None):
+    """Remembers a consent box the user ticked manually; returns False for attestations and non-consent labels."""
+    text = str(label or "")
+    if not str(host).strip() or not normalize_label(text) or ATTEST_TERMS.search(text) or not CONSENT_TERMS.search(text):
+        return False
+    data.setdefault("consents", {})[consent_key(host, text)] = {"label": text.strip()[:300], "accepted": now or date.today().isoformat()}
+    return True
+
+
+def has_consent(data, host, label):
+    return consent_key(host, label) in data.get("consents", {})
 
 
 def lookup(data, label):

@@ -46,6 +46,18 @@ class AnswerMemoryTests(unittest.TestCase):
         fields = [{"label": "Notice period"}, {"label": "Why us?"}, {"label": "why us"}, {"label": "I agree to the terms"}, {"label": ""}]
         self.assertEqual(memory.gaps(data, fields), ["Why us?"])
 
+    def test_consent_is_remembered_per_host_and_exact_label(self):
+        data = self.fresh()
+        self.assertTrue(memory.record_consent(data, "Citi.wd5.myworkdayjobs.com", "I agree to the Privacy Policy"))
+        self.assertTrue(memory.has_consent(data, "citi.wd5.myworkdayjobs.com", "i agree to the privacy policy"))
+        self.assertFalse(memory.has_consent(data, "other.example.com", "I agree to the Privacy Policy"))
+        self.assertFalse(memory.has_consent(data, "citi.wd5.myworkdayjobs.com", "I agree to the Terms"))
+
+    def test_attestations_never_become_consents(self):
+        data = self.fresh()
+        for label in ("I certify that the information is true and correct", "I agree and sign below", "Signature", "Favorite color"):
+            self.assertFalse(memory.record_consent(data, "a.example.com", label), label)
+
     def test_save_and_load_round_trip(self):
         with tempfile.TemporaryDirectory() as folder:
             data = memory.load_memory(folder)
