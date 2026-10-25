@@ -95,3 +95,14 @@ Source: Codex read the public code of andrewmillercode/Autofill-Jobs (MIT) and a
 ## Menu popup ownership confirmed (October 25, 2026)
 
 An Inspect export taken with the Degree menu open shows the button `education-747--degree` with `aria-expanded="true"` and `aria-controls="t4hi3m"`, and one `ul role="listbox"` whose id is `t4hi3m` with 23 options. So `aria-controls` does name the popup for this tenant (Citi), and the id is generated per open. Option commit, off-screen scrolling and read-back remain **UNVERIFIED**.
+
+## Search pickers, live behavior (October 25, 2026, Citi, observed on a filled application)
+
+| Item | Observed |
+|---|---|
+| Selected state | `multiselectInputContainer` holds the text input (`data-uxi-widget-type="selectinput"`, ids like `education-N--school`) and `ul[data-automation-id="selectedItemList"]`. Each selection is `div[role="option"][data-automation-id="selectedItem"]` with a `DELETE_charm` child and `p[data-automation-id="promptOption"][data-automation-label=<name>]`. The input value stays empty after a selection. |
+| Choosing | Typing text then pressing Enter selects the first result; the typed text clears and a pill appears. Nothing is listed without Enter. Search popup DOM was not captured. |
+| Removing | Click the pill's `DELETE_charm`. |
+| Risk | Enter selects the first match even when it is not the intended one, so a filler must compare the new pill label with the candidate and delete it on mismatch. |
+| Degree menu wording | The Degree menu offers short labels such as `M.S.` and `B.S.`, not the profile wording, so the wording is learned once per host as an alias. |
+| Dates | Existing rows showed month values without a leading zero (`5`, `8`) beside profile `05`; the date module compares month numerically. |

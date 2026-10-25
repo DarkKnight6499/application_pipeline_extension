@@ -54,3 +54,11 @@ class PickerAliasTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ProfilePickersTests(unittest.TestCase):
+    def test_profile_pickers_lists_names_and_fallback_per_kind(self):
+        data = aliases.load_aliases(tempfile.mkdtemp())
+        aliases.set_entity(data, "school", "Rutgers University - Newark", ["Rutgers Newark"], fallback="Rutgers")
+        entry = aliases.profile_pickers(data)["school"][0]
+        self.assertEqual((entry["names"], entry["fallback"]), (["Rutgers University - Newark", "Rutgers Newark"], "Rutgers"))

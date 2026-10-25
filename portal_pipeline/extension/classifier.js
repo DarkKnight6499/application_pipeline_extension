@@ -89,7 +89,7 @@
       "employment.location": ["location", "employment location"]
     },
     education: {
-      "education.school": ["school", "school name", "university", "institution"],
+      "education.school": ["school", "school name", "university", "institution", "school or university"], "education.field_of_study": ["field of study", "major"],
       "education.degree": ["degree", "degree earned"], "education.end_date": ["end date", "graduation date"],
       "education.start_date": ["start date", "from date"], "education.location": ["location", "education location"],
       "education.start_month": ["start month", "from month"], "education.start_year": ["start year", "from year"],

@@ -229,8 +229,22 @@
     return {value: answer.trim(), source: "Stored answer (exact question match)", basis: "answer_memory", truth: null};
   }
 
+  // Ordered names a search picker should try: the stored entity containing this value, else the value alone.
+  function pickerCandidates(profile, kind, value) {
+    const key = labelKey(value);
+    const entity = (profile.pickers?.[kind] || []).find(item => item.names.some(name => labelKey(name) === key));
+    return entity ? entity.names : (String(value ?? "").trim() ? [String(value).trim()] : []);
+  }
+
   function proposeCore(field, profile, {element, options = field.options || []} = {}) {
-    const fact = storedFact(profile, field, options, element) || (field.key ? datePartFact(profile, field.key, element, options) : null);
+    const base = storedFact(profile, field, options, element) || (field.key ? datePartFact(profile, field.key, element, options) : null);
+    // A portal's own option wording, learned once per host, replaces the profile wording (for example a degree).
+    const learned = base && base.basis !== "answer_memory" && profile.aliases ? profile.aliases[`${location.hostname.toLowerCase()}|${labelKey(base.value)}`] : null;
+    const aliased = typeof learned === "string" && learned.trim() ? {...base, value: learned.trim(), source: `${base.source} (learned portal label)`, basis: "alias"} : base;
+    // Field of study has no profile fact; the row's degree selects its stored name list.
+    const degree = !aliased && /^education\.\d+\.field_of_study$/.test(field.key || "") ? profile.values[field.key.replace("field_of_study", "degree")] : null;
+    const fact = aliased || (degree && pickerCandidates(profile, "field_of_study", degree.value).length > 1
+      ? {value: pickerCandidates(profile, "field_of_study", degree.value)[0], source: "Stored picker names (from this row's degree)", basis: "alias", truth: null} : null);
     const derived = /^(employment|education)\.\d+\.(start|end)_(month|year)$/.test(field.key || "");
     return {key: field.key, value: fact?.value ?? "", source: fact?.source || "Manual answer required",
       status: field.blocked ? "manual_only" : !fact && field.type !== "file" ? "pending" : "prepared", basis: fact?.basis || (derived ? "derived" : "exact_alias"), truth: fact?.truth || null};
@@ -293,12 +307,16 @@
       counts.set(ordinalKey, ordinal + 1);
       const id = `${ordinalKey}|${ordinal}`;
       const customInfo = custom ? dropdown(element)?.describe(element) || {supported: false, reason: "No custom dropdown adapter is installed.", options: []} : null;
-      const current = blocked ? "" : custom ? dropdown(element)?.read(element) ?? element.value ?? "" : type === "radio" ? members.find(item => item.checked)?.value || ""
+      const picker = !blocked && globalThis.PortalWorkdayPicker?.matches(element);
+      const current = picker ? PortalWorkdayPicker.selected(element).join(", ") : blocked ? "" : custom ? dropdown(element)?.read(element) ?? element.value ?? "" : type === "radio" ? members.find(item => item.checked)?.value || ""
         : type === "checkbox" ? element.checked : type === "file" ? [...element.files].map(file => file.name).join(", ") : element.value || "";
       const options = custom ? customInfo.options : element.tagName === "SELECT" ? [...element.options].map(option => ({value: option.value, label: option.textContent.trim(), disabled: optionDisabled(option)}))
         : type === "radio" ? members.map(item => ({value: item.value, label: labelFor(item), disabled: unavailable(item) || !visible(item)})) : [];
       const proposal = proposeCore({key, blocked, type, options, label}, profile, {element, options});
-      const field = {id, label, key, section: key?.split(".")[0] || section, type, current, options, record,
+      const pickerKind = picker ? (/\.school$/.test(key || "") ? "school" : /\.field_of_study$/.test(key || "") ? "field_of_study" : "") : "";
+      const lookup = pickerKind === "field_of_study" ? profile.values[(key || "").replace("field_of_study", "degree")]?.value : proposal.value;
+      const candidates = pickerKind && lookup ? pickerCandidates(profile, pickerKind, lookup) : [];
+      const field = {id, label, key, candidates, section: key?.split(".")[0] || section, type, current, options, record,
                      required: element.required || element.getAttribute("aria-required") === "true" || globalThis.PortalGreenhouse?.uploadGroup(element)?.getAttribute("aria-required") === "true",
                      blocked, disabled: unavailable(element),
                      adapter: customInfo?.supported ? (dropdown(element) === globalThis.PortalGreenhouseSelect ? "greenhouse-select" : isMenu(element) ? "workday-menu" : "aria-listbox") : null, manual_reason: customInfo?.reason || "",
@@ -391,7 +409,7 @@
 
   function verifyCore(control, expected) {
     const {element, members, field} = control;
-    const actual = field.type === "combobox" ? read(control) : field.type === "file" ? element.files[0]?.name : field.type === "radio" ? members.find(item => item.checked)?.value : field.type === "checkbox" ? element.checked : element.value;
+    const actual = field.type === "combobox" ? read(control) : field.type === "file" ? element.files[0]?.name : field.type === "radio" ? members.find(item => item.checked)?.value : field.type === "checkbox" ? element.checked : globalThis.PortalWorkdayPicker?.matches(element) ? PortalWorkdayPicker.selected(element)[0] : element.value;
     const flagged = element.isConnected ? validationText(control) : "";
     if (actual !== expected) return {ok: false, actual, reason: "reverted after blur", failure_kind: "reverted", validation_error: flagged,
       message: "Portal did not retain the value (reverted after blur). Review this field manually."};
@@ -502,6 +520,11 @@
         checkCurrent(control);
         if (element.checked !== wanted) element.click();
         expected = wanted;
+      } else if (globalThis.PortalWorkdayPicker?.matches(element)) {
+        if (!field.candidates?.length) throw new Error("No names to search for. Choose this answer manually.");
+        const outcome = await PortalWorkdayPicker.choose(element, field.candidates, () => { checkCollateral(); checkCurrent(control); });
+        if (outcome.status !== "selected" && outcome.status !== "already_selected") throw new Error("No exact search result matched. Choose this answer manually.");
+        expected = outcome.label;
       } else if (globalThis.PortalWorkdayDate?.matches(element)) {
         checkCollateral();
         checkCurrent(control);

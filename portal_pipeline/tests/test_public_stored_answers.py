@@ -115,3 +115,25 @@ class ConsentTests(SyntheticBrowserTest):
         self.open_markup(self.PAGE)
         fields = {f["structure"]["dom_id"]: f for f in self.page.evaluate("profile => PortalEngine.scan(profile)", {"values": {}, "answers": {}, "consents": ["other.example|yes i have read and consent to the above"]})}
         self.assertTrue(fields["consent"]["blocked"] and fields["other"]["blocked"])
+
+
+class ValueAliasTests(SyntheticBrowserTest):
+    PAGE = '''<form><div><label for="education-4--degree">Degree*</label><select id="education-4--degree"><option value="">Select</option><option value="ms">M.S.</option><option value="bs">B.S.</option></select></div></form>'''
+
+    def proposal(self, aliases):
+        self.open_markup(self.PAGE)
+        values = {"education.0.degree": {"value": "Master of Quantitative Finance (MQF)", "source": "x"}}
+        first = self.page.evaluate("p => PortalEngine.scan(p)", {"values": values, "aliases": aliases})
+        bindings = {f["record"]["id"]: 0 for f in first if f["record"]}
+        fields = self.page.evaluate("([p, b]) => PortalEngine.scan(p, {bindings: b})", [{"values": values, "aliases": aliases}, bindings])
+        return {f["structure"]["dom_id"]: f for f in fields}["education-4--degree"]
+
+    def test_host_alias_maps_profile_wording_to_the_portal_option(self):
+        host = "safety-fixture.myworkdayjobs.com"
+        field = self.proposal({f"{host}|master of quantitative finance mqf": "M.S."})
+        self.assertEqual((field["proposal"], field["status"]), ("M.S.", "prepared"))
+        self.assertIn("learned portal label", field["source"])
+
+    def test_alias_for_another_host_is_ignored(self):
+        field = self.proposal({"other.example|master of quantitative finance mqf": "M.S."})
+        self.assertEqual(field["proposal"], "Master of Quantitative Finance (MQF)")

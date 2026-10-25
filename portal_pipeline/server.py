@@ -22,6 +22,7 @@ import answer_memory
 import answer_sheet
 import application_mode
 import longform
+import picker_aliases
 import portal_record
 import question_corpus
 from portal_profile import hard_fact_errors, load_sponsorship_mode, resolve_for_application, resolve_profile, save_override, save_sponsorship_mode
@@ -257,7 +258,8 @@ class Pipeline:
 
 def memory_profile():
     data = answer_memory.load_memory()
-    return {"answers": answer_memory.profile_answers(data), "consents": answer_memory.profile_consents(data)}
+    return {"answers": answer_memory.profile_answers(data), "consents": answer_memory.profile_consents(data), "aliases": answer_memory.profile_aliases(data),
+            "pickers": picker_aliases.profile_pickers(picker_aliases.load_aliases())}
 
 
 def make_server(pipeline, port=8766, token=None):

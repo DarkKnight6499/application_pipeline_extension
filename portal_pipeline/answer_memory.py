@@ -77,6 +77,23 @@ def record_consent(data, host, label, now=None):
     return True
 
 
+def alias_key(host, value):
+    return f"{str(host).strip().lower()}|{normalize_label(value)}"
+
+
+def remember_alias(data, host, value, portal_label):
+    """Remembers the wording a portal used for a profile value (a degree, say) on one host; exact value only."""
+    key, label = alias_key(host, value), str(portal_label or "").strip()
+    if not str(host).strip() or not normalize_label(value) or not label or len(label) > MAX_ANSWER:
+        return False
+    data.setdefault("aliases", {})[key] = label
+    return True
+
+
+def profile_aliases(data):
+    return dict(data.get("aliases", {}))
+
+
 def profile_consents(data):
     """Recorded host|question consent keys, the shape the extension reads from profile.consents."""
     return list(data.get("consents", {}))

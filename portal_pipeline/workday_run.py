@@ -13,6 +13,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 import answer_memory
+import picker_aliases
 from portal_profile import resolve_profile
 
 # Config
@@ -22,11 +23,11 @@ CDP_URL = "http://127.0.0.1:9223"
 SOURCE = Path(os.environ.get("PORTAL_SOURCE", r"D:\Code\Resume"))
 HOST_MARK = "myworkdayjobs.com"
 SCRIPTS = ["adapters/registry.js", "adapters/generic.js", "adapters/workday.js", "adapters/aria-listbox.js", "workday-menu.js",
-           "classifier.js", "picker-search.js", "workday-upload.js", "workday-date.js", "engine.js"]
+           "classifier.js", "picker-search.js", "workday-upload.js", "workday-date.js", "workday-picker.js", "engine.js"]
 NEXT_SELECTOR = '[data-automation-id="pageFooterNextButton"]'
 STEP_SELECTOR = '[data-automation-id="progressBarActiveStep"]'
 FINAL_STEP_PATTERN = re.compile(r"\breview\b", re.I)
-GLOBALS = ["PortalEngine", "PortalAdapters", "PortalClassifier", "PortalWorkdayMenu", "PortalPickerSearch", "PortalWorkdayUpload", "PortalWorkdayDate"]
+GLOBALS = ["PortalEngine", "PortalAdapters", "PortalClassifier", "PortalWorkdayMenu", "PortalPickerSearch", "PortalWorkdayUpload", "PortalWorkdayDate", "PortalWorkdayPicker"]
 MAX_PAGES = 10
 FILL_ROUNDS = 3
 PAGE_SETTLE_SECONDS = 4
@@ -55,7 +56,9 @@ def step_title(page):
 
 def build_profile():
     profile = resolve_profile(SOURCE)
-    profile["answers"] = answer_memory.profile_answers(answer_memory.load_memory())
+    memory = answer_memory.load_memory()
+    profile.update(answers=answer_memory.profile_answers(memory), consents=answer_memory.profile_consents(memory),
+                   aliases=answer_memory.profile_aliases(memory), pickers=picker_aliases.profile_pickers(picker_aliases.load_aliases()))
     return profile
 
 
@@ -164,7 +167,7 @@ def learn(page, profile, fields):
 def run_page(page, profile, dry):
     if not dry and not ensure_rows(page, profile):
         print("  Could not add every history row. Add them yourself; stopping fill for this page.")
-    bindings = {} if dry else bind_rows(page, profile)
+    bindings = bind_rows(page, profile)
     fields = scan(page, profile, bindings)
     todo = prepared(fields)
     print(f"  fields {len(fields)} | proposals {len(todo)} | blocked {sum(f['blocked'] for f in fields)}")

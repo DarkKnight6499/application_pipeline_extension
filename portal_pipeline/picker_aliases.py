@@ -52,6 +52,12 @@ def set_entity(data, kind, canonical, names, fallback=""):
     return True
 
 
+def profile_pickers(data):
+    """Kind to a list of {names, fallback}, the shape the extension reads from profile.pickers."""
+    return {kind: [{NAMES_COLUMN: list(entity[NAMES_COLUMN]), FALLBACK_COLUMN: entity[FALLBACK_COLUMN]} for entity in group.values()]
+            for kind, group in data[ENTITIES_COLUMN].items()}
+
+
 def learn_name(data, kind, canonical, picked_label):
     """Adds a label a portal actually offered (user picked it once) so later runs try it; returns True if added."""
     entity = data[ENTITIES_COLUMN].get(kind, {}).get(normalize_label(canonical))

@@ -12,7 +12,7 @@
       if (!/^https?:/.test(tab?.url || "")) throw new Error("Open a normal application webpage first.");
       const {server: pairedServer} = await chrome.storage.local.get("server");
       const routing = PortalHostPolicy.assertAllowed(tab.url, pairedServer);
-      await chrome.scripting.executeScript({target: {tabId: tab.id}, files: ["adapters/registry.js", "adapters/generic.js", "adapters/workday.js", "adapters/aria-listbox.js", "workday-menu.js", "workday-date.js", "workday-upload.js", "picker-search.js", "adapters/greenhouse.js", "adapters/greenhouse-select.js", "adapters/phenom.js", "classifier.js", "application-mode.js", "engine.js", "progress.js", "handoff.js", "page-bridge.js"].concat(routing === "fallback" ? ["adapters/fallback.js"] : [])});
+      await chrome.scripting.executeScript({target: {tabId: tab.id}, files: ["adapters/registry.js", "adapters/generic.js", "adapters/workday.js", "adapters/aria-listbox.js", "workday-menu.js", "workday-date.js", "workday-upload.js", "workday-picker.js", "picker-search.js", "adapters/greenhouse.js", "adapters/greenhouse-select.js", "adapters/phenom.js", "classifier.js", "application-mode.js", "engine.js", "progress.js", "handoff.js", "page-bridge.js"].concat(routing === "fallback" ? ["adapters/fallback.js"] : [])});
       await chrome.sidePanel.setOptions({tabId: tab.id, path: `review.html?tab=${tab.id}${inspectionOnly ? "&mode=inspect" : ""}`, enabled: true});
       await chrome.sidePanel.open({tabId: tab.id});
       window.close();

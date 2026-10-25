@@ -100,3 +100,12 @@ class ProfileConsentsTests(unittest.TestCase):
         data = memory.load_memory(tempfile.mkdtemp())
         memory.record_consent(data, "Citi.WD5.example", "Yes, I have read and consent to the above.*")
         self.assertEqual(memory.profile_consents(data), ["citi.wd5.example|yes i have read and consent to the above"])
+
+
+class AliasTests(unittest.TestCase):
+    def test_alias_is_per_host_and_exact_value(self):
+        data = memory.load_memory(tempfile.mkdtemp())
+        self.assertTrue(memory.remember_alias(data, "Citi.example", "Master of Finance (MF)", "M.S."))
+        self.assertEqual(memory.profile_aliases(data), {"citi.example|master of finance mf": "M.S."})
+        self.assertFalse(memory.remember_alias(data, "", "x", "y"))
+        self.assertFalse(memory.remember_alias(data, "h", "x", ""))
