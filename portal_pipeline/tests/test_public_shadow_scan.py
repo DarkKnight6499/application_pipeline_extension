@@ -65,7 +65,7 @@ class ShadowScanTests(SyntheticBrowserTest):
           host = root.querySelector("spl-wrapper");
         }
         const root = document.querySelector("spl-wrapper").shadowRoot;
-        root.insertAdjacentHTML("beforeend", '<input type="hidden" name="hidden"><input name="honeypot"><input hidden name="invisible"><spl-closed></spl-closed>');
+        const extra = document.createElement("template"); extra.innerHTML = '<input type="hidden" name="hidden"><input name="honeypot"><input hidden name="invisible"><spl-closed></spl-closed>'; root.append(extra.content);
         root.querySelector("spl-closed").attachShadow({mode: "closed"}).innerHTML = '<input name="closed">';
         </script>''')
         fields = self.form_fields()

@@ -102,27 +102,58 @@
     return copy.textContent.trim();
   }
 
+  // Shadow controls need host order so scan IDs remain stable during filling.
+  function queryOpenRoots(selector, root = document, depth = 0) {
+    const found = [];
+    root.querySelectorAll("*").forEach(element => {
+      if (element.matches(selector)) found.push(element);
+      if (element.shadowRoot && depth < 6) found.push(...queryOpenRoots(selector, element.shadowRoot, depth + 1));
+    });
+    return found;
+  }
+
+  function closestAcrossRoots(element, selector) {
+    return element.closest(selector) || (element.getRootNode().host ? closestAcrossRoots(element.getRootNode().host, selector) : null);
+  }
+
+  // Component labels can sit outside the input's own shadow tree.
+  function shadowLabel(element) {
+    const root = element.getRootNode();
+    if (!root.host) return "";
+    const label = [...root.querySelectorAll("label[for]")].find(node => node.htmlFor === element.id && element.id);
+    if (label) return labelText(label);
+    const field = closestAcrossRoots(element, "spl-form-field");
+    if (!field) return questionText(root.host);
+    if (field.getAttribute("label")) return field.getAttribute("label");
+    const slotted = field.querySelector('[slot="label"]');
+    const slot = field.shadowRoot?.querySelector('slot[name="label"]');
+    const text = slotted ? labelText(slotted) : slot ? slot.assignedNodes({flatten: true}).map(node => node.textContent).join(" ").trim() || slot.textContent.trim() : "";
+    return text || questionText(field) || labelText(field);
+  }
+
   function labelFor(element) {
     const portalLabel = globalThis.PortalGreenhouse?.label(element);
     if (portalLabel) return portalLabel;
     const explicit = [...(element.labels || [])].map(labelText).join(" ");
     const ids = (element.getAttribute("aria-labelledby") || "").split(/\s+/).filter(Boolean);
-    const ariaText = ids.map(id => document.getElementById(id)?.textContent || "").join(" ").trim();
+    const ariaText = ids.map(id => element.getRootNode().getElementById(id)?.textContent || "").join(" ").trim();
     return explicit || element.getAttribute("aria-label") || ariaText || (element.closest("label") ? labelText(element.closest("label")) : "")
-      || element.getAttribute("placeholder") || element.name || element.getAttribute("data-automation-id") || "Unlabelled field";
+      || shadowLabel(element) || element.getAttribute("placeholder") || element.name || element.getAttribute("data-automation-id") || "Unlabelled field";
   }
 
   // Lever and Ashby keep the question text in a block label that the control itself is not tied to.
   function questionText(element, lever = false) {
-    const node = element.closest(lever ? "li.application-question" : "li.application-question, .ashby-application-form-field-entry")?.querySelector(".application-label .text, .application-label, .ashby-application-form-question-title");
+    const node = closestAcrossRoots(element, lever ? "li.application-question" : "li.application-question, .ashby-application-form-field-entry")?.querySelector(".application-label .text, .application-label, .ashby-application-form-question-title");
     if (!node) return "";
     const copy = node.cloneNode(true);
     copy.querySelectorAll(".required").forEach(mark => mark.remove());
-    return copy.textContent.replace(/[*✱]/g, "").replace(/\s+/g, " ").trim();
+    return copy.textContent.replace(/[*\u2731]/g, "").replace(/\s+/g, " ").trim();
   }
 
   function visible(element) {
     if (element.closest('[aria-hidden="true"],[hidden]')) return false;
+    const host = element.getRootNode().host;
+    if (host && !visible(host)) return false;
     const style = getComputedStyle(element);
     return !element.hidden && style.display !== "none" && style.visibility !== "hidden" && element.getClientRects().length > 0;
   }
@@ -133,8 +164,8 @@
   }
 
   function visibleControls() {
-    return [...document.querySelectorAll("input,select,textarea,[role=combobox],button[aria-haspopup=listbox]")].filter(element => {
-      if (element.closest("#portal-panel-host") || !controlVisible(element)) return false;
+    return queryOpenRoots("input,select,textarea,[role=combobox],button[aria-haspopup=listbox]").filter(element => {
+      if (closestAcrossRoots(element, "#portal-panel-host") || !controlVisible(element)) return false;
       if (globalThis.PortalGreenhouse?.active() && !PortalGreenhouse.formFor(element)) return false;
       if (isMenu(element)) return true;
       if (element.tagName === "BUTTON" && element.getAttribute("role") !== "combobox") return false;
@@ -198,7 +229,7 @@
   }
 
   function radioMembers(element) {
-    return element.name ? [...document.querySelectorAll("input[type=radio]")].filter(item => item.name === element.name && item.form === element.form) : [element];
+    return element.name ? [...element.getRootNode().querySelectorAll("input[type=radio]")].filter(item => item.name === element.name && item.form === element.form) : [element];
   }
 
   function unavailable(element) {
@@ -305,7 +336,7 @@
         radioMembers(element).forEach(item => seenRadio.add(item));
       }
       let label = labelFor(element);
-      const tied = (element.labels && element.labels.length) || element.getAttribute("aria-label") || element.getAttribute("aria-labelledby");
+      const tied = (element.labels && element.labels.length) || element.getAttribute("aria-label") || element.getAttribute("aria-labelledby") || shadowLabel(element);
       if (!tied && !["radio", "checkbox"].includes(type)) label = questionText(element) || label;
       if (isMenu(element)) label = PortalWorkdayMenu.question(element) || label;
       let members = [element];
@@ -369,7 +400,7 @@
     const listboxSamples = listboxes.slice(0, 20).map(node => ({tag: node.tagName.toLowerCase(), dom_id: node.id || "", automation_id: node.getAttribute("data-automation-id") || "",
       container_automation_id: node.closest("[data-automation-id]:not([role=listbox])")?.getAttribute("data-automation-id") || "", option_count: node.querySelectorAll('[role="option"]').length,
       multiselectable: node.getAttribute("aria-multiselectable") === "true",
-      labelled_by_text: (node.getAttribute("aria-labelledby") || "").split(/\s+/).filter(Boolean).map(id => document.getElementById(id)?.textContent || "").join(" ").replace(/\s+/g, " ").trim().slice(0, 80)}));
+      labelled_by_text: (node.getAttribute("aria-labelledby") || "").split(/\s+/).filter(Boolean).map(id => node.getRootNode().getElementById(id)?.textContent || "").join(" ").replace(/\s+/g, " ").trim().slice(0, 80)}));
     // Samples use the same question reader as the scan so exports show what the engine will see.
     const questionFor = node => (isMenu(node) ? PortalWorkdayMenu.question(node) : "");
     const buttonMenuSamples = buttonMenus.slice(0, 40).map(node => {
