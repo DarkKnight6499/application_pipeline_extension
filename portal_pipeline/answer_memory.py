@@ -17,6 +17,7 @@ LABEL_COLUMN = "label"
 TYPE_COLUMN = "type"
 FIELDS_COLUMN = "fields"
 MAX_ANSWER = 2000
+START_MONTH_DAY = (12, 15)  # every application starts 15 December (user rule 2026-10-25)
 DEFAULT_SALARY = 50000  # per year, used when a posting shows no band (user rule 2026-10-25)
 # Demographic self-ID answers are allowed (user decision 2026-10-25); credentials, attestations and signatures never are.
 NEVER_STORE = re.compile(r"\b(password|passcode|captcha|one.?time|otp|ssn|social security|credit card|bank account|routing number|signature|attest|certify|certification of|consent|agree|accept terms|privacy policy|declaration)\b", re.I)
@@ -87,6 +88,13 @@ def salary_expectation(band_low=None):
     except (TypeError, ValueError):
         return DEFAULT_SALARY
     return low if low > 0 else DEFAULT_SALARY
+
+
+def start_date(today=None):
+    """Next 15 December on or after today (user rule 2026-10-25), as an ISO date."""
+    today = today or date.today()
+    year = today.year if (today.month, today.day) <= START_MONTH_DAY else today.year + 1
+    return date(year, *START_MONTH_DAY).isoformat()
 
 
 def lookup(data, label):

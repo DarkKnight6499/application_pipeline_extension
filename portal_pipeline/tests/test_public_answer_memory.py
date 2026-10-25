@@ -70,6 +70,12 @@ class AnswerMemoryTests(unittest.TestCase):
         self.assertEqual(memory.salary_expectation("n/a"), 50000)
         self.assertEqual(memory.salary_expectation(0), 50000)
 
+    def test_start_date_is_next_15_december(self):
+        from datetime import date
+        self.assertEqual(memory.start_date(date(2026, 10, 25)), "2026-12-15")
+        self.assertEqual(memory.start_date(date(2026, 12, 15)), "2026-12-15")
+        self.assertEqual(memory.start_date(date(2026, 12, 16)), "2027-12-15")
+
     def test_save_and_load_round_trip(self):
         with tempfile.TemporaryDirectory() as folder:
             data = memory.load_memory(folder)
