@@ -6,7 +6,8 @@
     && getComputedStyle(node).visibility !== "hidden" && node.getClientRects().length > 0;
 
   const matches = element => element?.tagName === "INPUT" && element.getAttribute("role") === "combobox"
-    && element.getAttribute("aria-haspopup") === "grid";
+    && element.getAttribute("aria-haspopup") === "grid"
+    && !["submit", "image", "button", "reset"].includes((element.getAttribute("type") || "text").toLowerCase());
 
   function popupFor(element) {
     const ids = (element.getAttribute("aria-controls") || "").trim().split(/\s+/).filter(Boolean);
@@ -95,6 +96,7 @@
       assertSame();
       if (element.getAttribute("aria-expanded") !== "true" || popupFor(element) !== popup || !optionNodes(popup).includes(found[0]) || normalize(optionLabel(found[0])) !== wanted || disabled(found[0])) throw new Error("The menu option was replaced. Rescan before filling.");
       const label = optionLabel(found[0]);
+      if (found[0].closest("button[type=submit],input[type=submit],a[href]")) throw new Error("This option is a submit control. Choose this answer manually.");
       found[0].click();
       await sleep(300);
       guard();

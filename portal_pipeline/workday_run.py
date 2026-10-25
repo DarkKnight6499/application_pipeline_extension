@@ -52,7 +52,7 @@ def is_workday_url(url):
 
 
 def dialog_open(page):
-    return page.evaluate("[...document.querySelectorAll('[role=dialog],[role=alertdialog]')].some(node => node.getClientRects().length > 0)")
+    return page.evaluate("[...document.querySelectorAll('[role=dialog],[role=alertdialog],dialog[open]')].some(node => node.getClientRects().length > 0)")
 
 
 def is_next_label(text):
@@ -292,6 +292,9 @@ def main(argv=None):
             learned = learn(page, profile, fields)
             if learned:
                 print(f"  learned {learned} answer(s)")
+            if dialog_open(page):
+                print("  A dialog appeared while filling. Stopping before Next.")
+                break
             button = page.locator(next_selector())
             if button.count() != 1 or not is_next_label(button.inner_text()):
                 print("  No single Save and Continue button. Stopping.")

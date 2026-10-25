@@ -5,3 +5,12 @@ def test_oracle_skips_history_row_adding(monkeypatch):
     monkeypatch.setitem(w.PORTAL, "oracle", True)
     monkeypatch.setattr(w, "has_heading", lambda *a: (_ for _ in ()).throw(AssertionError("must not look for headings")))
     assert w.ensure_rows(object(), {"employment": [1], "education": [1]}) is True
+
+
+from browser_test_support import SyntheticBrowserTest
+
+
+class NativeDialogTests(SyntheticBrowserTest):
+    def test_native_open_dialog_counts(self):
+        self.open_markup("<dialog open><p>Sure?</p></dialog>")
+        self.assertTrue(w.dialog_open(self.page))
