@@ -6,6 +6,21 @@
   const POLL_INTERVAL = 100;
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+  const escapeRegExp = text => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const SIZE_PATTERN = /(\d+(?:\.\d+)?)\s*(bytes?|kb|mb)(?![a-z])/i;
+
+  // Confirmation means the exact filename as its own token (not a longer name), and the shown size, when any, matches the bytes.
+  function confirmed(container, name, byteLength) {
+    const text = container.innerText || container.textContent || "";
+    if (!new RegExp("(^|[\\s\"'(])" + escapeRegExp(name) + "($|[\\s\"')])").test(text)) return false;
+    const size = SIZE_PATTERN.exec(text);
+    if (!size) return true;
+    const unit = size[2].toLowerCase();
+    const shown = Number(size[1]) * (unit === "mb" ? 1048576 : unit.startsWith("b") ? 1 : 1024);
+    const slack = unit === "mb" ? 1048576 : unit.startsWith("b") ? 0 : 1024;
+    return Math.abs(shown - byteLength) <= slack;
+  }
+
   function find(root = document) {
     const inputs = root.querySelectorAll(INPUT_SELECTOR);
     return inputs.length === 1 ? inputs[0] : null;
@@ -35,17 +50,20 @@
     }
     guard();
     if (!input.isConnected || !container.contains(input) || [...input.files].length !== files.length) throw new Error("The upload input changed. Rescan before attaching.");
-    if (files.length && container.textContent.includes(name)) return "already attached";
+    if (files.length && confirmed(container, name, bytes.length)) return "already attached";
+    const stale = confirmed(container, name, bytes.length);
     const transfer = new DataTransfer();
     transfer.items.add(new File([bytes], name, {type: mime}));
     input.files = transfer.files;
     input.dispatchEvent(new Event("change", {bubbles: true}));
     guard();
     const deadline = performance.now() + CONFIRMATION_TIMEOUT;
-    while (!container.textContent.includes(name)) {
+    if (stale) throw new Error("Upload was not confirmed on the page: this filename was already shown before the upload. Check it manually.");
+    while (!confirmed(container, name, bytes.length)) {
       const remaining = deadline - performance.now();
       if (remaining <= 0) throw new Error("Upload was not confirmed on the page. Check it manually.");
       await sleep(Math.min(POLL_INTERVAL, remaining));
+      guard();
     }
     return name;
   }

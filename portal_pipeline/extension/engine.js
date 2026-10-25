@@ -621,7 +621,8 @@
       && /\b(projects?|experience|work|background|roles?|duties|responsibilities|contributions?|achievements?|accomplishments?|challenges?|impact|initiative|why|company|employer|organization|organisation|interested|interest|motivation|join|fit)\b/i.test(field.label);
   }
 
-  async function fillSelected(selections, {overwrite = false, attachment = null, manualIds = [], validateLongform = null} = {}) {
+  async function fillSelected(selections, {overwrite = false, attachment = null, manualIds = [], validateLongform = null, checkBoundary = null} = {}) {
+    if (checkBoundary !== null && typeof checkBoundary !== "function") throw new Error("The write boundary must be a function.");
     if (!Array.isArray(manualIds) || manualIds.some(id => typeof id !== "string")) throw new Error("Manual field IDs must be an array of strings.");
     const manualFields = new Set(manualIds);
     const adapter = route();
@@ -670,6 +671,7 @@
       if (globalThis.PortalGreenhouse?.protectedField(control.element)) throw new Error("This field is manual only.");
     };
     const checkCurrent = control => {
+      checkBoundary?.();
       const {element, members, field} = control;
       if (!element.isConnected || !controlVisible(element)) throw new Error("Field is no longer visible. Scan again.");
       if (element.form !== control.nativeForm) throw new Error("The field's form changed. Rescan before filling.");

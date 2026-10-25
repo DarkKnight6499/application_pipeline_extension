@@ -1,6 +1,7 @@
 """One command from a job link and an application folder to a filled application that stops before Submit."""
 import argparse
 import contextlib
+import hashlib
 import io
 import json
 import sys
@@ -11,12 +12,15 @@ from urllib.parse import urlsplit
 
 from playwright.sync_api import sync_playwright
 
+import edge_launch
+import login_fill
 import workday_run
 
 # Config
 HERE = Path(__file__).resolve().parent
 RUNS_DIR = HERE / "data" / "runs"
 APPLY_JSON = "apply.json"
+SESSION_SUBFOLDER = "_inputs"  # prepare_apply.py writes the session here so the folder stays deliverables-only
 RESUME_NAMES = ("Yazad_Madan.docx", "Yazad_Madan.pdf")
 COVER_PREFIX = "CoverLetter_"
 COVER_SUFFIXES = (".docx", ".pdf")
@@ -31,6 +35,8 @@ APPLY_CLICK = {
 ICIMS_APPLY_TEXT = "apply for this job"
 PAGE_WAIT_MS = 6000
 CLICK_WAIT_MS = 3000
+LOGIN_WAIT_SECONDS = 600
+LOGIN_POLL_SECONDS = 3
 
 
 def portal_for(url):
@@ -50,8 +56,14 @@ def find_files(folder):
 
 
 def read_apply_json(folder):
-    path = Path(folder) / APPLY_JSON
-    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    for path in (Path(folder) / SESSION_SUBFOLDER / APPLY_JSON, Path(folder) / APPLY_JSON):
+        if path.is_file():
+            return json.loads(path.read_text(encoding="utf-8"))
+    return {}
+
+
+def sha256_of(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
 def resolve(url, folder):
@@ -64,8 +76,19 @@ def resolve(url, folder):
     if not portal:
         raise SystemExit(f"No adapter for {urlsplit(url).hostname}.")
     resume, cover = find_files(folder) if folder else (None, None)
-    resume = Path(settings["resume"]) if settings.get("resume") else resume
-    cover = Path(settings["cover"]) if settings.get("cover") else cover
+    if settings.get("session"):
+        # A prepared session names its files exactly; nothing is auto-picked from the folder.
+        resume = Path(settings["resume"]) if settings.get("resume") else None
+        cover = Path(settings["cover"]) if settings.get("cover") else None
+    else:
+        resume = Path(settings["resume"]) if settings.get("resume") else resume
+        cover = Path(settings["cover"]) if settings.get("cover") else cover
+    expected = settings.get("resume_sha256")
+    if expected:
+        if not resume or not resume.is_file():
+            raise SystemExit("Session resume file is missing.")
+        if sha256_of(resume) != expected:
+            raise SystemExit("Resume changed since the audit (SHA-256 mismatch). Rebuild and audit it again.")
     return {"url": url, "portal": portal, "resume": resume, "cover": cover}
 
 
@@ -112,21 +135,57 @@ def open_job(job):
     return notes
 
 
-def run(url=None, folder=None, open_page=True):
+def password_box_visible(page):
+    return any(page.locator(login_fill.PASSWORD_SELECTOR).nth(i).is_visible() for i in range(page.locator(login_fill.PASSWORD_SELECTOR).count()))
+
+
+def login_step(job, wait=time.sleep, clock=time.monotonic):
+    """Type the stored login, or wait for a manual login; returns a result code, never a secret."""
+    with sync_playwright() as p:
+        browser = p.chromium.connect_over_cdp(workday_run.CDP_URL)
+        try:
+            tabs = [page for context in browser.contexts for page in context.pages if login_fill.same_host(page.url, job["url"])]
+            if len(tabs) != 1:
+                return f"login skipped: {len(tabs)} tab(s) on the job host"
+            tab = tabs[0]
+            result = login_fill.login(tab, job["url"], submit=True)["result"]
+            deadline = clock() + LOGIN_WAIT_SECONDS
+            while password_box_visible(tab):
+                if clock() >= deadline:
+                    raise workday_run.DriverStopped(f"Login not completed ({result}). Sign in by hand, then run again.")
+                wait(LOGIN_POLL_SECONDS)
+            return result
+        finally:
+            browser.close()
+
+
+def run(url=None, folder=None, open_page=True, launch=False, dry=False):
+    """Returns the exit code: 0 Review reached, 2 human gate, 3 failure; writes data/runs/<id>.json."""
     job = resolve(url, folder)
-    report = {"started": datetime.now().isoformat(timespec="seconds"), "url": job["url"], "portal": job["portal"],
-              "resume": str(job["resume"]) if job["resume"] else None, "cover": str(job["cover"]) if job["cover"] else None, "notes": []}
-    if open_page:
-        report["notes"] += open_job(job)
-    buffer = io.StringIO()
-    with contextlib.redirect_stdout(buffer):
-        workday_run.main(driver_args(job))
-    output = buffer.getvalue()
-    print(output)
-    report["driver_output"] = output.splitlines()
+    notes = []
+    try:
+        if launch:
+            notes.append("edge: " + ("started" if edge_launch.ensure_edge()["started"] else "already running"))
+        if open_page:
+            notes += open_job(job)
+        if launch:
+            notes.append("login: " + login_step(job))
+        args = workday_run.parse_args(driver_args(job) + (["--dry"] if dry else []))
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            report = workday_run.execute(args)
+        print(buffer.getvalue())
+    except (edge_launch.EdgeRefused, edge_launch.EdgeNotReady, workday_run.DriverStopped) as stop:
+        report = workday_run.RunReport(job["portal"], dry).finish_report(str(stop), getattr(stop, "code", workday_run.EXIT_FAILURE))
+    data = {**report.data, "url": job["url"], "notes": notes,
+            "resume": {"file": job["resume"].name, "sha256": sha256_of(job["resume"])} if job["resume"] else None,
+            "cover": {"file": job["cover"].name, "sha256": sha256_of(job["cover"])} if job["cover"] else None}
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
-    (RUNS_DIR / f"{time.strftime('%Y%m%d_%H%M%S')}_{job['portal']}.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
-    return report
+    path = RUNS_DIR / f"{time.strftime('%Y%m%d_%H%M%S')}_{job['portal']}.json"
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    print(report.summary())
+    print(f"Report: {path}")
+    return report.data["exit_code"]
 
 
 def main(argv=None):
@@ -134,8 +193,10 @@ def main(argv=None):
     parser.add_argument("url", nargs="?", help="Job link; optional when the folder has apply.json.")
     parser.add_argument("--folder", type=Path, help="Application folder holding the resume and cover letter.")
     parser.add_argument("--no-open", action="store_true", help="Use the tab that is already open instead of opening the link.")
+    parser.add_argument("--launch", action="store_true", help="Start the dedicated Edge if needed, type the stored login, then drive the form.")
+    parser.add_argument("--dry", action="store_true", help="Scan and print proposals only; nothing is written to the portal.")
     args = parser.parse_args(argv)
-    run(args.url, args.folder, open_page=not args.no_open)
+    return run(args.url, args.folder, open_page=not args.no_open, launch=args.launch, dry=args.dry)
 
 
 if __name__ == "__main__":
