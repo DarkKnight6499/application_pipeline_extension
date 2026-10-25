@@ -502,6 +502,11 @@
         checkCurrent(control);
         if (element.checked !== wanted) element.click();
         expected = wanted;
+      } else if (globalThis.PortalWorkdayDate?.matches(element)) {
+        checkCollateral();
+        checkCurrent(control);
+        await PortalWorkdayDate.write(element, expected, () => { checkCollateral(); checkCurrent(control); });
+        expected = PortalWorkdayDate.read(element);
       } else {
         expected = String(expected ?? "");
         if (!expected.trim()) throw new Error("Provide an answer before selecting this field.");
