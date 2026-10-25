@@ -35,3 +35,11 @@ class AttachmentTests(SyntheticBrowserTest):
         record = workday_run.attachment_for(path)
         self.assertEqual((record["name"], record["mime"]), ("Resume.pdf", "application/pdf"))
         self.assertEqual(hashlib.sha256(base64.b64decode(record["base64"])).hexdigest(), record["sha256"])
+
+
+class DialogTests(SyntheticBrowserTest):
+    def test_only_visible_dialogs_count(self):
+        self.open_markup('<div role="dialog" style="display:none">hidden</div><div role="alertdialog" hidden>hidden</div>')
+        self.assertFalse(workday_run.dialog_open(self.page))
+        self.page.evaluate("document.body.insertAdjacentHTML('beforeend', '<div role=dialog>shown</div>')")
+        self.assertTrue(workday_run.dialog_open(self.page))

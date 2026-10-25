@@ -23,6 +23,10 @@ EXTENSION = HERE / "extension"
 CDP_URL = "http://127.0.0.1:9223"
 SOURCE = Path(os.environ.get("PORTAL_SOURCE", r"D:\Code\Resume"))
 HOST_MARK = "myworkdayjobs.com"
+ORACLE_HOST_MARK = "oraclecloud.com"
+ORACLE_EXTRA_SCRIPTS = ["oracle-grid.js", "adapters/oracle.js", "oracle-live.js"]
+ORACLE_GLOBALS = ["PortalOracleGrid", "PortalOracleAdapter"]
+PORTAL = {"oracle": False}
 NEXT_LABELS = {"save and continue", "next"}
 SCRIPTS = ["adapters/registry.js", "adapters/generic.js", "adapters/workday.js", "adapters/aria-listbox.js", "workday-menu.js",
            "classifier.js", "picker-search.js", "workday-upload.js", "workday-date.js", "workday-picker.js", "engine.js"]
@@ -41,7 +45,12 @@ STEP_PATTERN = re.compile(r"step (\d+) of (\d+)")
 
 def is_workday_url(url):
     host = urlsplit(url).hostname or ""
-    return host == HOST_MARK or host.endswith("." + HOST_MARK)
+    mark = ORACLE_HOST_MARK if PORTAL["oracle"] else HOST_MARK
+    return host == mark or host.endswith("." + mark)
+
+
+def dialog_open(page):
+    return page.evaluate("[...document.querySelectorAll('[role=dialog],[role=alertdialog]')].some(node => node.getClientRects().length > 0)")
 
 
 def is_next_label(text):
@@ -56,8 +65,8 @@ def page_of(browser):
 
 
 def inject(page):
-    page.evaluate("names => names.forEach(name => { delete globalThis[name]; })", GLOBALS)
-    for name in SCRIPTS:
+    page.evaluate("names => names.forEach(name => { delete globalThis[name]; })", GLOBALS + ORACLE_GLOBALS)
+    for name in SCRIPTS + (ORACLE_EXTRA_SCRIPTS if PORTAL["oracle"] else []):
         page.add_script_tag(path=str(EXTENSION / name))
 
 
@@ -221,13 +230,15 @@ def wait_for_person(page, profile):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--resume", type=Path, help="Reviewed resume file to attach on the upload step.")
+    parser.add_argument("--portal", choices=["workday", "oracle"], default="workday")
     parser.add_argument("--dry", action="store_true", help="Scan and print proposals only; write and click nothing.")
     args = parser.parse_args(argv)
+    PORTAL["oracle"] = args.portal == "oracle"
     with sync_playwright() as p:
         browser = p.chromium.connect_over_cdp(CDP_URL)
         page = page_of(browser)
         for _ in range(MAX_PAGES):
-            if page.locator("[role=dialog], [role=alertdialog]").count():
+            if dialog_open(page):
                 print("A dialog is open. Stopping so nothing is discarded or submitted.")
                 break
             inject(page)

@@ -202,7 +202,7 @@
 
   const isMenu = element => !!globalThis.PortalWorkdayMenu?.matches(element);
   const isCustom = element => (element.getAttribute("role") === "combobox" && element.tagName !== "SELECT") || isMenu(element);
-  const dropdown = element => isMenu(element) ? PortalWorkdayMenu : globalThis.PortalGreenhouseSelect?.matches(element) ? PortalGreenhouseSelect : globalThis.PortalListbox;
+  const dropdown = element => isMenu(element) ? PortalWorkdayMenu : globalThis.PortalOracleGrid?.matches(element) ? PortalOracleGrid : globalThis.PortalGreenhouseSelect?.matches(element) ? PortalGreenhouseSelect : globalThis.PortalListbox;
 
   function fingerprint(element) {
     const custom = isCustom(element);
@@ -230,8 +230,10 @@
     if (field.blocked || !field.label || field.record) return null;
     if (field.type === "checkbox" && element && consentRecorded(element)) return {value: "Yes", source: "Recorded consent (this site, exact question)", basis: "consent_memory", truth: null};
     if (!profile.answers) return null;
-    const answer = profile.answers[labelKey(field.label)];
-    if (typeof answer !== "string" || !answer.trim()) return null;
+    const stored = profile.answers[labelKey(field.label)];
+    if (typeof stored !== "string" || !stored.trim()) return null;
+    const learnedLabel = profile.aliases?.[`${location.hostname.toLowerCase()}|${labelKey(stored)}`];
+    const answer = typeof learnedLabel === "string" && learnedLabel.trim() ? learnedLabel : stored;
     if (field.type === "checkbox" && !/^(yes|no)$/i.test(answer.trim())) return null;
     const exact = options.filter(option => !option.disabled && [option.label, option.value].some(text => answerKey(text) === answerKey(answer)));
     if ((field.type === "radio" || options.length) && field.type !== "combobox" && exact.length !== 1) return null;
@@ -246,7 +248,9 @@
   }
 
   function proposeCore(field, profile, {element, options = field.options || []} = {}) {
-    const base = storedFact(profile, field, options, element) || (field.key ? datePartFact(profile, field.key, element, options) : null);
+    // A phone-code picker shares the phone label; the number must never be typed into it.
+    const phoneCode = field.type === "combobox" && field.key === "phone";
+    const base = phoneCode ? null : storedFact(profile, field, options, element) || (field.key ? datePartFact(profile, field.key, element, options) : null);
     // A portal's own option wording, learned once per host, replaces the profile wording (for example a degree).
     const learned = base && base.basis !== "answer_memory" && profile.aliases ? profile.aliases[`${location.hostname.toLowerCase()}|${labelKey(base.value)}`] : null;
     const aliased = typeof learned === "string" && learned.trim() ? {...base, value: learned.trim(), source: `${base.source} (learned portal label)`, basis: "alias"} : base;
@@ -328,7 +332,7 @@
       const field = {id, label, key, candidates, section: key?.split(".")[0] || section, type, current, options, record,
                      required: element.required || element.getAttribute("aria-required") === "true" || globalThis.PortalGreenhouse?.uploadGroup(element)?.getAttribute("aria-required") === "true",
                      blocked, disabled: unavailable(element),
-                     adapter: customInfo?.supported ? (dropdown(element) === globalThis.PortalGreenhouseSelect ? "greenhouse-select" : isMenu(element) ? "workday-menu" : "aria-listbox") : null, manual_reason: customInfo?.reason || "",
+                     adapter: customInfo?.supported ? (dropdown(element) === globalThis.PortalGreenhouseSelect ? "greenhouse-select" : isMenu(element) ? "workday-menu" : dropdown(element) === globalThis.PortalOracleGrid ? "oracle-grid" : "aria-listbox") : null, manual_reason: customInfo?.reason || "",
                      dropdown_state: customInfo?.dropdown_state || null,
                      structure: {tag: element.tagName.toLowerCase(), name: element.name || "", automation_id: element.getAttribute("data-automation-id") || "",
                        dom_id: element.id, role: element.getAttribute("role") || "", controls: element.getAttribute("aria-controls") || "", popup: element.getAttribute("aria-haspopup") || "",

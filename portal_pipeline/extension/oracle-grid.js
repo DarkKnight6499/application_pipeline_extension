@@ -15,13 +15,19 @@
     return found.length === 1 && ["grid", "listbox"].includes(found[0].getAttribute("role")) ? found[0] : null;
   }
 
+  // Oracle puts one gridcell in each row; the cell is the click target, so it is the option when a row holds exactly one.
   function optionNodes(popup) {
     if (!popup) return [];
-    return [...popup.querySelectorAll('[role="option"],[role="row"],[role="gridcell"]')].filter(node => {
-      if (node.closest('[role="grid"],[role="listbox"]') !== popup || !visible(node)) return false;
-      if (node.parentElement.closest('[role="option"],[role="row"]')) return false;
-      return node.getAttribute("role") === "option" || popup.getAttribute("role") === "grid";
-    });
+    const picked = [];
+    for (const node of popup.querySelectorAll('[role="option"],[role="row"]')) {
+      if (node.closest('[role="grid"],[role="listbox"]') !== popup || !visible(node)) continue;
+      if (node.parentElement.closest('[role="option"],[role="row"]')) continue;
+      if (node.getAttribute("role") === "option") { picked.push(node); continue; }
+      if (popup.getAttribute("role") !== "grid") continue;
+      const cells = [...node.querySelectorAll('[role="gridcell"]')];
+      picked.push(cells.length === 1 ? cells[0] : node);
+    }
+    return picked;
   }
 
   const optionLabel = node => (node.getAttribute("role") === "option" ? node.getAttribute("aria-label") || node.textContent : node.textContent).replace(/\s+/g, " ").trim();

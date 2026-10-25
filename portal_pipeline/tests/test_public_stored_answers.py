@@ -170,3 +170,18 @@ class HistoryRowMemoryTests(SyntheticBrowserTest):
         bindings = {f["record"]["id"]: 0 for f in first if f["record"]}
         fields = self.page.evaluate("([p, b]) => PortalEngine.scan(p, {bindings: b})", [profile, bindings])
         self.assertEqual([f["proposal"] for f in fields if f["structure"]["dom_id"].startswith("workExperience")], ["Analyst"])
+
+
+class PhoneComboAndAliasAnswerTests(SyntheticBrowserTest):
+    def test_phone_code_combobox_is_never_given_the_phone_number(self):
+        self.open_markup('<label for="pc">Phone Number</label><input id="pc" role="combobox" aria-haspopup="grid" aria-controls="pc-listbox" value="">')
+        profile = {"values": {"phone": {"value": "(862) 452-0144", "source": "x"}}}
+        field = [f for f in self.page.evaluate("p => PortalEngine.scan(p)", profile) if f["structure"]["dom_id"] == "pc"][0]
+        self.assertEqual(field["proposal"], "")
+
+    def test_host_alias_also_rewrites_a_stored_answer(self):
+        self.open_markup('<label for="st">State</label><select id="st"><option value=""></option><option value="nj">NJ</option><option value="ny">NY</option></select>')
+        host = "safety-fixture.myworkdayjobs.com"
+        profile = {"values": {}, "answers": {"state": "New Jersey"}, "aliases": {f"{host}|new jersey": "NJ"}}
+        field = [f for f in self.page.evaluate("p => PortalEngine.scan(p)", profile) if f["structure"]["dom_id"] == "st"][0]
+        self.assertEqual((field["proposal"], field["status"]), ("NJ", "prepared"))

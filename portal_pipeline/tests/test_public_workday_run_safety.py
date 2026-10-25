@@ -32,3 +32,14 @@ class DriverSafetyTests(unittest.TestCase):
         row = field(current="Intern", record={"id": "x"})
         loose = field(current="Yes", label="Are you over 18?")
         self.assertEqual([f["label"] for f in workday_run.learnable([row, loose])], ["Are you over 18?"])
+
+
+class PortalHostTests(unittest.TestCase):
+    def test_oracle_mode_accepts_only_oraclecloud_hosts(self):
+        workday_run.PORTAL["oracle"] = True
+        try:
+            self.assertTrue(workday_run.is_workday_url("https://jpmc.fa.oraclecloud.com/hcmUI/x"))
+            self.assertFalse(workday_run.is_workday_url("https://citi.wd5.myworkdayjobs.com/x"))
+            self.assertFalse(workday_run.is_workday_url("https://evil.example/?u=oraclecloud.com"))
+        finally:
+            workday_run.PORTAL["oracle"] = False
