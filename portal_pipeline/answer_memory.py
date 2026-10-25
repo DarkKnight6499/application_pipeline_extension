@@ -1,0 +1,94 @@
+"""Local memory of reviewed answers, matched on exact normalized question text only (no fuzzy matching)."""
+import argparse
+import json
+import sys
+from datetime import date
+from pathlib import Path
+
+from question_corpus import is_protected, normalize_label
+
+# Config
+DATA_DIR = Path(__file__).resolve().parent / "data"
+MEMORY_FILENAME = "answer_memory.json"
+SCHEMA_VERSION = 1
+LABEL_COLUMN = "label"
+TYPE_COLUMN = "type"
+FIELDS_COLUMN = "fields"
+MAX_ANSWER = 2000
+
+
+def memory_path(data_dir=DATA_DIR):
+    return Path(data_dir).resolve() / MEMORY_FILENAME
+
+
+def load_memory(data_dir=DATA_DIR):
+    path = memory_path(data_dir)
+    if not path.is_file():
+        return {"schema_version": SCHEMA_VERSION, "answers": {}}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if data.get("schema_version") != SCHEMA_VERSION or not isinstance(data.get("answers"), dict):
+        raise ValueError("Answer memory has an unsupported schema.")
+    return data
+
+
+def save_memory(data, data_dir=DATA_DIR):
+    path = memory_path(data_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+
+
+def remember(data, label, answer, source="manual", now=None):
+    """Stores one reviewed answer; returns False for protected, empty or oversized input."""
+    key = normalize_label(label)
+    text = str(answer or "").strip()
+    if not key or not text or len(text) > MAX_ANSWER or is_protected({LABEL_COLUMN: label}):
+        return False
+    today = now or date.today().isoformat()
+    entry = data["answers"].setdefault(key, {LABEL_COLUMN: str(label).strip()[:300], "first_seen": today, "uses": 0})
+    entry.update(answer=text, source=source, last_seen=today)
+    return True
+
+
+def lookup(data, label):
+    entry = data["answers"].get(normalize_label(label))
+    return entry["answer"] if entry else None
+
+
+def gaps(data, fields):
+    """Distinct unprotected question labels with no stored answer, in first-seen order."""
+    seen, result = set(), []
+    for field in fields:
+        label = str(field.get(LABEL_COLUMN) or "").strip()
+        key = normalize_label(label)
+        if not key or key in seen or key in data["answers"] or is_protected(field):
+            continue
+        seen.add(key)
+        result.append(label)
+    return result
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest="command", required=True)
+    add = sub.add_parser("add", help="Store one reviewed answer.")
+    add.add_argument("question")
+    add.add_argument("answer")
+    report = sub.add_parser("gaps", help="List questions in an Inspect export with no stored answer.")
+    report.add_argument("export")
+    args = parser.parse_args(argv)
+    data = load_memory()
+    if args.command == "add":
+        if not remember(data, args.question, args.answer):
+            print("Not stored: empty, oversized or protected question.", file=sys.stderr)
+            return 1
+        save_memory(data)
+        print(f"Stored. {len(data['answers'])} answer(s).")
+        return 0
+    fields = json.loads(Path(args.export).read_text(encoding="utf-8")).get(FIELDS_COLUMN, [])
+    for label in gaps(data, fields):
+        print(label)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
