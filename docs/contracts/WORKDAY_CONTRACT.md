@@ -67,3 +67,16 @@ Source: four Inspect-only exports of the Citi My Information page (tenant `citi.
 | How Did You Hear About Us, Country Phone Code | Export as text inputs (`source--source`, `phoneNumber--countryPhoneCode`) with no popup attributes. Each sits beside a `ul role="listbox"` with `data-automation-id="selectedItemList"` inside `multiselectInputContainer`. Search dialog contents are not captured. |
 
 Still **UNVERIFIED**: that `aria-controls` names the popup (the export records only that it is set; later exports record its value), how an option is committed, and whether unselected options render off screen. The October 18 notes record that off-screen options could not be clicked and that Country once changed unexpectedly, so any adapter must scroll an exact option into view, select only one exact label match, and read the button text back.
+
+## My Experience and Application Questions (October 25, 2026 live Inspect exports)
+
+Source: Inspect-only exports of the Citi My Experience and Application Questions pages, nothing entered. Native fill stays **UNVERIFIED**.
+
+| Item | Observed structure |
+|---|---|
+| Repeated rows | Control ids carry a row prefix, `workExperience-N--` and `education-N--` (N is a generated number such as 78 or 83), with no container automation id the scanner could use. Rows are now grouped by this prefix. |
+| Date parts | `input role="spinbutton"`, ids `<row>--startDate-dateSectionMonth-input`, `...-dateSectionYear-input`, `endDate`, and for education only `firstYearAttended` and `lastYearAttended` (year only). Every label is just "Month" or "Year", so the date part comes from the id. |
+| Employment row | `jobTitle`, `companyName`, `location`, `currentlyWorkHere` checkbox, `roleDescription` textarea. |
+| Education row | `school` and `fieldOfStudy` text inputs backed by search pickers, `gradeAverage` input, and a `degree` button menu (`education-N--degree`, `aria-haspopup="listbox"`, 23 options once open, popup reachable through `aria-controls`). |
+| Resume/CV | A "Drop files here / Select files" zone is visible, but no file input or upload control appears in the export. **UNVERIFIED** and not yet captured. |
+| Application Questions | Six `button` menus with ids `primaryQuestionnaire--<32 hex>`, all labelled "Select One Required", so question text is not captured. The 32 hex ids trip the export validator, so these files stay private. |

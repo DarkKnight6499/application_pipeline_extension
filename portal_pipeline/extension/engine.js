@@ -11,7 +11,30 @@
   const recordIds = new WeakMap();
   const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
+  const prefixGroups = new WeakMap();
+  const ROW_PREFIX = /^(workExperience|education)-\d+--/;
+
+  // Workday rows have no container id, only control ids sharing a row prefix; use the smallest ancestor holding exactly one prefix.
+  function prefixContexts() {
+    const byPrefix = new Map();
+    document.querySelectorAll("[id]").forEach(element => {
+      const match = element.id.match(ROW_PREFIX);
+      if (match) byPrefix.set(match[0], [...(byPrefix.get(match[0]) || []), element]);
+    });
+    const result = [];
+    byPrefix.forEach((elements, prefix) => {
+      let node = elements[0].parentElement;
+      while (node && !elements.every(element => node.contains(element))) node = node.parentElement;
+      const mixed = node && [...node.querySelectorAll("[id]")].some(element => ROW_PREFIX.test(element.id) && !element.id.startsWith(prefix));
+      if (!node || mixed || !node.matches("fieldset,section,div")) return;
+      prefixGroups.set(node, prefix.startsWith("education") ? "education" : "employment");
+      result.push(node);
+    });
+    return result;
+  }
+
   function historyGroup(node) {
+    if (prefixGroups.has(node)) return prefixGroups.get(node);
     if (!node.matches("fieldset,section,div")) return null;
     const explicit = node.getAttribute("data-portal-section");
     if (["employment", "education"].includes(explicit)) return explicit;
@@ -20,7 +43,7 @@
   }
 
   function historyContexts() {
-    const candidates = [...document.querySelectorAll("[data-portal-section],[data-automation-id]")].filter(node => historyGroup(node));
+    const candidates = [...new Set([...document.querySelectorAll("[data-portal-section],[data-automation-id]"), ...prefixContexts()])].filter(node => historyGroup(node));
     return candidates.filter(node => !candidates.some(child => child !== node && node.contains(child) && historyGroup(child) === historyGroup(node)));
   }
 
