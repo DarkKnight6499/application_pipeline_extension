@@ -214,6 +214,9 @@ def main(argv=None):
         browser = p.chromium.connect_over_cdp(CDP_URL)
         page = page_of(browser)
         for _ in range(MAX_PAGES):
+            if page.locator("[role=dialog], [role=alertdialog]").count():
+                print("A dialog is open. Stopping so nothing is discarded or submitted.")
+                break
             inject(page)
             title = step_title(page)
             print(title)

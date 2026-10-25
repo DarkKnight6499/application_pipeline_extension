@@ -128,7 +128,7 @@
       if (element.closest("#portal-panel-host") || !controlVisible(element)) return false;
       if (globalThis.PortalGreenhouse?.active() && !PortalGreenhouse.formFor(element)) return false;
       if (isMenu(element)) return true;
-      if (element.tagName === "BUTTON") return false;
+      if (element.tagName === "BUTTON" && element.getAttribute("role") !== "combobox") return false;
       const type = element.getAttribute("role") === "combobox" && element.tagName !== "SELECT" ? "combobox" : element.type;
       return !["hidden", "submit", "button", "reset", "image"].includes(type);
     });

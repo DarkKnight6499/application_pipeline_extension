@@ -106,3 +106,8 @@ An Inspect export taken with the Degree menu open shows the button `education-74
 | Risk | Enter selects the first match even when it is not the intended one, so a filler must compare the new pill label with the candidate and delete it on mismatch. |
 | Degree menu wording | The Degree menu offers short labels such as `M.S.` and `B.S.`, not the profile wording, so the wording is learned once per host as an alias. |
 | Dates | Existing rows showed month values without a leading zero (`5`, `8`) beside profile `05`; the date module compares month numerically. |
+
+## Navigation notes (October 25, 2026)
+
+- The progress bar steps are `li` items, not links; only Back and Save and Continue move between pages.
+- Pressing Back on My Experience opened a "Discard Application?" dialog (Discard, Continue). Only Continue is safe; the run driver stops when any dialog is open.
