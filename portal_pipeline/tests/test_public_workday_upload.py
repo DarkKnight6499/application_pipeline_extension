@@ -118,4 +118,34 @@ class WorkdayUploadTests(SyntheticBrowserTest):
     def test_guard_runs_after_change(self):
         self.open_upload_page()
         result = self.page.evaluate("attachment => { const calls = []; return PortalWorkdayUpload.upload(document.getElementById('resume'), attachment, () => { calls.push(window.changeCount); }).then(name => ({name, calls})); }", ATTACHMENT)
-        self.assertEqual(result, {"name": ATTACHMENT["name"], "calls": [0, 1]})
+        self.assertEqual(result["name"], ATTACHMENT["name"])
+        self.assertEqual((result["calls"][0], result["calls"][-1]), (0, 1))
+
+
+class UploadReviewFixTests(WorkdayUploadTests):
+    def test_existing_file_with_same_name_but_other_bytes_is_refused(self):
+        self.open_upload_page()
+        self.page.evaluate("""() => { const t = new DataTransfer(); t.items.add(new File(['wrong bytes'], 'Resume.pdf'));
+          const i = document.getElementById('resume'); i.files = t.files; document.getElementById('confirmation').textContent = 'Resume.pdf'; }""")
+        with self.assertRaisesRegex(Exception, "do(es)? not match|different"):
+            self.upload()
+
+    def test_guard_revoked_during_hashing_blocks_the_write(self):
+        self.open_upload_page()
+        with self.assertRaisesRegex(Exception, "revoked"):
+            self.page.evaluate("""attachment => { let calls = 0;
+          return PortalWorkdayUpload.upload(document.getElementById('resume'), attachment, () => { if (++calls >= 3) throw new Error('revoked'); }); }""", ATTACHMENT)
+        self.assertEqual(self.page.evaluate("[changeCount, document.getElementById('resume').files.length]"), [0, 0])
+
+    def test_cover_letter_upload_is_not_given_the_resume(self):
+        self.open_markup(PAGE.replace('<input id="resume"', '<h3>Cover Letter</h3><input id="resume"'))
+        self.page.add_script_tag(path=str(SCRIPT))
+        with self.assertRaisesRegex(Exception, "[Cc]over"):
+            self.upload()
+
+    def test_disabled_input_is_refused(self):
+        self.open_upload_page()
+        self.page.evaluate("document.getElementById('resume').disabled = true")
+        with self.assertRaisesRegex(Exception, "unavailable"):
+            self.upload()
+        self.assertEqual(self.page.evaluate("changeCount"), 0)

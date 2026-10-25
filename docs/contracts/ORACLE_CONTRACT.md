@@ -43,3 +43,16 @@ Source: one Inspect-only export of `jpmc.fa.oraclecloud.com` (signed in, nothing
 | Coverage gaps | One visible iframe and four open shadow hosts are not inspected. |
 
 Next capture needed: one combobox open (for example State) to see whether options render as `role="option"` in a grid or a listbox.
+
+## JPMC application flow and State popup, live (October 25, 2026)
+
+Source: a live read-only walk of `jpmc.fa.oraclecloud.com`, job 210778739 (Risk Reporting - Associate), with the user's account. Fill stays **UNVERIFIED**.
+
+| Item | Observed |
+|---|---|
+| Entry | Job page has an `Apply Now` button. It leads to `.../job/<id>/apply/email`: an email input (`name=primary-email`), a `honey-pot` text input (never fill), a legal checkbox (`name=legal-disclaimer-checkbox`, "I agree with the terms and conditions"), Cancel, Next, and a privacy `Accept`/`Decline` banner. |
+| Verification | After Next the page shows "Confirm Your Identity" with six single-digit inputs (`pin-code-1` to `pin-code-6`); the code arrives by email. |
+| Contact page | `.../apply/section/1`. 17 inspectable fields: resume import file input, First/Middle/Last name, Email, phone code combobox plus tel input, Country, Address Lines 1 to 3, City, Tax District, County, State, Postal Code, Preferred Location. Inspection still reports `iframe_uninspected` and `open_shadow_uninspected`. |
+| Comboboxes | `input role="combobox"` with `aria-haspopup="grid"` (Preferred Location uses `listbox`), names `country`, `city`, `region1`, `region2`, `postalCode`, `phoneNumber`. Values may be prefilled from the account (State showed `NJ`). |
+| State popup | Opens on click. `div role="grid"` named by `aria-controls` (`region2-37-listbox`, generated per page), `aria-label="State"`, `aria-busy`. 60 `div role="row"`, each with one `div role="gridcell" id="<popup>-listitem-N" aria-selected`. The label is the cell text (`NJ`). The selected cell has `aria-selected="true"`. |
+| Closing | Escape closes the popup and leaves the value unchanged. |

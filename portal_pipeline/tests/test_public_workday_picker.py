@@ -136,3 +136,18 @@ class WorkdayPickerTests(SyntheticBrowserTest):
         self.open_picker_page({"quantitative-finance": "Quantitative Finance"})
         self.assertEqual(self.choose(["quantitative-finance"]), {
             "status": "selected", "label": "Quantitative Finance", "tried": ["quantitative-finance"]})
+
+
+class PickerReviewFixTests(WorkdayPickerTests):
+    def test_punctuation_that_distinguishes_values_is_kept(self):
+        self.open_picker_page({"c++": "C#"})
+        result = self.choose(["C++"])
+        self.assertEqual((result["status"], self.selected()), ("not_found", []))
+
+    def test_late_wrong_pill_after_cleared_input_is_removed(self):
+        self.open_picker_page({})
+        self.page.evaluate("""() => { const i = document.getElementById('education-school');
+          i.addEventListener('keydown', e => { if (e.key !== 'Enter') return; i.value = '';
+            setTimeout(() => window.addPill(document.getElementById('picker'), 'Wrong School'), 600); }); }""")
+        result = self.choose(["Rutgers"])
+        self.assertEqual((result["status"], self.selected()), ("not_found", []))

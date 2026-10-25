@@ -9,6 +9,7 @@ import re
 import sys
 import time
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from playwright.sync_api import sync_playwright
 
@@ -22,12 +23,14 @@ EXTENSION = HERE / "extension"
 CDP_URL = "http://127.0.0.1:9223"
 SOURCE = Path(os.environ.get("PORTAL_SOURCE", r"D:\Code\Resume"))
 HOST_MARK = "myworkdayjobs.com"
+NEXT_LABELS = {"save and continue", "next"}
 SCRIPTS = ["adapters/registry.js", "adapters/generic.js", "adapters/workday.js", "adapters/aria-listbox.js", "workday-menu.js",
            "classifier.js", "picker-search.js", "workday-upload.js", "workday-date.js", "workday-picker.js", "engine.js"]
 NEXT_SELECTOR = '[data-automation-id="pageFooterNextButton"]'
 STEP_SELECTOR = '[data-automation-id="progressBarActiveStep"]'
 FINAL_STEP_PATTERN = re.compile(r"\breview\b", re.I)
 GLOBALS = ["PortalEngine", "PortalAdapters", "PortalClassifier", "PortalWorkdayMenu", "PortalPickerSearch", "PortalWorkdayUpload", "PortalWorkdayDate", "PortalWorkdayPicker"]
+FAILED = {}
 MAX_PAGES = 10
 FILL_ROUNDS = 3
 PAGE_SETTLE_SECONDS = 4
@@ -36,12 +39,20 @@ GAP_WAIT_SECONDS = 600
 STEP_PATTERN = re.compile(r"step (\d+) of (\d+)")
 
 
+def is_workday_url(url):
+    host = urlsplit(url).hostname or ""
+    return host == HOST_MARK or host.endswith("." + HOST_MARK)
+
+
+def is_next_label(text):
+    return " ".join(str(text).lower().split()) in NEXT_LABELS
+
+
 def page_of(browser):
-    for context in browser.contexts:
-        for page in context.pages:
-            if HOST_MARK in page.url:
-                return page
-    raise SystemExit("No Workday tab found in the debuggable Edge window.")
+    tabs = [page for context in browser.contexts for page in context.pages if is_workday_url(page.url)]
+    if len(tabs) != 1:
+        raise SystemExit(f"Expected exactly one Workday tab, found {len(tabs)}. Close the extras.")
+    return tabs[0]
 
 
 def inject(page):
@@ -144,19 +155,20 @@ def prepared(fields):
 
 
 def unanswered(fields):
-    """Required, empty, unblocked fields that have no proposal: the ones a person must answer once."""
-    return [f for f in fields if f["required"] and not f["blocked"] and f["current"] in ("", False) and f["proposal"] == "" and f["type"] != "file"]
+    """Required, still-empty, unblocked fields after filling: the ones a person must answer."""
+    return [f for f in fields if f["required"] and not f["blocked"] and f["current"] in ("", False) and f["type"] != "file"]
+
+
+def learnable(fields):
+    """Fields whose typed value may be remembered by exact question; history row fields differ per row, so never."""
+    return [f for f in fields if not f["blocked"] and f["current"] not in ("", False) and f["proposal"] == "" and f["type"] != "checkbox" and not f["record"]]
 
 
 def learn(page, profile, fields):
     """Store what the person entered for fields that had no answer, under the exact question text."""
     memory = answer_memory.load_memory()
     learned = 0
-    for field in scan(page, profile):
-        if field["blocked"] or field["current"] in ("", False) or field["proposal"] != "":
-            continue
-        if field["type"] == "checkbox":
-            continue
+    for field in learnable(scan(page, profile, bind_rows(page, profile))):
         if answer_memory.remember(memory, field["label"], str(field["current"]), source="manual"):
             learned += 1
     if learned:
@@ -185,6 +197,7 @@ def run_page(page, profile, dry):
         print(f"  fill round {round_number + 1}:", counts)
         for r in results:
             if r["status"] in ("failed", "refused"):
+                FAILED["count"] = FAILED.get("count", 0) + 1
                 print("   !", r.get("message", "")[:120])
         if not counts.get("filled"):
             break
@@ -220,8 +233,14 @@ def main(argv=None):
             inject(page)
             title = step_title(page)
             print(title)
+            if FINAL_STEP_PATTERN.search(title) and not args.dry:
+                print("  Review page reached. Nothing is filled here. Check it and submit yourself.")
+                break
             profile = build_profile()
             fields = run_page(page, profile, args.dry)
+            if FAILED.get("count"):
+                print("  A fill failed. Stopping so you can check the page.")
+                break
             if not args.dry:
                 note = upload_resume(page, args.resume)
                 if note:
@@ -235,11 +254,14 @@ def main(argv=None):
             if learned:
                 print(f"  learned {learned} answer(s)")
             button = page.locator(NEXT_SELECTOR)
-            if button.count() != 1 or not re.search(r"save and continue|next", button.inner_text(), re.I):
+            if button.count() != 1 or not is_next_label(button.inner_text()):
                 print("  No single Save and Continue button. Stopping.")
                 break
             button.click()
             time.sleep(PAGE_SETTLE_SECONDS)
+            if step_title(page) == title:
+                print("  The page did not advance (Workday probably flagged a field). Stopping for you.")
+                break
         print("Stopped. Submit stays manual.")
         browser.close()
 

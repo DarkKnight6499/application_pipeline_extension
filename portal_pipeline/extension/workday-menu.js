@@ -83,7 +83,10 @@
     found[0].scrollIntoView({block: "nearest"});
     await sleep(100);
     assertSame();
-    if (popupFor(element) !== popup || !found[0].isConnected) { await close(element); throw new Error("The menu option was replaced. Rescan before filling."); }
+    const liveMatches = optionNodes(popup).filter(node => normalize(optionLabel(node)) === wanted && node.getAttribute("aria-disabled") !== "true");
+    if (popupFor(element) !== popup || !visible(popup) || !visible(found[0]) || liveMatches.length !== 1 || liveMatches[0] !== found[0]) {
+      await close(element); throw new Error("The menu option changed. Rescan before filling.");
+    }
     found[0].click();
     await sleep(300);
     if (normalize(read(element)) !== wanted) { await close(element); throw new Error("The menu did not show the chosen option. Choose this answer manually."); }

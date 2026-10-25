@@ -137,3 +137,36 @@ class ValueAliasTests(SyntheticBrowserTest):
     def test_alias_for_another_host_is_ignored(self):
         field = self.proposal({"other.example|master of quantitative finance mqf": "M.S."})
         self.assertEqual(field["proposal"], "Master of Quantitative Finance (MQF)")
+
+
+class ReviewFixTests(SyntheticBrowserTest):
+    def scan(self, markup, answers=None, consents=None):
+        self.open_markup(markup)
+        fields = self.page.evaluate("p => PortalEngine.scan(p)", {"values": {}, "answers": answers or {}, "consents": consents or []})
+        return {f["structure"]["dom_id"]: f for f in fields}
+
+    def test_stored_yes_does_not_pick_a_longer_conditional_option(self):
+        page = '<label for="q">Relocate?</label><select id="q"><option value=""></option><option value="a">Yes, only if relocated</option></select>'
+        self.assertEqual(self.scan(page, {"relocate": "Yes"})["q"]["proposal"], "")
+
+    def test_demographic_fill_must_equal_the_stored_answer(self):
+        page = '<label><input type="checkbox" id="g"> Gender: Male</label>'
+        fields = self.scan(page, {"gender male": "No"})
+        result = self.fill([{"id": fields["g"]["id"], "value": "Yes"}])[0]
+        self.assertEqual(result["status"], "failed")
+        self.assertFalse(self.page.locator("#g").is_checked())
+
+    def test_recorded_consent_never_unlocks_a_signature_control(self):
+        host = "safety-fixture.myworkdayjobs.com"
+        page = '<label><input type="checkbox" id="signature"> I agree</label>'
+        self.assertTrue(self.scan(page, consents=[f"{host}|i agree"])["signature"]["blocked"])
+
+
+class HistoryRowMemoryTests(SyntheticBrowserTest):
+    def test_stored_answer_never_overrides_a_history_row_field(self):
+        self.open_markup('<div><label for="workExperience-3--jobTitle">Job Title*</label><input id="workExperience-3--jobTitle"></div>')
+        profile = {"values": {"employment.0.title": {"value": "Analyst", "source": "x"}}, "answers": {"job title": "Intern"}}
+        first = self.page.evaluate("p => PortalEngine.scan(p)", profile)
+        bindings = {f["record"]["id"]: 0 for f in first if f["record"]}
+        fields = self.page.evaluate("([p, b]) => PortalEngine.scan(p, {bindings: b})", [profile, bindings])
+        self.assertEqual([f["proposal"] for f in fields if f["structure"]["dom_id"].startswith("workExperience")], ["Analyst"])

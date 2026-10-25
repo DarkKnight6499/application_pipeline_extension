@@ -3,7 +3,8 @@
   if (globalThis.PortalWorkdayPicker) return;
   const CONTAINER = '[data-automation-id="multiselectInputContainer"]';
   const PILL = '[data-automation-id="selectedItem"]';
-  const normalize = value => String(value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const normalize = value => String(value ?? "").toLowerCase().replace(/[^a-z0-9+#]+/g, " ").trim();
+  const PILL_WAIT_MS = 3000, LATE_RESULT_MS = 800;
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
   const matches = input => input?.tagName === "INPUT" && input.getAttribute("data-uxi-widget-type") === "selectinput"
@@ -63,7 +64,9 @@
         guard();
         input.dispatchEvent(new view.KeyboardEvent(type, {key: "Enter", code: "Enter", keyCode: 13, bubbles: true}));
       }
-      await waitUntil(() => pillNodes(input).some(node => !before.has(node)) || input.value === "", 3000);
+      await waitUntil(() => pillNodes(input).some(node => !before.has(node)), PILL_WAIT_MS);
+      // A late result can still land after the search box clears, so look once more before judging.
+      if (!pillNodes(input).some(node => !before.has(node))) { await sleep(LATE_RESULT_MS); }
       guard();
       const added = pillNodes(input).filter(node => !before.has(node));
       if (added.length === 1 && normalize(pillLabel(added[0])) === normalize(candidate)) {

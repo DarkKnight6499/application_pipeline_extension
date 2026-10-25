@@ -13,21 +13,29 @@
 
   async function upload(input, attachment, guard = () => {}) {
     guard();
-    if (!input?.isConnected || !input.matches(INPUT_SELECTOR)) throw new Error("The upload input is unavailable. Rescan before attaching.");
+    if (!input?.isConnected || !input.matches(INPUT_SELECTOR) || input.matches(":disabled") || input.getAttribute("aria-disabled") === "true") throw new Error("The upload input is unavailable. Rescan before attaching.");
     if (!attachment || ["name", "mime", "base64", "sha256"].some(key => typeof attachment[key] !== "string" || !attachment[key])) {
       throw new Error("Provide all resume attachment fields.");
     }
     const {name, mime, base64, sha256} = attachment;
     const container = input.parentElement?.closest(CONTAINER_SELECTOR);
     if (!container) throw new Error("The upload container is unavailable. Rescan before attaching.");
+    if (/cover letter/i.test(container.textContent) && !/(resume|cv)/i.test(container.textContent)) throw new Error("This looks like a cover letter upload, not the resume. Attach it manually.");
     const bytes = Uint8Array.from(atob(base64), character => character.charCodeAt(0));
     const digest = await crypto.subtle.digest("SHA-256", bytes);
     const checksum = [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, "0")).join("");
     if (checksum !== sha256) throw new Error("Resume checksum does not match.");
+    guard();
     if (!input.isConnected || !container.contains(input)) throw new Error("The upload input is unavailable. Rescan before attaching.");
     const files = [...input.files];
     if (files.some(file => file.name !== name)) throw new Error("A different file is already attached. Replace it manually.");
-    if (files.some(file => file.name === name) && container.textContent.includes(name)) return "already attached";
+    for (const file of files) {
+      const existing = [...new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer()))].map(value => value.toString(16).padStart(2, "0")).join("");
+      if (existing !== sha256) throw new Error("A different file with this name is already attached. Replace it manually.");
+    }
+    guard();
+    if (!input.isConnected || !container.contains(input) || [...input.files].length !== files.length) throw new Error("The upload input changed. Rescan before attaching.");
+    if (files.length && container.textContent.includes(name)) return "already attached";
     const transfer = new DataTransfer();
     transfer.items.add(new File([bytes], name, {type: mime}));
     input.files = transfer.files;

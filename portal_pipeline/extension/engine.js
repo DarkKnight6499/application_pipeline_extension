@@ -164,12 +164,20 @@
   // Demographic questions are filled only from an answer the person already gave to the identical question.
   let knownAnswers = null, knownConsents = new Set();
   // A consent box counts only for the host and the exact question where the person ticked it.
-  const consentRecorded = element => element.type === "checkbox" && knownConsents.has(`${location.hostname.toLowerCase()}|${labelKey(labelFor(element))}`);
+  const signatureTerms = /\b(signature|sign|signed|signing|initials|esign)\b/i;
+  const consentRecorded = element => element.type === "checkbox" && !signatureTerms.test(`${labelFor(element)} ${element.name || ""} ${element.id || ""} ${element.getAttribute("data-automation-id") || ""}`) && knownConsents.has(`${location.hostname.toLowerCase()}|${labelKey(labelFor(element))}`);
   function hasStoredAnswer(element) {
     if (!knownAnswers) return false;
     const legend = element.closest("fieldset")?.querySelector("legend")?.textContent;
     const labels = [labelFor(element), legend, isMenu(element) ? PortalWorkdayMenu.question(element) : ""];
     return labels.some(label => label && Object.hasOwn(knownAnswers, labelKey(label)));
+  }
+
+  const demographicContext = element => !!element.closest(demographicContainers) || demographicTerms.test(`${labelFor(element)} ${element.name || ""} ${element.id || ""} ${element.getAttribute("data-automation-id") || ""} ${element.closest("fieldset")?.querySelector("legend")?.textContent || ""}`);
+  function storedFor(element) {
+    const legend = element.closest("fieldset")?.querySelector("legend")?.textContent;
+    const label = [labelFor(element), legend, isMenu(element) ? PortalWorkdayMenu.question(element) : ""].find(text => text && Object.hasOwn(knownAnswers || {}, labelKey(text)));
+    return label ? knownAnswers[labelKey(label)] : null;
   }
 
   function protectedControl(element) {
@@ -219,13 +227,14 @@
   const labelKey = value => String(value ?? "").toLowerCase().replace(/['\u2019]/g, "").replace(/[^a-z0-9+#\s-]+/g, " ").replace(/\s+/g, " ").trim();
 
   function storedFact(profile, field, options, element) {
-    if (field.blocked || !field.label) return null;
+    if (field.blocked || !field.label || field.record) return null;
     if (field.type === "checkbox" && element && consentRecorded(element)) return {value: "Yes", source: "Recorded consent (this site, exact question)", basis: "consent_memory", truth: null};
     if (!profile.answers) return null;
     const answer = profile.answers[labelKey(field.label)];
     if (typeof answer !== "string" || !answer.trim()) return null;
     if (field.type === "checkbox" && !/^(yes|no)$/i.test(answer.trim())) return null;
-    if ((field.type === "radio" || options.length) && field.type !== "combobox" && !optionMatch(options, answer)) return null;
+    const exact = options.filter(option => !option.disabled && [option.label, option.value].some(text => answerKey(text) === answerKey(answer)));
+    if ((field.type === "radio" || options.length) && field.type !== "combobox" && exact.length !== 1) return null;
     return {value: answer.trim(), source: "Stored answer (exact question match)", basis: "answer_memory", truth: null};
   }
 
@@ -312,7 +321,7 @@
         : type === "checkbox" ? element.checked : type === "file" ? [...element.files].map(file => file.name).join(", ") : element.value || "";
       const options = custom ? customInfo.options : element.tagName === "SELECT" ? [...element.options].map(option => ({value: option.value, label: option.textContent.trim(), disabled: optionDisabled(option)}))
         : type === "radio" ? members.map(item => ({value: item.value, label: labelFor(item), disabled: unavailable(item) || !visible(item)})) : [];
-      const proposal = proposeCore({key, blocked, type, options, label}, profile, {element, options});
+      const proposal = proposeCore({key, blocked, type, options, label, record}, profile, {element, options});
       const pickerKind = picker ? (/\.school$/.test(key || "") ? "school" : /\.field_of_study$/.test(key || "") ? "field_of_study" : "") : "";
       const lookup = pickerKind === "field_of_study" ? profile.values[(key || "").replace("field_of_study", "degree")]?.value : proposal.value;
       const candidates = pickerKind && lookup ? pickerCandidates(profile, pickerKind, lookup) : [];
@@ -352,7 +361,7 @@
       const label = labelFor(node).replace(/\s+/g, " ").trim().slice(0, 80);
       return {tag: node.tagName.toLowerCase(), automation_id: node.getAttribute("data-automation-id") || "", dom_id: node.id || "", name: node.getAttribute("name") || "", label,
         haspopup: node.getAttribute("aria-haspopup"), expanded: node.getAttribute("aria-expanded"), controls: node.getAttribute("aria-controls") || "",
-        required: node.getAttribute("aria-required") === "true" || /\*|required/i.test(label), question: questionFor(node)};
+        required: node.getAttribute("aria-required") === "true" || /\*|\brequired\b/i.test(label), question: questionFor(node)};
     });
     // File inputs are usually hidden behind a drop zone, so list them regardless of visibility, including open shadow roots; names of chosen files are never read.
     const roots = [document, ...[...document.querySelectorAll("*")].map(node => node.shadowRoot).filter(Boolean)];
@@ -429,6 +438,7 @@
       checkCollateral();
       checkCurrent(control);
       if (fingerprint(element) !== control.fingerprint) throw new Error("Question or control identity changed. Rescan before filling.");
+      if (demographicContext(element) && answerKey(selection.value) !== answerKey(storedFor(element))) throw new Error("A demographic field fills only with its stored answer. Choose it manually.");
       if (field.record?.index === null) throw new Error(field.record.error || "Choose a profile record or manual answers for this row before filling.");
       const current = field.type === "combobox" ? read(control) : field.type === "radio" ? members.find(item => item.checked)?.value || ""
         : field.type === "checkbox" ? element.checked : field.type === "file" ? element.files.length : element.value;

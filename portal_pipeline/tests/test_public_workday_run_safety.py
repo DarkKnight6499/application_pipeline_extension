@@ -1,0 +1,34 @@
+"""Run driver safety helpers: tab choice, Next button text, required gaps, what may be learned."""
+import sys
+import unittest
+
+from browser_test_support import HERE
+
+sys.path.insert(0, str(HERE))
+import workday_run
+
+
+def field(**kw):
+    base = {"required": True, "blocked": False, "current": "", "proposal": "", "type": "text", "record": None, "label": "Q", "disabled": False}
+    return {**base, **kw}
+
+
+class DriverSafetyTests(unittest.TestCase):
+    def test_only_real_workday_hosts_are_workday_tabs(self):
+        self.assertTrue(workday_run.is_workday_url("https://citi.wd5.myworkdayjobs.com/en-US/2/apply"))
+        self.assertFalse(workday_run.is_workday_url("https://unrelated.example/?return=myworkdayjobs.com"))
+        self.assertFalse(workday_run.is_workday_url("https://evilmyworkdayjobs.com/x"))
+
+    def test_next_button_text_must_match_exactly(self):
+        self.assertTrue(workday_run.is_next_label(" Save and Continue "))
+        self.assertFalse(workday_run.is_next_label("Submit application and go to next"))
+        self.assertFalse(workday_run.is_next_label("Submit"))
+
+    def test_required_empty_field_with_a_proposal_still_counts_as_a_gap(self):
+        self.assertEqual(len(workday_run.unanswered([field(proposal="2023")])), 1)
+        self.assertEqual(workday_run.unanswered([field(current="2023")]), [])
+
+    def test_learning_skips_history_row_fields(self):
+        row = field(current="Intern", record={"id": "x"})
+        loose = field(current="Yes", label="Are you over 18?")
+        self.assertEqual([f["label"] for f in workday_run.learnable([row, loose])], ["Are you over 18?"])
