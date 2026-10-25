@@ -7,7 +7,7 @@ SLOT_JS = r"""() => [...document.querySelectorAll('.attachment-upload-button')].
   const remove = node.querySelector('.attachment-upload-button__bottom-button');
   const name = node.querySelector('.attachment-upload-button__download');
   return {index, remove: remove ? remove.textContent.trim().toLowerCase() : "", name: name ? name.textContent.trim() : "",
-          input: !!node.querySelector('input[type=file]'), text: node.innerText.replace(/s+/g, ' ').trim().slice(0, 120)};
+          input: !!node.querySelector('input[type=file]'), text: node.innerText.replace(/\s+/g, ' ').trim().slice(0, 120)};
 })"""
 
 
