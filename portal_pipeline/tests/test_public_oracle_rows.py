@@ -19,3 +19,9 @@ class NativeDialogTests(SyntheticBrowserTest):
 def test_us_state_location_maps_to_united_states():
     import oracle_history as h
     assert h.plan(["x"], {"education": [{"school": "Rutgers", "location": "Newark, NJ"}]}) == [("education", 0)]
+
+
+class CookieDialogTests(SyntheticBrowserTest):
+    def test_cookie_banner_is_not_a_blocking_dialog(self):
+        self.open_markup('<div role="dialog">We use cookies</div>')
+        self.assertFalse(w.dialog_open(self.page))

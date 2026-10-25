@@ -112,6 +112,15 @@
       || element.getAttribute("placeholder") || element.name || element.getAttribute("data-automation-id") || "Unlabelled field";
   }
 
+  // Lever and Ashby keep the question text in a block label that the control itself is not tied to.
+  function questionText(element, lever = false) {
+    const node = element.closest(lever ? "li.application-question" : "li.application-question, .ashby-application-form-field-entry")?.querySelector(".application-label .text, .application-label, .ashby-application-form-question-title");
+    if (!node) return "";
+    const copy = node.cloneNode(true);
+    copy.querySelectorAll(".required").forEach(mark => mark.remove());
+    return copy.textContent.replace(/[*✱]/g, "").replace(/\s+/g, " ").trim();
+  }
+
   function visible(element) {
     if (element.closest('[aria-hidden="true"],[hidden]')) return false;
     const style = getComputedStyle(element);
@@ -296,11 +305,13 @@
         radioMembers(element).forEach(item => seenRadio.add(item));
       }
       let label = labelFor(element);
+      const tied = (element.labels && element.labels.length) || element.getAttribute("aria-label") || element.getAttribute("aria-labelledby");
+      if (!tied && !["radio", "checkbox"].includes(type)) label = questionText(element) || label;
       if (isMenu(element)) label = PortalWorkdayMenu.question(element) || label;
       let members = [element];
       if (type === "radio") {
         members = radioMembers(element);
-        label = element.closest("fieldset")?.querySelector("legend")?.textContent.trim() || element.getAttribute("aria-label") || element.name;
+        label = element.closest("fieldset")?.querySelector("legend")?.textContent.trim() || element.getAttribute("aria-label") || questionText(element, true) || element.name;
       }
       const identity = `${element.name || ""} ${element.id || ""} ${element.getAttribute("data-automation-id") || ""}`;
       const context = contextFor(element, contexts), record = records.get(context) || null;

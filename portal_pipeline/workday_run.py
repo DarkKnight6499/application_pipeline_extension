@@ -12,6 +12,7 @@ from pathlib import Path
 
 import oracle_attach
 import oracle_history
+import single_upload
 from urllib.parse import urlsplit
 
 from playwright.sync_api import sync_playwright
@@ -33,7 +34,10 @@ GREENHOUSE_HOST_MARK = "greenhouse.io"
 GREENHOUSE_EXTRA_SCRIPTS = ["adapters/greenhouse.js", "adapters/greenhouse-select.js"]
 GREENHOUSE_GLOBALS = ["PortalGreenhouse", "PortalGreenhouseSelect"]
 GREENHOUSE_UPLOAD_SELECTORS = {"resume": "form#application-form input#resume", "cover": "form#application-form input#cover_letter"}
-PORTAL = {"oracle": False, "greenhouse": False}
+SINGLE_PAGE_HOSTS = {"greenhouse": "greenhouse.io", "lever": "lever.co", "ashby": "ashbyhq.com"}
+LEVER_EXTRA_SCRIPTS = ["adapters/lever.js", "lever-live.js"]
+LEVER_GLOBALS = ["PortalLeverAdapter"]
+PORTAL = {"oracle": False, "greenhouse": False, "lever": False, "single": False, "host": ""}
 NEXT_LABELS = {"save and continue", "next"}
 SCRIPTS = ["adapters/registry.js", "adapters/generic.js", "adapters/workday.js", "adapters/aria-listbox.js", "workday-menu.js",
            "classifier.js", "picker-search.js", "workday-upload.js", "workday-date.js", "workday-picker.js", "engine.js"]
@@ -52,12 +56,12 @@ STEP_PATTERN = re.compile(r"step (\d+) of (\d+)")
 
 def is_workday_url(url):
     host = urlsplit(url).hostname or ""
-    mark = GREENHOUSE_HOST_MARK if PORTAL["greenhouse"] else ORACLE_HOST_MARK if PORTAL["oracle"] else HOST_MARK
+    mark = PORTAL["host"] or (ORACLE_HOST_MARK if PORTAL["oracle"] else HOST_MARK)
     return host == mark or host.endswith("." + mark)
 
 
 def dialog_open(page):
-    return page.evaluate("[...document.querySelectorAll('[role=dialog],[role=alertdialog],dialog[open]')].some(node => node.getClientRects().length > 0)")
+    return page.evaluate("[...document.querySelectorAll('[role=dialog],[role=alertdialog],dialog[open]')].some(node => node.getClientRects().length > 0 && !/cookie/i.test(node.innerText))")
 
 
 def is_next_label(text):
@@ -72,9 +76,10 @@ def page_of(browser):
 
 
 def inject(page):
-    page.evaluate("names => names.forEach(name => { delete globalThis[name]; })", GLOBALS + ORACLE_GLOBALS + GREENHOUSE_GLOBALS)
-    for name in SCRIPTS + (ORACLE_EXTRA_SCRIPTS if PORTAL["oracle"] else []) + (GREENHOUSE_EXTRA_SCRIPTS if PORTAL["greenhouse"] else []):
-        page.add_script_tag(path=str(EXTENSION / name))
+    page.evaluate("names => names.forEach(name => { delete globalThis[name]; })", GLOBALS + ORACLE_GLOBALS + GREENHOUSE_GLOBALS + LEVER_GLOBALS)
+    session = page.context.new_cdp_session(page)
+    for name in SCRIPTS + (ORACLE_EXTRA_SCRIPTS if PORTAL["oracle"] else []) + (GREENHOUSE_EXTRA_SCRIPTS if PORTAL["greenhouse"] else []) + (LEVER_EXTRA_SCRIPTS if PORTAL["lever"] else []):
+        session.send("Runtime.evaluate", {"expression": (EXTENSION / name).read_text(encoding="utf-8")})  # CDP evaluate is not bound by page CSP
 
 
 ORACLE_NEXT_SELECTOR = 'button[data-qa="applyFlowPaginationNextButton"]'
@@ -86,15 +91,21 @@ def next_selector():
 
 
 def step_title(page):
-    if PORTAL["greenhouse"]:
-        return "greenhouse application form"
+    if PORTAL["single"]:
+        return "single page application form"
     if PORTAL["oracle"]:
         return " ".join(page.evaluate(ORACLE_TITLE_JS).split())
     return page.evaluate("(sel) => (document.querySelector(sel)?.textContent || '').replace(/\\s+/g, ' ').trim()", STEP_SELECTOR)
 
 
+SPONSORSHIP_KEYS = ("sponsorship_now", "sponsorship_future", "sponsorship_now_or_future")
+SPONSORSHIP_SOURCE = "User rule 2026-10-25: every sponsorship question is answered No"
+
+
 def build_profile():
     profile = resolve_profile(SOURCE)
+    for key in SPONSORSHIP_KEYS:
+        profile["values"][key] = {"value": "No", "source": SPONSORSHIP_SOURCE}
     memory = answer_memory.load_memory()
     profile.update(answers=answer_memory.profile_answers(memory), consents=answer_memory.profile_consents(memory),
                    aliases=answer_memory.profile_aliases(memory), pickers=picker_aliases.profile_pickers(picker_aliases.load_aliases()))
@@ -275,11 +286,15 @@ def main(argv=None):
     parser.add_argument("--resume", type=Path, help="Reviewed resume file to attach on the upload step.")
     parser.add_argument("--cover", type=Path, help="Oracle: cover letter to attach, replacing a different one.")
     parser.add_argument("--no-cover", action="store_true", help="Oracle: remove any attached cover letter.")
-    parser.add_argument("--portal", choices=["workday", "oracle", "greenhouse"], default="workday")
+    parser.add_argument("--portal", choices=["workday", "oracle", *SINGLE_PAGE_HOSTS], default="workday")
     parser.add_argument("--dry", action="store_true", help="Scan and print proposals only; write and click nothing.")
     args = parser.parse_args(argv)
+    sys.stdout.reconfigure(errors="replace")  # page labels can hold symbols the console codepage lacks
     PORTAL["oracle"] = args.portal == "oracle"
     PORTAL["greenhouse"] = args.portal == "greenhouse"
+    PORTAL["lever"] = args.portal == "lever"
+    PORTAL["single"] = args.portal in SINGLE_PAGE_HOSTS
+    PORTAL["host"] = SINGLE_PAGE_HOSTS.get(args.portal, "")
     with sync_playwright() as p:
         browser = p.chromium.connect_over_cdp(CDP_URL)
         page = page_of(browser)
@@ -305,15 +320,15 @@ def main(argv=None):
                 if PORTAL["oracle"]:
                     for line in oracle_attach.apply(page, args.resume, args.cover, args.no_cover):
                         print("  attach:", line)
-                if PORTAL["greenhouse"]:
-                    for line in (greenhouse_upload(page, "resume", args.resume), greenhouse_upload(page, "cover", args.cover)):
+                if PORTAL["single"]:
+                    for line in (single_upload.upload(page, "resume", args.resume), single_upload.upload(page, "cover", args.cover)):
                         if line:
                             print("  upload:", line)
-                note = None if PORTAL["oracle"] or PORTAL["greenhouse"] else upload_resume(page, args.resume)
+                note = None if PORTAL["oracle"] or PORTAL["single"] else upload_resume(page, args.resume)
                 if note:
                     print("  upload:", note)
-            if args.dry or FINAL_STEP_PATTERN.search(title) or PORTAL["greenhouse"]:
-                if PORTAL["greenhouse"] and not args.dry and wait_for_person(page, profile):
+            if args.dry or FINAL_STEP_PATTERN.search(title) or PORTAL["single"]:
+                if PORTAL["single"] and not args.dry and wait_for_person(page, profile):
                     print(f"  learned {learn(page, profile, fields)} answer(s)")
                 break
             if not wait_for_person(page, profile):
