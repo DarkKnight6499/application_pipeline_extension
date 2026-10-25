@@ -38,6 +38,15 @@
     return result;
   }
 
+  // Workday date parts are labelled only "Month" or "Year"; the id says which date and part.
+  const DATE_PART_ID = /^(?:workExperience|education)-\d+--(startDate|endDate|firstYearAttended|lastYearAttended)-dateSection(Month|Year)-input$/;
+  const DATE_PART_KEY = {startDate: "start", endDate: "end", firstYearAttended: "start", lastYearAttended: "end"};
+
+  function datePartName(element) {
+    const match = element.id.match(DATE_PART_ID);
+    return match ? `${DATE_PART_KEY[match[1]]}_${match[2].toLowerCase()}` : null;
+  }
+
   function historyGroup(node) {
     if (prefixGroups.has(node)) return prefixGroups.get(node);
     if (!node.matches("fieldset,section,div")) return null;
@@ -238,6 +247,8 @@
       const section = record?.group || "contact";
       let blocked = members.some(protectedControl);
       let key = blocked ? null : classify(label, identity, section);
+      const datePart = !blocked && !key && record ? datePartName(element) : null;
+      if (datePart) key = `${record.group}.${datePart}`;
       const required = element.required || element.getAttribute("aria-required") === "true";
       if (!blocked && type === "checkbox" && PortalClassifier.isAttestationCheckbox({type, label, key, required, checked: element.checked})) { blocked = true; key = null; }
       if (key?.includes(".")) {

@@ -46,3 +46,39 @@ class RowPrefixShapeTests(SyntheticBrowserTest):
         self.assertEqual(sorted(row["group"] for row in rows), ["employment", "employment"])
         self.assertEqual({row["container_tag"] for row in rows}, {"li"})
         self.assertTrue(all(row["controls"] == 1 and not row["mixed"] for row in rows))
+
+
+class WorkdayDatePartTests(SyntheticBrowserTest):
+    PAGE = '''<div><label for="workExperience-9--jobTitle">Job Title*</label><input id="workExperience-9--jobTitle">
+      <label>Month<input id="workExperience-9--startDate-dateSectionMonth-input" role="spinbutton"></label>
+      <label>Year<input id="workExperience-9--startDate-dateSectionYear-input" role="spinbutton"></label>
+      <label>Month<input id="workExperience-9--endDate-dateSectionMonth-input" role="spinbutton"></label>
+      <label>Year<input id="workExperience-9--endDate-dateSectionYear-input" role="spinbutton"></label></div>
+    <div><label for="education-4--school">School*</label><input id="education-4--school">
+      <label>Year<input id="education-4--firstYearAttended-dateSectionYear-input" role="spinbutton"></label>
+      <label>Year<input id="education-4--lastYearAttended-dateSectionYear-input" role="spinbutton"></label></div>'''
+    VALUES = {"employment.0.start_date": {"value": "2023-05", "source": "Fabricated"}, "employment.0.end_date": {"value": "2024-08", "source": "Fabricated"},
+              "education.0.start_date": {"value": "2019-09", "source": "Fabricated"}, "education.0.end_date": {"value": "2021-06", "source": "Fabricated"}}
+
+    def proposals(self, bind=True):
+        self.open_markup(self.PAGE)
+        first = self.page.evaluate("values => PortalEngine.scan({values}, {})", self.VALUES)
+        if not bind:
+            return {f["structure"]["dom_id"]: (f["key"], f["proposal"]) for f in first}
+        bindings = {f["record"]["id"]: 0 for f in first if f["record"]}
+        bound = self.page.evaluate("({values, bindings}) => PortalEngine.scan({values}, {bindings})", {"values": self.VALUES, "bindings": bindings})
+        return {f["structure"]["dom_id"]: (f["key"], f["proposal"]) for f in bound}
+
+    def test_date_parts_resolve_from_id_once_row_is_bound(self):
+        got = self.proposals()
+        self.assertEqual(got["workExperience-9--startDate-dateSectionMonth-input"], ("employment.0.start_month", "05"))
+        self.assertEqual(got["workExperience-9--startDate-dateSectionYear-input"], ("employment.0.start_year", "2023"))
+        self.assertEqual(got["workExperience-9--endDate-dateSectionMonth-input"], ("employment.0.end_month", "08"))
+        self.assertEqual(got["workExperience-9--endDate-dateSectionYear-input"], ("employment.0.end_year", "2024"))
+        self.assertEqual(got["education-4--firstYearAttended-dateSectionYear-input"], ("education.0.start_year", "2019"))
+        self.assertEqual(got["education-4--lastYearAttended-dateSectionYear-input"], ("education.0.end_year", "2021"))
+
+    def test_unbound_rows_propose_nothing(self):
+        got = self.proposals(bind=False)
+        self.assertIsNone(got["workExperience-9--startDate-dateSectionYear-input"][0])
+        self.assertIsNone(got["education-4--lastYearAttended-dateSectionYear-input"][0])
