@@ -104,6 +104,18 @@ def next_selector():
     return ORACLE_NEXT_SELECTOR if PORTAL["oracle"] else NEXT_SELECTOR
 
 
+ICIMS_OVERRIDE = "input[name=override][type=checkbox]"
+
+
+def accept_address_override(page):
+    """iCIMS asks 'Use this address anyway?' when it cannot verify city, zip and state; the person chose to accept it."""
+    box = page.locator(ICIMS_OVERRIDE)
+    if box.count() != 1 or not box.is_visible():
+        return False
+    box.check()
+    return True
+
+
 def step_title(page):
     if PORTAL["frame"]:
         return " ".join(page.evaluate(ICIMS_TITLE_JS).split())
@@ -114,6 +126,7 @@ def step_title(page):
     return page.evaluate("(sel) => (document.querySelector(sel)?.textContent || '').replace(/\\s+/g, ' ').trim()", STEP_SELECTOR)
 
 
+IMMIGRATION_LABEL = re.compile(r"sponsor|\bopt\b|\bstem\b|visa|h-?1b|immigration|work permit", re.I)  # stale prefilled immigration answers must not become stored truth
 UNLEARNABLE_LABELS = {"login", "type", "number", "username", "user name"}  # account fields and bare option ids are not reusable answers
 SPONSORSHIP_KEYS = ("sponsorship_now", "sponsorship_future", "sponsorship_now_or_future")
 SPONSORSHIP_SOURCE = "User rule 2026-10-25: every sponsorship question is answered No"
@@ -227,6 +240,18 @@ def bind_rows(page, profile):
     return bindings
 
 
+def is_sponsorship(field):
+    return "sponsorship" in str(field.get("key") or "") or bool(IMMIGRATION_LABEL.search(str(field.get("label") or "")))
+
+
+def selection_for(field):
+    """Sponsorship answers overwrite what the portal prefilled, because the rule is always No."""
+    selection = {"id": field["id"], "value": field["proposal"]}
+    if is_sponsorship(field):
+        selection["overwrite"] = True
+    return selection
+
+
 def prepared(fields):
     return [f for f in fields if f["status"] == "prepared" and f["proposal"] != "" and not f["blocked"] and f["type"] != "file" and not f["disabled"]]
 
@@ -241,7 +266,7 @@ def learnable(fields):
     counts = {}
     for f in fields:
         counts[f["label"]] = counts.get(f["label"], 0) + 1
-    return [f for f in fields if not f["blocked"] and f["current"] not in ("", False) and f["proposal"] == "" and f["type"] != "checkbox" and not f["record"] and counts[f["label"]] == 1 and not (f["type"] == "select-one" and str(f["current"]).isdigit()) and f["type"] != "password" and f["label"].strip().lower() not in UNLEARNABLE_LABELS]
+    return [f for f in fields if not f["blocked"] and f["current"] not in ("", False) and f["proposal"] == "" and f["type"] != "checkbox" and not f["record"] and counts[f["label"]] == 1 and not (f["type"] == "select-one" and str(f["current"]).isdigit()) and f["type"] != "password" and f["label"].strip().lower() not in UNLEARNABLE_LABELS and not IMMIGRATION_LABEL.search(f["label"])]
 
 
 def learn(page, profile, fields):
@@ -270,7 +295,7 @@ def run_page(page, profile, dry):
     for round_number in range(FILL_ROUNDS):
         if not todo:
             break
-        results = page.evaluate("async selections => PortalEngine.fill(selections)", [{"id": f["id"], "value": f["proposal"]} for f in todo])
+        results = page.evaluate("async selections => PortalEngine.fill(selections)", [selection_for(f) for f in todo])
         counts = {}
         for r in results:
             counts[r["status"]] = counts.get(r["status"], 0) + 1
@@ -359,12 +384,16 @@ def main(argv=None):
                 print("  A dialog appeared while filling. Stopping before Next.")
                 break
             button = page.locator(next_selector())
-            label = button.get_attribute("value") if PORTAL["frame"] else button.inner_text()
+            label = button.get_attribute("value") if PORTAL["frame"] and button.count() == 1 else button.inner_text() if button.count() == 1 else ""
             if button.count() != 1 or not is_next_label(label):
                 print("  No single Save and Continue button. Stopping.")
                 break
             button.click()
             time.sleep(PAGE_SETTLE_SECONDS)
+            if PORTAL["frame"] and step_title(page) == title and accept_address_override(page):
+                button = page.locator(next_selector())
+                button.click()
+                time.sleep(PAGE_SETTLE_SECONDS)
             if step_title(page) == title:
                 print("  The page did not advance (Workday probably flagged a field). Stopping for you.")
                 break

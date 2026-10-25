@@ -59,3 +59,16 @@ def test_learnable_skips_option_ids_and_account_fields():
               dict(base, label="Login", type="text", current="a@b.c"),
               dict(base, label="Zip/Postal Code", type="text", current="07029")]
     assert [f["label"] for f in workday_run.learnable(fields)] == ["Zip/Postal Code"]
+
+
+def test_sponsorship_selection_overwrites_prefilled_value():
+    assert workday_run.selection_for({"id": "a", "proposal": "No", "key": "sponsorship_now"}) == {"id": "a", "value": "No", "overwrite": True}
+    assert workday_run.selection_for({"id": "b", "proposal": "Yes", "key": "authorized_us"}) == {"id": "b", "value": "Yes"}
+
+
+def test_learnable_skips_immigration_questions():
+    base = {"blocked": False, "proposal": "", "record": None, "type": "select-one", "current": "Yes"}
+    fields = [dict(base, label="If you currently hold OPT, are you eligible for a 24-month extension?"),
+              dict(base, label="Do you require visa sponsorship?"),
+              dict(base, label="Are you at least 18?")]
+    assert [f["label"] for f in workday_run.learnable(fields)] == ["Are you at least 18?"]

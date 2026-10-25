@@ -25,3 +25,14 @@ class CookieDialogTests(SyntheticBrowserTest):
     def test_cookie_banner_is_not_a_blocking_dialog(self):
         self.open_markup('<div role="dialog">We use cookies</div>')
         self.assertFalse(w.dialog_open(self.page))
+
+
+class AddressOverrideTests(SyntheticBrowserTest):
+    def test_override_checkbox_is_ticked_once(self):
+        self.open_markup('<label><input type="checkbox" name="override">Yes</label>')
+        self.assertTrue(w.accept_address_override(self.page))
+        self.assertTrue(self.page.evaluate("document.querySelector('input[name=override]').checked"))
+
+    def test_no_override_means_false(self):
+        self.open_markup("<p>nothing</p>")
+        self.assertFalse(w.accept_address_override(self.page))
