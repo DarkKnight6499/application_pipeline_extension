@@ -34,10 +34,12 @@ GREENHOUSE_HOST_MARK = "greenhouse.io"
 GREENHOUSE_EXTRA_SCRIPTS = ["adapters/greenhouse.js", "adapters/greenhouse-select.js"]
 GREENHOUSE_GLOBALS = ["PortalGreenhouse", "PortalGreenhouseSelect"]
 GREENHOUSE_UPLOAD_SELECTORS = {"resume": "form#application-form input#resume", "cover": "form#application-form input#cover_letter"}
-SINGLE_PAGE_HOSTS = {"greenhouse": "greenhouse.io", "lever": "lever.co", "ashby": "ashbyhq.com", "smartrecruiters": "smartrecruiters.com", "eightfold": "eightfold.ai"}
+SINGLE_PAGE_HOSTS = {"greenhouse": "greenhouse.io", "lever": "lever.co", "ashby": "ashbyhq.com", "smartrecruiters": "smartrecruiters.com", "eightfold": "eightfold.ai", "icims": "icims.com", "taleo": "taleo.net"}
 LEVER_EXTRA_SCRIPTS = ["adapters/lever.js", "lever-live.js"]
 LEVER_GLOBALS = ["PortalLeverAdapter"]
-PORTAL = {"oracle": False, "greenhouse": False, "lever": False, "single": False, "host": ""}
+FRAME_PORTALS = {"icims"}
+FORM_FRAME_JS = "() => [...document.querySelectorAll('input,select,textarea')].filter(i => i.type !== 'hidden' && i.getClientRects().length).length"
+PORTAL = {"frame": False, "oracle": False, "greenhouse": False, "lever": False, "single": False, "host": ""}
 NEXT_LABELS = {"save and continue", "next"}
 SCRIPTS = ["adapters/registry.js", "adapters/generic.js", "adapters/workday.js", "adapters/aria-listbox.js", "workday-menu.js",
            "classifier.js", "picker-search.js", "workday-upload.js", "workday-date.js", "workday-picker.js", "engine.js"]
@@ -72,14 +74,22 @@ def page_of(browser):
     tabs = [page for context in browser.contexts for page in context.pages if is_workday_url(page.url)]
     if len(tabs) != 1:
         raise SystemExit(f"Expected exactly one Workday tab, found {len(tabs)}. Close the extras.")
+    if PORTAL["frame"]:
+        best = max(tabs[0].frames, key=lambda frame: frame.evaluate(FORM_FRAME_JS))  # the form lives in one iframe
+        return best
     return tabs[0]
 
 
 def inject(page):
     page.evaluate("names => names.forEach(name => { delete globalThis[name]; })", GLOBALS + ORACLE_GLOBALS + GREENHOUSE_GLOBALS + LEVER_GLOBALS)
-    session = page.context.new_cdp_session(page)
+    in_frame = hasattr(page, "page")  # iframes share their parent CDP session, so they take the plain evaluate path
+    session = None if in_frame else page.context.new_cdp_session(page)
     for name in SCRIPTS + (ORACLE_EXTRA_SCRIPTS if PORTAL["oracle"] else []) + (GREENHOUSE_EXTRA_SCRIPTS if PORTAL["greenhouse"] else []) + (LEVER_EXTRA_SCRIPTS if PORTAL["lever"] else []):
-        session.send("Runtime.evaluate", {"expression": (EXTENSION / name).read_text(encoding="utf-8")})  # CDP evaluate is not bound by page CSP
+        source = (EXTENSION / name).read_text(encoding="utf-8")
+        if in_frame:
+            page.evaluate("() => {" + source + chr(10) + "}")
+        else:
+            session.send("Runtime.evaluate", {"expression": source})  # CDP evaluate is not bound by page CSP
 
 
 ORACLE_NEXT_SELECTOR = 'button[data-qa="applyFlowPaginationNextButton"]'
@@ -293,6 +303,7 @@ def main(argv=None):
     PORTAL["oracle"] = args.portal == "oracle"
     PORTAL["greenhouse"] = args.portal == "greenhouse"
     PORTAL["lever"] = args.portal == "lever"
+    PORTAL["frame"] = args.portal in FRAME_PORTALS
     PORTAL["single"] = args.portal in SINGLE_PAGE_HOSTS
     PORTAL["host"] = SINGLE_PAGE_HOSTS.get(args.portal, "")
     with sync_playwright() as p:
