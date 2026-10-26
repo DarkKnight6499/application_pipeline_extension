@@ -51,7 +51,7 @@ FINAL_STEP_PATTERN = re.compile(r"\breview\b", re.I)
 GLOBALS = ["PortalEngine", "PortalAdapters", "PortalClassifier", "PortalWorkdayMenu", "PortalPickerSearch", "PortalWorkdayUpload", "PortalWorkdayDate", "PortalWorkdayPicker"]
 FAILED = {}
 MAX_PAGES = 10
-FILL_ROUNDS = 3
+FILL_ROUNDS = 20  # a form that reflows after each write may take one field per round
 PAGE_SETTLE_SECONDS = 4
 GAP_POLL_SECONDS = 3
 GAP_WAIT_SECONDS = 600
@@ -60,6 +60,8 @@ RUNS_DIR = HERE / "data" / "runs"
 EXIT_REVIEW, EXIT_GATE, EXIT_FAILURE = 0, 2, 3  # Review reached, human gate, failure
 REPORT_LABEL_LIMIT = 60
 FILL_OK_STATUSES = {"filled", "preserved", "skipped_existing"}
+STRUCTURE_CHANGED = "visible form structure changed"  # engine.js abort text after a write alters the page
+IDENTITY_CHANGED = "identity changed"  # engine.js text when a re-render replaced the field's node
 FILL_GATE_STATUSES = {"blocked_by_human_gate", "refused"}
 DIALOG_TEST_JS = "[...document.querySelectorAll('[role=dialog],[role=alertdialog],dialog[open]')].some(node => node.getClientRects().length > 0 && node.innerText.trim() !== '' && !/cookie/i.test(node.innerText))"
 WORKDAY_STEP_CHECK_JS = r"""const title = (document.querySelector('[data-automation-id="progressBarActiveStep"]')?.textContent || '').trim();
@@ -443,14 +445,21 @@ def run_page(page, profile, dry, event=None):
         for r in results:
             if r["status"] in ("failed", "refused"):
                 print("   !", r.get("message", "")[:120])
-        if len(results) != len(todo) or any(r["status"] not in FILL_OK_STATUSES for r in results):
+        bad = [r for r in results if r["status"] not in FILL_OK_STATUSES]
+        # A filled field can open a suggestion list; the engine then aborts the rest, so rescan and continue.
+        rescan_only = bool(bad) and all(any(text in str(r.get("message") or "") for text in (STRUCTURE_CHANGED, IDENTITY_CHANGED)) for r in bad)
+        if len(results) != len(todo) or (bad and not rescan_only):
             gate = any(r["status"] in FILL_GATE_STATUSES for r in results) and not any(r["status"] == "failed" for r in results)
             raise (DriverStopped if gate else DriverFailed)("A field was not filled successfully. Review it manually before continuing.")
-        if not counts.get("filled"):
+        if not counts.get("filled") and not bad:
             break
         time.sleep(ROW_SETTLE_SECONDS)
         fields = scan(page, profile, bindings)
-        todo = [f for f in prepared(fields) if f["current"] in ("", False)]
+        remaining = [f for f in prepared(fields) if f["current"] in ("", False)]
+        # A re-rendered node can abort a round that still wrote; stop only when a rescan shows no progress.
+        if bad and len(remaining) >= len(todo):
+            raise DriverFailed("A field was not filled successfully. Review it manually before continuing.")
+        todo = remaining
     return fields
 
 

@@ -368,7 +368,7 @@
       const options = custom ? customInfo.options : element.tagName === "SELECT" ? [...element.options].map(option => ({value: option.value, label: option.textContent.trim(), disabled: optionDisabled(option)}))
         : type === "radio" ? members.map(item => ({value: item.value, label: labelFor(item), disabled: unavailable(item) || !visible(item)})) : [];
       const proposal = proposeCore({key, blocked, type, options, label, record}, profile, {element, options});
-      const pickerKind = picker ? (/\.school$/.test(key || "") ? "school" : /\.field_of_study$/.test(key || "") ? "field_of_study" : "") : "";
+      const pickerKind = picker ? (/\.school$/.test(key || "") ? "school" : /\.field_of_study$/.test(key || "") ? "field_of_study" : /\b(how did you hear|hear about us|referral source)\b/i.test(label) ? "source" : "") : "";
       const lookup = pickerKind === "field_of_study" ? profile.values[(key || "").replace("field_of_study", "degree")]?.value : proposal.value;
       const candidates = pickerKind && lookup ? pickerCandidates(profile, pickerKind, lookup) : [];
       const field = {id, label, key, candidates, section: key?.split(".")[0] || section, type, current, options, record,
@@ -654,7 +654,10 @@
         (radioMembers(control.element).length !== control.members.length || radioMembers(control.element).some(item => !control.members.includes(item))));
       if (surface.length !== registeredSurface.length || surface.some(element => !registeredSurface.includes(element)) || changedMembership) {
         state.aborted = true;
-        throw new Error("The visible form structure changed. Stop and rescan before filling more fields.");
+        const describe = element => (element.getAttribute("data-automation-id") || element.id || element.getAttribute("aria-label") || element.tagName).slice(0, 40);
+        const added = surface.filter(element => !registeredSurface.includes(element)).map(describe).slice(0, 3).join(",");
+        const removed = registeredSurface.filter(element => !surface.includes(element)).map(describe).slice(0, 3).join(",");
+        throw new Error(`The visible form structure changed (+${added || "none"} -${removed || "none"}). Stop and rescan before filling more fields.`);
       }
       const collateral = [...baseline].filter(([id, value]) => (!selectedIds.has(id) || liveProtected(controls.get(id))) && read(controls.get(id)) !== value);
       if (collateral.length) {
