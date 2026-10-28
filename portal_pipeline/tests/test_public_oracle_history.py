@@ -24,13 +24,13 @@ def test_empty_names_never_match_every_card():
 
 def test_plan_keeps_group_and_record_order():
     profile = {o.EDUCATION: [EDUCATION_RECORD, {o.SCHOOL: "Other University"}],
-               o.EMPLOYMENT: [EMPLOYMENT_RECORD, {o.COMPANY: "Other Bank"}]}
+               o.EMPLOYMENT: [EMPLOYMENT_RECORD, {o.COMPANY: "Other Bank", o.TITLE: "Associate"}]}
     assert o.plan([], profile) == [(o.EDUCATION, 0), (o.EDUCATION, 1),
                                     (o.EMPLOYMENT, 0), (o.EMPLOYMENT, 1)]
-    assert o.plan(["example university", "OTHER BANK"], profile) == [
+    assert o.plan(["example university", "Associate | OTHER BANK"], profile) == [
         (o.EDUCATION, 1), (o.EMPLOYMENT, 0)]
     assert o.plan([], {}) == []
-    assert o.plan(["Example University", "Example Bank"], PROFILE) == []
+    assert o.plan(["Example University", "Analyst | Example Bank 04/2021 - 11/2024"], PROFILE) == []
 
 
 MARKUP = r"""
