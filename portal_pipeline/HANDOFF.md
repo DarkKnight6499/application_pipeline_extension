@@ -263,3 +263,94 @@ FULL 400 in 221.495 seconds and PUBLIC 318 in 165.735 seconds pass, each with tw
 The Resume status fingerprint changed during validation as additional application artifacts appeared; the existing reference change flags stayed the same. This run does not claim an unchanged whole source checkout. Phase code and test additions are confined to the extension workspace; the private plan receives only the authorized section 9 handoff entry. Current resume generation remains independent.
 
 Next: commit and push only when requested. Obtain Workday page exports and establish a reviewed Oracle inspection path before collecting Oracle exports. Complete application-scoped CAPTCHA downgrade persistence before enabling Oracle fill. P9 still requires merged PF1/PF2 and 50 approved real pending wordings.
+
+## October 28, 2026: bounded batches and shared learning
+
+Author: Yazad Madan. Date: 2026-10-28.
+
+`batch_apply.py` runs 2 or 3 folders in separate Python processes, caps workers at 3, staggers starts by 3 seconds, checks Edge once, and locks manual login per host. Each job gets a unique report. Drivers bind to normalized URLs or stable CDP target IDs; portal settings use a resettable ContextVar. Memory changes merge under an OS lock and use atomic replacement. Temporary files stay outside the repository; cross-drive Windows writes use `worktrees/.portal-tmp`, configurable through `PORTAL_TEMP_DIR` on the destination volume.
+
+From this directory:
+
+```powershell
+py batch_apply.py --folders "F1" "F2" "F3" --workers 3
+py batch_apply.py --learn-only
+py answer_memory.py --import-answers data/learning_queue.json
+```
+
+The batch stops at missing answers and writes `data/learning_queue.json` plus `data/learning_queue.md`, ordered by job count. Fill JSON answer values once. Import stores source `batch-review` and reruns queued jobs in their original tabs. Protected, immigration, account, checkbox, and history-row questions are excluded; incompatible option sets refuse import. Blank answers remain pending. `--store-only` stores without resuming. Batch `--dry` scans existing tabs without launching or navigating and never resumes as a writable run. The latest batch owns the shared sheet; rebuilding replaces partial sheet edits.
+
+Login, verification codes, CAPTCHA, signatures, attestations, and Submit remain human. Batch filling disables remembered consents. No tracker status or Application ID changes. One Edge profile still shares cookies and login state; popups and focus stealing can interfere. The login lock covers participating processes only. Closed targets and browser restarts require a new reviewed batch. Live concurrency, uploads, and persistence remain unverified.
+
+Validation: 22 new browser-free unittest cases pass; expanded pytest selection passes 120 tests with 1 Playwright-dependent skip and 5 browser report cases excluded. Ten repeated two-process memory merges pass. The first regression failed because the batch module was absent. Validation then exposed a Windows lock-initialization race and a legacy mocked-save incompatibility; both were fixed without editing inherited tests. Python 3.14.6 works at `C:/Users/yazad/anaconda3/python.exe`; `py`, `rg`, and Playwright are unavailable in this sandbox. No Edge or employer page was opened. Full browser and private-source suites were not run. Owner validation after dependency setup: `py -B -m pytest -q -p no:cacheprovider tests`.
+
+The sandbox denied the authorized append to `D:/Code/Resume/.claude/commands/apply.md`. Its exact batch appendix is saved in [APPLY_BATCH_NOTE.md](APPLY_BATCH_NOTE.md) for the owner to append. No Git staging, commit, or push occurred.
+
+## October 28, 2026: Workday failure telemetry and recovery
+
+Author: Yazad Madan. Date: 2026-10-28.
+
+Reports add `source_revision` (Git short hash when available and current Python file hashes), page `field_results`, `field_results_truncated`, `rerender_retries`, `fill_stop_reason`, and `next_outcome`. Field records retain sanitized labels, logical and DOM identities, adapter, row binding, required/disabled flags, attempted value kind/length, overwrite, status, reason/code, failure kind, validation error, and available DOM validity/popup/count state. Answers, file bytes, and credentials are excluded. URLs omit credentials, queries, and fragments. Existing report keys remain.
+
+`structure_changed`, `node_replaced`, and `fill_aborted` allow one rescan retry only after observed progress and stable field/row identities. `unsupported_control`, `human_gate`, and `refused` pause for a person. Validation, reversion, identity changes, collateral changes, unknown codes, and result-ID mismatches stop. Message-only legacy failures stop conservatively. `retry_cap`, `fill_round_cap`, and `unstable_identity_or_no_progress` explain refused recovery.
+
+Upload records add subtype, observed filename/size, elapsed seconds, replacement flag, and reason. `upload_timeout` means confirmation is incomplete, including missing size; `upload_stale_filename` means the name existed without a verified file; `upload_size_mismatch` means displayed size disagrees; `upload_rejected` means a visible upload error; `upload_container_replaced` means replacement remained unconfirmed. Successful replacement reports `upload_confirmed` with its flag. `upload_error` and `upload_boundary_stopped` identify earlier stops. Exact filename and SHA-256 checks remain. Existing matching files wait without reassignment. A fresh widget is observed after rerender, never assigned again automatically.
+
+Next records before/after title and URL, bounded inline errors, elapsed seconds, dialog title/text, observation-error count, and last error type. Outcomes: `step_changed`, new/changed `inline_validation_error`, `dialog_opened`, or `timeout`. `click_pending` means no click outcome was obtained; `boundary_stopped` means the pre-click guard stopped. Observation errors share the original timeout. Unchanged errors do not count as new errors. Dialogs have priority and remain manual. The prior address-override acceptance path is no longer called.
+
+Configuration: `UPLOAD_CONFIRM_SECONDS=15`, `NEXT_TIMEOUT_SECONDS=15`, `NEXT_POLL_SECONDS=0.1`, `RERENDER_RETRY_CAP=1`; existing `FILL_ROUNDS=20` and `MAX_PAGES=10` remain. Telemetry caps: 200 field records per page, 240 characters per text, 10 inline errors, 120 characters per dialog title/text. The latest failure replaces the last record when capped. The upload adapter defaults to 15000 ms, polls every 100 ms, and clamps requested waits to 60000 ms. Size is required for confirmation; prior rounding tolerance remains.
+
+Validation: the selection below passed 101 tests, with 6 skips and 26 passing subtests in 36.63 seconds. After the final upload-slot guard, the new file passed 25 tests and 27 subtests in 19.22 seconds. The six browser-dependent cases skipped because Playwright is unavailable. Node VM tests exercise the actual upload adapter with fabricated DOM objects, including replacement without an input, refusal of a replacement cover-letter slot, delayed size, stale text, rejection, mismatch, and checksum refusal. No browser or employer page was opened. Python AST, both JavaScript syntax checks, and Git diff whitespace checks pass. First execution exposed one shared subprocess-mock collision and seven inherited pytest temporary-directory permission errors. The Git probe now uses an independent subprocess binding; pytest uses a unique temporary root outside the project. No inherited tests were edited. Live persistence, DOM contracts, and remote upload acceptance remain unverified. Unknown personal information embedded in portal labels can still require manual report review. Sponsorship answer/selection logic and existing batch behavior remain unchanged. No Git staging, commit, or push occurred.
+
+Final test command used the installed Python because `py` is unavailable. Set `PYTEST_DEBUG_TEMPROOT` to a unique existing directory under the system temporary directory, then run from this directory:
+
+```powershell
+& C:/Users/yazad/anaconda3/python.exe -B -m pytest -q -p no:cacheprovider --tb=short `
+  tests/test_public_failure_telemetry.py tests/test_public_batch_apply.py `
+  tests/test_public_answer_memory.py tests/test_public_apply_router.py `
+  tests/test_public_apply_session.py tests/test_public_captcha_gate.py `
+  tests/test_public_answer_sheet.py tests/test_public_workday_driver_safety.py `
+  tests/test_public_run_report.py::ApplyLaunchOrderTests `
+  tests/test_public_workday_rows_upload_confirm.py::RowTests `
+  tests/test_public_workday_rows_upload_confirm.py::UploadStatusTests
+```
+
+## October 28, 2026: Workday previous-application reuse
+
+Author: Yazad Madan. Date: 2026-10-28.
+
+Workday defaults to `reuse`. After the Apply dialog opens, one visible, enabled control must match `LAST_APPLICATION_PATTERN` before it is clicked. The default is `last application|previous application|use my last`; configure it through `WORKDAY_LAST_APPLICATION_PATTERN`. Missing, ambiguous, unsafe, and fresh paths record fallback reasons in report notes. Unrecognized labels and Submit-like or native submit controls are refused. Use `--fresh` with `apply.py`, `workday_run.py`, or `batch_apply.py` for the original empty-form path. Other portals retain fresh behavior.
+
+Reuse preserves ordinary prefills, compares case, whitespace, punctuation, dates, and phone digits, and fills known empty fields. Unknown required answers stay pending. Conflicts remain unchanged. Existing sponsorship answer, detection, and selection functions are untouched. Reuse adds overwrite for their existing selections, US work authorization, available start date, and salary proposals. Protected and disabled fields remain excluded. Employment binds by company plus title; education by school plus degree. Populated rows remain untouched. Blank rows hold missing records; only remaining missing rows are added. Surplus rows are reported without deletion. Duplicate matching identities require a person.
+
+Resume and cover-letter replacements require one identified slot, one old attachment, and one recognized non-submit delete control. Incoming fields and SHA-256 are checked before removal. Removal must become observable before upload. Unknown slots, multiple files, disabled targets, missing controls, and changed identities stop with the slot in telemetry. Existing exact filename, checksum, displayed size, rejection, and timeout checks remain. An unconfirmed slot stops before another slot changes. Confirmation does not establish remote persistence.
+
+Reports add `mode` (`reuse` or `fresh`) and `last_application_used` (`true`, `false`, or `unknown`). True records the control click, not verified server-side reuse. Direct-driver, dry, and already-open runs retain unknown without that observation. Pages add `kept`, `diff`, `forced`, `diffs`, and `extra_history_rows`. In reuse, existing `filled` counts successful ordinary writes; `forced` counts successful job-specific writes and confirmed uploads. Dry scans count matches and conflicts without counting writes. Diffs contain label, type, prefilled value kind, masked preview, and profile value kind. No profile answer is copied. Console summaries show at most ten records; batch summaries show counts and preserve the worst exit code. Learning queues list only genuinely new required questions. Their Prefill differences note points to per-job reports without copying diffs.
+
+Marked configuration blocks contain `FORCED_KEYS`, `HISTORY_IDENTITIES`, `HISTORY_LABELS`, `DATE_FORMATS`, `MONTH_FORMATS`, `SENSITIVE_LABEL`, `ID_VALUE`, `DIFF_LIMIT=100`, and `PREVIEW_LIMIT=40` in `reuse_mode.py`; `RUN_MODE`, `SUMMARY_DIFF_LIMIT=10`, `UPLOAD_SLOTS`, and upload scripts in `workday_run.py`; and slot/delete selectors and label patterns in `extension/workday-upload.js`. Extra-row records are capped at 200 with a truncation flag. Date comparisons support ISO and US slash dates; month precision never supplies a day. History identities do not infer employer or degree aliases.
+
+Browser-free tests use invented profiles, mocked pages and engine results, and actual upload JavaScript in a Node VM. New negative cases first exposed removal before validating a blank filename or disabled input. Both now refuse removal. A combined unittest launch from stdin failed because Windows multiprocessing could not reload `<stdin>`; the module-entry rerun passed 92 tests. The `py` launcher is unavailable. Portable Python lacks pytest; Anaconda Python named in the previous handoff supplies it. No inherited test was edited. Temporary test outputs stay outside this project.
+
+Live behavior remains UNVERIFIED: actual previous-application wording, attachment deletion labels and DOM behavior, prefilled value/history exposure, and employer-side persistence. No browser, Edge, employer page, login, CAPTCHA, verification code, signature, attestation, or Submit action was exercised. No Git staging, commit, or push occurred. Existing and concurrent unrelated edits remain intact.
+
+Final validation: 167 tests and 62 subtests passed in 26.29 seconds, with zero skips. This includes 22 tests in `tests/test_public_reuse_mode.py`. Python AST and whitespace checks passed for six Python files; JavaScript syntax and Git diff whitespace checks passed. Browser-dependent suites and live behavior were not run because this task prohibits browser use. Local source files and fabricated mocks supplied all evidence; no external data was fetched.
+
+The requested `py -3 -B -m pytest -q -p no:cacheprovider` entry point could not start because `py` is absent. Equivalent executed selection, with `PYTEST_DEBUG_TEMPROOT` set to a unique system temporary directory outside the project:
+
+```powershell
+& C:/Users/yazad/anaconda3/python.exe -B -m pytest -q -p no:cacheprovider --tb=short `
+  tests/test_public_reuse_mode.py tests/test_public_failure_telemetry.py `
+  tests/test_public_batch_apply.py tests/test_public_answer_memory.py `
+  tests/test_public_apply_router.py tests/test_public_apply_session.py `
+  tests/test_public_sponsorship_labels.py tests/test_public_sponsorship_rule.py `
+  tests/test_public_code_gate.py tests/test_public_workday_driver_safety.py `
+  tests/test_public_workday_run_safety.py tests/test_public_run_report.py::ApplyLaunchOrderTests `
+  tests/test_public_workday_rows_upload_confirm.py::RowTests `
+  tests/test_public_workday_rows_upload_confirm.py::UploadStatusTests
+```
+
+## October 28, 2026: queue dry scan, Oracle readiness, email gate
+
+Author: Yazad Madan. Added bounded queue dry scanning through the existing apply.py dry path and batch subprocess machinery. Scans run serially, default to 10 jobs, and select existing matching tabs without opening or navigating them. Reports include eligible required and optional unanswered questions. The consolidated review deduplicates normalized labels, ranks by distinct jobs, records job URLs, and excludes protected, never-store, immigration, history-row, and remembered questions. Current-page coverage is recorded; the number of unreached pages remains unknown. Later and conditional questions require manual advancement and another scan. Live compatibility remains unverified.
+
+Oracle: history and attachment helpers return a checked result; the driver stops with the reason and field on failure. History cards match on company plus title plus start date, and ambiguous or incomplete matches stop for review. No live Oracle run has happened. `code_gate.py` handles emailed codes and activation links for every adapter with a verified sender (see apply.md); Lever, Ashby and Taleo stay refused until a sample sender is verified.

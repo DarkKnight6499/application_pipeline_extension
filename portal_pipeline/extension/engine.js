@@ -1,6 +1,9 @@
 /* Form scanning and selected filling. Only a bounded dropdown adapter clicks controls. */
 (() => {
   if (globalThis.PortalEngine) return;
+  // Config
+  const DIAGNOSTIC_COUNT_LIMIT = 1000000;
+  const VALIDITY_KEYS = ["valid", "valueMissing", "typeMismatch", "patternMismatch", "tooLong", "tooShort", "rangeUnderflow", "rangeOverflow", "stepMismatch", "badInput", "customError"];
   const protectedTerms = /\b(password|passcode|captcha|one.?time|otp|ssn|social security|credit card|bank account|routing number|signature|attest|certify|certification of|consent|agree|accept terms|privacy policy|declaration)\b/i;
   const demographicTerms = /\b(gender|race|ethnicity|veteran|disability|sexual orientation)\b/i;
   const normalize = value => String(value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -437,7 +440,7 @@
     const prototype = element.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype
       : element.tagName === "SELECT" ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
     const setter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
-    if (!setter) throw new Error("Unsupported control. Fill this field manually.");
+    if (!setter) throw codedError("unsupported_control", "Unsupported control. Fill this field manually.");
     setter.call(element, value);
     element.dispatchEvent(new Event("input", {bubbles: true}));
     element.dispatchEvent(new Event("change", {bubbles: true}));
@@ -468,7 +471,7 @@
     const flagged = element.isConnected ? validationText(control) : "";
     if (actual !== expected) return {ok: false, actual, reason: "reverted after blur", failure_kind: "reverted", validation_error: flagged,
       message: "Portal did not retain the value (reverted after blur). Review this field manually."};
-    if (!element.isConnected) return {ok: false, actual, reason: "Portal replaced the field after filling. Scan again to verify.", failure_kind: "error", validation_error: ""};
+    if (!element.isConnected) return {ok: false, actual, reason: "Portal replaced the field after filling. Scan again to verify.", failure_kind: "node_replaced", validation_error: ""};
     if (element.validity && !element.validity.valid) return {ok: false, actual, reason: "Portal validation rejected the value.", failure_kind: "validation_error", validation_error: element.validationMessage || "Portal validation rejected the value."};
     if (flagged) return {ok: false, actual, reason: "Portal flagged a validation error: " + flagged, failure_kind: "validation_error", validation_error: flagged};
     return {ok: true, actual, reason: "", failure_kind: "", validation_error: ""};
@@ -479,7 +482,7 @@
     const {checkCollateral, checkCurrent, checkApplication, attachment, overwrite} = guard;
     try {
       if (!control) throw new Error("Field changed. Scan the page again.");
-      if (guard.state.aborted) throw new Error("Filling stopped after an unexpected form change. Rescan and review.");
+      if (guard.state.aborted) throw codedError(guard.state.failure_kind || "error", "Filling stopped after an unexpected form change. Rescan and review.");
       const {element, members, field} = control;
       checkCollateral();
       checkCurrent(control);
@@ -561,7 +564,7 @@
         }
       } else if (field.type === "combobox") {
         if (checkApplication?.required) throw new Error("Application-scoped dropdown filling needs a verified asynchronous guard. Choose this field manually.");
-        if (!field.adapter || !dropdown(element)) throw new Error(field.manual_reason || "This custom dropdown requires manual review.");
+        if (!field.adapter || !dropdown(element)) throw codedError("unsupported_control", field.manual_reason || "This custom dropdown requires manual review.");
         expected = await dropdown(element).choose(element, expected, () => {
           checkCollateral();
           checkCurrent(control);
@@ -604,14 +607,14 @@
       if (!check.ok) {
         const failed = {id: field.id, status: "failed", message: check.message || check.reason, reason: check.reason,
           failure_kind: check.failure_kind || "error", validation_error: check.validation_error || ""};
-        try { checkCollateral(); } catch (change) {failed.message = change.message;}
+        try { checkCollateral(); } catch (change) {failed.message = change.message; failed.reason = change.message; failed.failure_kind = change.failure_kind || "error";}
         return failed;
       }
       return {id: field.id, status: "filled", message: field.type === "file" ? "File input verified. Check the portal's upload completion indicator." : "Value verified.",
         reason: "", failure_kind: "", validation_error: ""};
     } catch (error) {
-      const outcome = {id: selection.id, status: "failed", message: error.message, reason: error.message, failure_kind: "error", validation_error: ""};
-      try { checkCollateral(); } catch (change) {outcome.message = change.message; outcome.reason = change.message;}
+      const outcome = {id: selection.id, status: "failed", message: error.message, reason: error.message, failure_kind: error.failure_kind || "error", validation_error: ""};
+      try { checkCollateral(); } catch (change) {outcome.message = change.message; outcome.reason = change.message; outcome.failure_kind = change.failure_kind || "error";}
       return outcome;
     }
   }
@@ -619,6 +622,21 @@
   function isLongform(field) {
     return field?.type === "textarea" && !field.blocked && !/^(employment|education)\./.test(field.key || "")
       && /\b(projects?|experience|work|background|roles?|duties|responsibilities|contributions?|achievements?|accomplishments?|challenges?|impact|initiative|why|company|employer|organization|organisation|interested|interest|motivation|join|fit)\b/i.test(field.label);
+  }
+
+  function codedError(kind, message) {
+    return Object.assign(new Error(message), {failure_kind: kind});
+  }
+
+  function diagnosticState(control) {
+    if (!control) return {};
+    const element = control.element;
+    const popup = document.getElementById(element.getAttribute("aria-controls"));
+    return {visible: !!controlVisible(element), aria_invalid: element.getAttribute("aria-invalid") === "true",
+      validity: element.validity ? Object.fromEntries(VALIDITY_KEYS.map(key => [key, !!element.validity[key]])) : {},
+      popup_expanded: element.getAttribute("aria-expanded") === "true", popup_owned: !!popup,
+      option_count: Math.min(DIAGNOSTIC_COUNT_LIMIT, popup?.querySelectorAll('[role=option]').length || element.options?.length || 0),
+      selected_token_count: Math.min(DIAGNOSTIC_COUNT_LIMIT, globalThis.PortalWorkdayPicker?.matches(element) ? PortalWorkdayPicker.selected(element).length : element.selectedOptions?.length || 0)};
   }
 
   async function fillSelected(selections, {overwrite = false, attachment = null, manualIds = [], validateLongform = null, checkBoundary = null} = {}) {
@@ -633,9 +651,9 @@
         try { await PortalApplicationMode.observe(adapter); } catch { /* The human gate still blocks every write. */ }
       }
       const reason = `A ${gate.kind} step needs you. Nothing was written. Complete it yourself, then rescan.`;
-      return selections.map(selection => ({id: selection.id, ok: false, status: "blocked_by_human_gate", actual: null, reason, message: reason}));
+      return selections.map(selection => ({id: selection.id, ok: false, status: "blocked_by_human_gate", actual: null, reason, message: reason, failure_kind: "human_gate", adapter: adapter?.id || "core"}));
     }
-    const refused = (selection, reason) => ({id: selection.id, ok: false, status: "refused", actual: null, reason, message: reason});
+    const refused = (selection, reason) => ({id: selection.id, ok: false, status: "refused", actual: null, reason, message: reason, failure_kind: "refused", adapter: adapter?.id || "core"});
     if (adapter?.requiresApplicationMode === true) {
       try {
         if (adapter.mode === "answer_sheet_only") throw new Error("Application adapter is answer sheet only.");
@@ -654,20 +672,22 @@
         (radioMembers(control.element).length !== control.members.length || radioMembers(control.element).some(item => !control.members.includes(item))));
       if (surface.length !== registeredSurface.length || surface.some(element => !registeredSurface.includes(element)) || changedMembership) {
         state.aborted = true;
+        state.failure_kind = "structure_changed";
         const describe = element => (element.getAttribute("data-automation-id") || element.id || element.getAttribute("aria-label") || element.tagName).slice(0, 40);
         const added = surface.filter(element => !registeredSurface.includes(element)).map(describe).slice(0, 3).join(",");
         const removed = registeredSurface.filter(element => !surface.includes(element)).map(describe).slice(0, 3).join(",");
-        throw new Error(`The visible form structure changed (+${added || "none"} -${removed || "none"}). Stop and rescan before filling more fields.`);
+        throw codedError("structure_changed", `The visible form structure changed (+${added || "none"} -${removed || "none"}). Stop and rescan before filling more fields.`);
       }
       const collateral = [...baseline].filter(([id, value]) => (!selectedIds.has(id) || liveProtected(controls.get(id))) && read(controls.get(id)) !== value);
       if (collateral.length) {
         state.aborted = true;
+        state.failure_kind = "collateral_change";
         const labels = collateral.map(([id]) => liveProtected(controls.get(id)) ? "a protected field" : controls.get(id).field.label);
-        throw new Error("An unselected field changed: " + labels.join(", ") + ". Review the form manually.");
+        throw codedError("collateral_change", "An unselected field changed: " + labels.join(", ") + ". Review the form manually.");
       }
     };
     const checkHistory = control => {
-      if (control.context && (contextFor(control.element) !== control.context || contextIdentity(control.context) !== control.contextIdentity)) throw new Error("The history row identity changed. Rescan and choose its profile record again.");
+      if (control.context && (contextFor(control.element) !== control.context || contextIdentity(control.context) !== control.contextIdentity)) throw codedError("row_identity_changed", "The history row identity changed. Rescan and choose its profile record again.");
     };
     const checkPortal = control => {
       if (globalThis.PortalGreenhouse?.active() && (!control.portalForm || PortalGreenhouse.formFor(control.element) !== control.portalForm)) throw new Error("The Greenhouse application form changed. Rescan before filling.");
@@ -676,14 +696,15 @@
     const checkCurrent = control => {
       checkBoundary?.();
       const {element, members, field} = control;
-      if (!element.isConnected || !controlVisible(element)) throw new Error("Field is no longer visible. Scan again.");
+      if (!element.isConnected) throw codedError("node_replaced", "Field is no longer visible. Scan again.");
+      if (!controlVisible(element)) throw new Error("Field is no longer visible. Scan again.");
       if (element.form !== control.nativeForm) throw new Error("The field's form changed. Rescan before filling.");
       checkHistory(control);
       checkPortal(control);
       if (field.blocked || members.some(protectedControl)) throw new Error("This field is manual only.");
       if (unavailable(element)) throw new Error("This field cannot be edited.");
       const changed = field.type === "combobox" ? controlIdentity(element) !== control.identity : fingerprint(element) !== control.fingerprint;
-      if (changed) throw new Error("Question or control identity changed. Rescan before filling.");
+      if (changed) throw codedError("identity_changed", "Question or control identity changed. Rescan before filling.");
     };
     const verify = (control, expected) => (adapter ? adapter.verify(control, expected) : verifyCore(control, expected));
     for (const selection of selections) {
@@ -722,8 +743,9 @@
         }
       }
       const guard = {selection, overwrite, attachment, state, checkCollateral, checkCurrent, checkApplication, verify};
-      results.push(!adapter ? await fillField(control, selection, guard)
-        : control?.field.type === "file" ? await adapter.upload(control, attachment, guard) : await adapter.fill(control, selection, guard));
+      const result = !adapter ? await fillField(control, selection, guard)
+        : control?.field.type === "file" ? await adapter.upload(control, attachment, guard) : await adapter.fill(control, selection, guard);
+      results.push({...result, adapter: adapter?.id || "core", dom_state: diagnosticState(control)});
     }
     return results;
   }
