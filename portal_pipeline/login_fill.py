@@ -4,7 +4,7 @@ import re
 import sys
 from urllib.parse import urlsplit
 
-from playwright.sync_api import sync_playwright
+from browser_target import sync_playwright
 
 import credential_store
 import verification_code

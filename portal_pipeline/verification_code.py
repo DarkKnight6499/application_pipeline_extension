@@ -1,12 +1,14 @@
 """Pulls a one-time verification code out of a portal email; sender and age gates keep it from reading unrelated mail."""
 import re
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlsplit
 
 # Config
 MAX_AGE_MINUTES = 15
-CODE_CONTEXT = re.compile(r"(?:verification|security|confirmation|one.?time|access|login|sign.?in)\s*(?:code|pin)|\bcode\b|\botp\b|\bpin\b", re.I)
-CODE_PATTERN = re.compile(r"(?<![A-Za-z0-9])(\d{6,8}|\d{3}[ -]\d{3}|[A-Z0-9]{6,8})(?![A-Za-z0-9])")
+CODE_CONTEXT = re.compile(r"(?:verification|security|confirmation|one.?time|access|login|sign.?in)\s*(?:code|pin)|\bpass.?code\b|\bcode\b|\botp\b|\bpin\b", re.I)
+CODE_PATTERN = re.compile(r"(?<![A-Za-z0-9])(\d{6,8}|\d{3}[ -]\d{3}|[A-Za-z0-9]{6,8})(?![A-Za-z0-9])")  # Greenhouse codes are mixed case
 URL_PATTERN = re.compile(r"https?://\S+")
+LINK_PATTERN = re.compile(r"https://[^\s<>()\[\]\"']+")
 STOP_WORDS = {"SUBMIT", "ACCOUNT", "PORTAL", "VERIFY", "SECURE", "CITIBA", "WORKDAY"}
 
 
@@ -28,6 +30,18 @@ def extract_code(subject, body):
             for match in CODE_PATTERN.finditer(candidate):
                 if _is_code(match.group(1)):
                     return re.sub(r"[ -]", "", match.group(1))
+    return None
+
+
+def extract_link(body, session_host, link_suffixes=(), path_hint=None):
+    """First https link on the session host (or a listed host suffix) whose path matches path_hint; else None."""
+    for url in LINK_PATTERN.findall(body or ""):
+        url = url.rstrip(".,;")
+        parts = urlsplit(url)
+        host = (parts.hostname or "").lower()
+        host_ok = host == session_host or any(host == s or host.endswith("." + s) for s in link_suffixes)
+        if host_ok and (path_hint is None or re.search(path_hint, parts.path)):
+            return url
     return None
 
 
