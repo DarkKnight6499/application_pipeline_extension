@@ -19,6 +19,7 @@ import edge_launch
 import login_fill
 import workday_run
 import reuse_mode as reuse
+import successfactors
 
 # Config
 HERE = Path(__file__).resolve().parent
@@ -55,6 +56,8 @@ def portal_for(url):
     for mark, portal in HOST_PORTALS:
         if host == mark or host.endswith("." + mark):
             return portal
+    if successfactors.matches_url(url):
+        return "successfactors"
     return None
 
 
@@ -77,13 +80,22 @@ def sha256_of(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def resolve(url, folder):
+def resolve(url, folder, target_id=None):
     """Job link, portal, resume and cover letter from the arguments and an optional apply.json."""
     settings = read_apply_json(folder) if folder else {}
     url = url or settings.get("url")
     if not url:
         raise SystemExit("No job link. Pass it or put it in apply.json.")
     portal = portal_for(url)
+    if not portal and (target_id or successfactors.JOB_PATH.fullmatch(urlsplit(url).path)):
+        with sync_playwright() as p:
+            browser = p.chromium.connect_over_cdp(workday_run.CDP_URL)
+            try:
+                page = select_tab(browser, url, target_id)
+                if urlsplit(page.url).netloc == urlsplit(url).netloc and successfactors.matches_page(page):
+                    portal = "successfactors"
+            finally:
+                browser.close()
     if not portal:
         raise SystemExit(f"No adapter for {urlsplit(url).hostname}.")
     resume, cover = find_files(folder) if folder else (None, None)
@@ -94,13 +106,17 @@ def resolve(url, folder):
     else:
         resume = Path(settings["resume"]) if settings.get("resume") else resume
         cover = Path(settings["cover"]) if settings.get("cover") else cover
+    if portal == "workday" and settings:
+        resume = Path(settings["resume"]) if settings.get("resume") else None
+        cover = Path(settings["cover"]) if settings.get("cover") else None
     expected = settings.get("resume_sha256")
     if expected:
         if not resume or not resume.is_file():
             raise SystemExit("Session resume file is missing.")
         if sha256_of(resume) != expected:
             raise SystemExit("Resume changed since the audit (SHA-256 mismatch). Rebuild and audit it again.")
-    return {"url": url, "portal": portal, "resume": resume, "cover": cover}
+    return {"url": url, "portal": portal, "resume": resume, "cover": cover,
+            "attachment_manifest": settings if portal == "workday" and settings else None}
 
 
 def driver_args(job):
@@ -147,17 +163,19 @@ def choose_last_application(page):
     return True, "Clicked the uniquely matched last application control."
 
 
-def open_job(job):
+def open_job(job, dry=False):
     """Open one tab and return its stable target id after the posting navigation."""
     notes = []
     last_used = reuse.UNKNOWN
-    url = job["url"].rstrip("/") + APPLY_PATH_SUFFIX.get(job["portal"], "")
+    url = job["url"] if dry else job["url"].rstrip("/") + APPLY_PATH_SUFFIX.get(job["portal"], "")
     with sync_playwright() as p:
         browser = p.chromium.connect_over_cdp(workday_run.CDP_URL)
         try:
             page = browser.contexts[0].new_page()
             page.goto(url, wait_until="domcontentloaded", timeout=60000)
             page.wait_for_timeout(PAGE_WAIT_MS)
+            if dry:
+                return {NOTES_KEY: notes, URL_KEY: page.url, TARGET_KEY: target_id_of(page), reuse.LAST_USED_KEY: last_used}
             if job["portal"] == "icims":
                 notes.append(click_icims_apply(page))
             for selector in APPLY_CLICK.get(job["portal"], []):
@@ -216,19 +234,19 @@ def login_step(job, wait=time.sleep, clock=time.monotonic):
 
 def run(url=None, folder=None, open_page=True, launch=False, dry=False, batch=False, target_id=None, report_path=None, fresh=False):
     """Returns the exit code: 0 Review reached, 2 human gate, 3 failure; writes data/runs/<id>.json."""
-    job = resolve(url, folder)
+    job = resolve(url, folder, target_id=target_id)
     job[reuse.MODE_KEY] = reuse.REUSE if job["portal"] == "workday" and not fresh else reuse.FRESH
     last_used = reuse.UNKNOWN
     if target_id:
         job[TARGET_KEY] = target_id
     notes = []
     try:
-        if launch and not dry:
+        if launch:
             notes.append("edge: " + ("started" if edge_launch.ensure_edge()["started"] else "already running"))
         lock = file_lock(LOGIN_LOCK_PREFIX + (urlsplit(job[URL_KEY]).hostname or "").lower()) if batch and not dry else contextlib.nullcontext()
         with lock:
-            if open_page and not dry:
-                opened = open_job(job)
+            if open_page and (not dry or launch):
+                opened = open_job(job, dry=True) if dry else open_job(job)
                 if isinstance(opened, dict):
                     notes += opened[NOTES_KEY]
                     job.update({URL_KEY: opened[URL_KEY], TARGET_KEY: opened[TARGET_KEY]})
@@ -243,6 +261,7 @@ def run(url=None, folder=None, open_page=True, launch=False, dry=False, batch=Fa
         if job.get(TARGET_KEY):
             extra += ["--target-id", job[TARGET_KEY]]
         args = workday_run.parse_args(driver_args(job) + extra + (["--dry"] if dry else []) + (["--batch"] if batch else []))
+        args.attachment_manifest = job.get("attachment_manifest")
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer):
             report = workday_run.execute(args)

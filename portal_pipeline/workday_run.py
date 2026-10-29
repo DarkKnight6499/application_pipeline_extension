@@ -15,6 +15,7 @@ from uuid import uuid4
 import oracle_attach
 import oracle_history
 import single_upload
+import workday_attachments
 from urllib.parse import urlsplit
 
 from browser_target import select_tab, sync_playwright
@@ -24,6 +25,7 @@ import answer_memory
 import failure_telemetry as telemetry
 import picker_aliases
 import reuse_mode as reuse
+import successfactors
 from portal_profile import resolve_profile
 
 # Config
@@ -42,6 +44,8 @@ GREENHOUSE_UPLOAD_SELECTORS = {"resume": "form#application-form input#resume", "
 SINGLE_PAGE_HOSTS = {"greenhouse": "greenhouse.io", "lever": "lever.co", "ashby": "ashbyhq.com", "smartrecruiters": "smartrecruiters.com", "eightfold": "eightfold.ai", "icims": "icims.com", "taleo": "taleo.net"}
 LEVER_EXTRA_SCRIPTS = ["adapters/lever.js", "lever-live.js"]
 LEVER_GLOBALS = ["PortalLeverAdapter"]
+SUCCESSFACTORS_EXTRA_SCRIPTS = ["successfactors-detection.js", "adapters/successfactors.js", "successfactors-live.js"]
+SUCCESSFACTORS_GLOBALS = ["PortalSuccessFactorsAdapter", "PortalSuccessFactorsDetection"]
 FRAME_PORTALS = {"icims"}
 FORM_FRAME_JS = "() => [...document.querySelectorAll('input,select,textarea')].filter(i => i.type !== 'hidden' && i.getClientRects().length).length"
 PORTAL = {"frame": False, "oracle": False, "greenhouse": False, "lever": False, "single": False, "host": ""}
@@ -68,7 +72,18 @@ PAGE_SETTLE_SECONDS = 4
 NEXT_TIMEOUT_SECONDS = 15
 NEXT_POLL_SECONDS = 0.1
 UPLOAD_CONFIRM_SECONDS = 15
-RERENDER_RETRY_CAP = 1
+RERENDER_RETRY_CAP = 2
+TRANSIENT_RETRY_CAP = 2
+FORM_READY_SECONDS = 5
+FORM_STABLE_SECONDS = 0.4
+FORM_POLL_SECONDS = 0.1
+KNOWN_FIELDLESS_STEPS = frozenset()
+FORM_TITLE_JS = r"""([selector, expected]) => {
+  const node = document.querySelector(selector);
+  return !!node && node.getClientRects().length > 0 && !node.closest('[hidden],[aria-hidden=true]')
+    && node.textContent.replace(/\s+/g, ' ').trim() === expected
+    && !document.querySelector('[aria-busy=true]');
+}"""
 REPORT_SECRETS = ContextVar("report_secrets", default=None)
 RUN_MODE = ContextVar("run_mode", default=None)
 GAP_POLL_SECONDS = 3
@@ -77,6 +92,7 @@ STEP_PATTERN = re.compile(r"step (\d+) of (\d+)")
 RUNS_DIR = HERE / "data" / "runs"
 EXIT_REVIEW, EXIT_GATE, EXIT_FAILURE = 0, 2, 3  # Review reached, human gate, failure
 REPORT_LABEL_LIMIT = 60
+STOP_REASON_LIMIT = telemetry.TEXT_LIMIT * telemetry.FIELD_LIMIT
 SUMMARY_DIFF_LIMIT = 10
 FILL_OK_STATUSES = {"filled", "preserved", "skipped_existing"}
 FILL_GATE_STATUSES = {"blocked_by_human_gate", "refused"}
@@ -103,7 +119,9 @@ PAGE_STATE_JS = r"""() => {
     document.getElementById(dialog.getAttribute('aria-labelledby'))?.textContent || dialog.querySelector('h1,h2,h3')?.textContent || '');
   return {dialog: dialog ? {title: scrub(title).slice(0, 120), text: scrub(dialog.innerText || dialog.textContent).slice(0, 120)} : null,
     inline_errors: [...document.querySelectorAll('[role=alert],[data-automation-id*=error],[id$="-error"]')]
-      .filter(visible).slice(0, 10).map(node => scrub(node.innerText || node.textContent)).filter(Boolean)};
+      .filter(visible).map(node => node.innerText || node.textContent)
+      .filter(text => !globalThis.PortalEngine?.isInlineError || PortalEngine.isInlineError(text))
+      .slice(0, 10).map(scrub).filter(Boolean)};
 }"""
 REVIEW_ATTACHMENTS_JS = r"""() => {
   const names = new Set();
@@ -141,31 +159,40 @@ class RunReport:
         self._secrets = REPORT_SECRETS.get() if REPORT_SECRETS.get() is not None else set()
         self.data = {"started": time.strftime("%Y-%m-%dT%H:%M:%S"), "portal": portal, "dry": dry, "pages": [],
                      "stop_reason": None, "exit_code": None, "review_attachments": None, UNANSWERED_KEY: [],
+                     "attachment_check": {slot: {"expected_bytes": None, "seen_kb": None, "status": "not_checked"}
+                                          for slot in UPLOAD_SLOTS},
                      telemetry.REVISION_KEY: telemetry.source_revision(HERE),
                      reuse.MODE_KEY: mode or (reuse.REUSE if portal == "workday" else reuse.FRESH),
                      reuse.LAST_USED_KEY: reuse.UNKNOWN}
 
     def record_unanswered(self, fields, url):
+        from learning_queue import eligible
         entries = []
         for field in unanswered(fields):
-            if field.get(RECORD_KEY) is not None or field.get(BLOCKED_KEY) or answer_memory.is_protected(field):
+            if not eligible(field, include_optional=True):
                 continue
             options = [str(option.get(LABEL_KEY, "") if isinstance(option, dict) else option)[:QUEUE_LABEL_LIMIT]
                        for option in field.get(OPTIONS_KEY, [])][:QUEUE_OPTIONS_LIMIT]
             entries.append({LABEL_KEY: telemetry.clean_text(field[LABEL_KEY], report_secrets(), QUEUE_LABEL_LIMIT), TYPE_KEY: field[TYPE_KEY],
                             OPTIONS_KEY: [telemetry.clean_text(option, report_secrets(), QUEUE_LABEL_LIMIT) for option in options],
-                            HOST_KEY: urlsplit(url).hostname or "", REQUIRED_KEY: True})
+                            HOST_KEY: urlsplit(url).hostname or "", REQUIRED_KEY: bool(field.get(REQUIRED_KEY)),
+                            "visible": field.get("visible", True) is True})
         self.data[UNANSWERED_KEY] = entries[:telemetry.FIELD_LIMIT]
 
     def new_page(self, title):
-        event = {"title": telemetry.clean_text(title, report_secrets()), "fields": 0, "filled": 0, "pending_required": [], "blocked_gates": [], "uploads": [], "learned": 0,
+        event = {"title": telemetry.clean_text(title, report_secrets()), "fields": 0, "filled": 0, "pending_required": [], "manual_required": [], "blocked_gates": [], "uploads": [], "learned": 0,
                  telemetry.FIELD_RECORDS_KEY: [], reuse.KEPT_KEY: 0, reuse.DIFF_KEY: 0, reuse.FORCED_KEY: 0,
                  reuse.DIFFS_KEY: [], reuse.EXTRAS_KEY: []}
         self.data["pages"].append(event)
         return event
 
     def finish_report(self, reason, code):
-        self.data.update(stop_reason=telemetry.clean_text(reason, report_secrets()), exit_code=code)
+        limit = STOP_REASON_LIMIT if code == EXIT_GATE else telemetry.TEXT_LIMIT
+        failures = self.data.get("failure_telemetry", [])
+        reason = (workday_attachments.mismatch_message(failures[-1])
+                  if code == EXIT_GATE and failures and failures[-1].get("kind") == "attachment_mismatch"
+                  else telemetry.clean_text(reason, report_secrets(), limit))
+        self.data.update(stop_reason=reason, exit_code=code)
         return self
 
     def write(self, directory=None, path=None):
@@ -190,6 +217,13 @@ class RunReport:
             lines.append(f"  {difference[reuse.LABEL_KEY]} ({difference[reuse.TYPE_KEY]}): {difference[reuse.PREVIEW_KEY]}")
         if len(differences) > SUMMARY_DIFF_LIMIT:
             lines.append("  More differences are recorded in the per-job report.")
+        if self.data["exit_code"] == EXIT_GATE:
+            for page in pages:
+                for label in dict.fromkeys(page.get("manual_required", page.get("blocked_gates", [])) + page.get("pending_required", [])):
+                    lines.append(f"  Manual: {page['title']}: {label}")
+        for slot, check in self.data.get("attachment_check", {}).items():
+            seen = f"{check['seen_kb']} KB" if check.get("seen_kb") is not None else "missing/unknown"
+            lines.append(f"  Attachment {slot}: expected {check['expected_bytes']} bytes, seen {seen}, {check['status']}.")
         return "\n".join(lines)
 
 
@@ -215,7 +249,7 @@ def page_state(page):
     secrets = report_secrets()
     dialog = state.get("dialog")
     return {"title": telemetry.clean_text(step_title(page), secrets), "url": telemetry.safe_url(page.url, secrets),
-            "inline_errors": [telemetry.clean_text(text, secrets) for text in state.get("inline_errors", [])[:telemetry.ERROR_LIMIT]],
+            "inline_errors": [telemetry.clean_text(text, secrets) for text in state.get("inline_errors", []) if telemetry.is_inline_error(text)][:telemetry.ERROR_LIMIT],
             "dialog": {key: telemetry.clean_text(dialog.get(key), secrets, telemetry.DIALOG_LIMIT) for key in ("title", "text")} if dialog else None}
 
 
@@ -243,7 +277,8 @@ def portal_settings():
 
 def settings_for(portal):
     return {"oracle": portal == "oracle", "greenhouse": portal == "greenhouse", "lever": portal == "lever",
-            "frame": portal in FRAME_PORTALS, "single": portal in SINGLE_PAGE_HOSTS and portal not in FRAME_PORTALS,
+            "successfactors": portal == "successfactors",
+            "frame": portal in FRAME_PORTALS, "single": portal == "successfactors" or portal in SINGLE_PAGE_HOSTS and portal not in FRAME_PORTALS,
             "host": SINGLE_PAGE_HOSTS.get(portal, "")}
 
 
@@ -260,6 +295,11 @@ def is_workday_url(url):
     host = parts.hostname or ""
     if parts.scheme != "https":
         return False
+    if portal_settings().get("successfactors"):
+        # Custom career sites hand off to the vendor host after sign-in.
+        bound = portal_settings()["host"]
+        vendor = any(host == domain or host.endswith("." + domain) for domain in successfactors.VENDOR_DOMAINS)
+        return host == bound if bound and not vendor else (vendor or successfactors.matches_url(url))
     mark = portal_settings()["host"] or (ORACLE_HOST_MARK if portal_settings()["oracle"] else HOST_MARK)
     return host == mark or host.endswith("." + mark)
 
@@ -274,6 +314,8 @@ def is_next_label(text):
 
 def page_of(browser, url=None, target_id=None):
     tab = select_tab(browser, url, target_id, predicate=is_workday_url)
+    if portal_settings().get("successfactors") and not successfactors.matches_page(tab):
+        raise DriverStopped("The selected page has no confirmed SuccessFactors signals. Continue manually.")
     if portal_settings()["frame"]:
         best = max(tab.frames, key=lambda frame: frame.evaluate(FORM_FRAME_JS))
         return best
@@ -281,10 +323,10 @@ def page_of(browser, url=None, target_id=None):
 
 
 def inject(page):
-    page.evaluate("names => names.forEach(name => { delete globalThis[name]; })", GLOBALS + ORACLE_GLOBALS + GREENHOUSE_GLOBALS + LEVER_GLOBALS)
+    page.evaluate("names => names.forEach(name => { delete globalThis[name]; })", GLOBALS + ORACLE_GLOBALS + GREENHOUSE_GLOBALS + LEVER_GLOBALS + SUCCESSFACTORS_GLOBALS)
     in_frame = hasattr(page, "page")  # iframes share their parent CDP session, so they take the plain evaluate path
     session = None if in_frame else page.context.new_cdp_session(page)
-    for name in SCRIPTS + (ORACLE_EXTRA_SCRIPTS if portal_settings()["oracle"] else []) + (GREENHOUSE_EXTRA_SCRIPTS if portal_settings()["greenhouse"] else []) + (LEVER_EXTRA_SCRIPTS if portal_settings()["lever"] else []):
+    for name in SCRIPTS + (ORACLE_EXTRA_SCRIPTS if portal_settings()["oracle"] else []) + (GREENHOUSE_EXTRA_SCRIPTS if portal_settings()["greenhouse"] else []) + (LEVER_EXTRA_SCRIPTS if portal_settings()["lever"] else []) + (SUCCESSFACTORS_EXTRA_SCRIPTS if portal_settings().get("successfactors") else []):
         source = (EXTENSION / name).read_text(encoding="utf-8")
         if in_frame:
             page.evaluate("() => {" + source + chr(10) + "}")
@@ -460,6 +502,37 @@ def scan(page, profile, bindings=None, mode=None):
     return page.evaluate("([profile, bindings]) => PortalEngine.scan(profile, {bindings})", [profile, bindings or {}])
 
 
+def form_title_rendered(page, title):
+    return page.evaluate(FORM_TITLE_JS, [STEP_SELECTOR, title]) is True
+
+
+def wait_form_ready(page, profile, title, event):
+    deadline = time.monotonic() + FORM_READY_SECONDS
+    stable_since, previous = None, None
+    while True:
+        try:
+            fields = scan(page, profile)
+            rendered = step_title(page) == title and form_title_rendered(page, title)
+        except Exception as error:
+            fields, rendered = [], False
+            event["scan_observation_error"] = type(error).__name__
+        now = time.monotonic()
+        signature = (title, len(fields)) if rendered else None
+        if signature is None or signature != previous:
+            stable_since = now
+        previous = signature
+        stable = signature is not None and now - stable_since >= FORM_STABLE_SECONDS
+        event["scan_readiness"] = {"fields": len(fields), "title_rendered": rendered, "stable": stable}
+        if stable and fields:
+            return fields
+        if now >= deadline:
+            if stable and not fields and title in KNOWN_FIELDLESS_STEPS:
+                event["known_fieldless"] = True
+                return fields
+            raise DriverStopped(f"Form fields or title did not settle on {telemetry.clean_text(title, report_secrets())}. Rescan before Next.")
+        time.sleep(min(FORM_POLL_SECONDS, max(0, deadline - now)))
+
+
 CLICK_ADD_JS = """heading => {
   const buttons = [...document.querySelectorAll('button[data-automation-id="add-button"]')];
   const owns = (button) => { for (let node = button.parentElement, depth = 0; node && depth < 8; node = node.parentElement, depth += 1) {
@@ -494,6 +567,8 @@ def row_ids(fields, group):
 
 def ensure_rows(page, profile):
     """Add only missing records in reuse mode; fresh mode retains the original row count rule."""
+    if portal_settings().get("successfactors"):
+        return True
     if portal_settings()["oracle"]:
         return True  # Oracle history sections have no Workday Add buttons
     if reuse_active():
@@ -537,6 +612,8 @@ def ensure_rows(page, profile):
 
 def bind_rows(page, profile):
     """Bind by identity in reuse mode and by page order in fresh mode."""
+    if portal_settings().get("successfactors"):
+        return {}
     fields = scan(page, profile)
     if reuse_active():
         try:
@@ -569,8 +646,29 @@ def prepared(fields):
 
 
 def unanswered(fields):
-    """Required, still-empty, unblocked fields after filling: the ones a person must answer."""
-    return [f for f in fields if f["required"] and not f["blocked"] and f["current"] in ("", False) and f["type"] != "file"]
+    """Required or visible empty questions remain pending until answered."""
+    return [f for f in fields if (f.get("required") or f.get("visible", True)) and not f.get("blocked")
+            and not answer_memory.is_protected(f) and f.get("current") in ("", False, None)
+            and f.get("type") != "file" and not f.get("disabled")]
+
+
+def record_pending(event, fields):
+    from learning_queue import eligible
+    gaps = unanswered(fields)
+    manual_fields = [field for field in fields if field.get("blocked") or answer_memory.is_protected(field)
+                     or field in gaps and field.get("record") is None and not eligible(field, include_optional=True)]
+    manual = [field for field in manual_fields if field.get("required")
+              and not field.get("has_value", not reuse.empty(field.get("current")))
+              and field.get("type") != "file" and not field.get("disabled")]
+    event["pending_required"] = [telemetry.clean_text(field["label"], report_secrets(), telemetry.TEXT_LIMIT)
+                                 for field in gaps if field not in manual_fields][:telemetry.FIELD_LIMIT]
+    event["manual_required"] = [telemetry.clean_text(field["label"], report_secrets(), telemetry.TEXT_LIMIT)
+                                for field in manual][:telemetry.FIELD_LIMIT]
+
+
+def pending_stop(event):
+    labels = list(dict.fromkeys(event.get("pending_required", []) + event.get("manual_required", [])))
+    return f"Manual answers required on {event['title']}: " + "; ".join(labels)
 
 
 def learnable(fields):
@@ -623,6 +721,7 @@ def fill_page(page, profile, dry, event=None):
         reuse.record_classifications(event, fields, force_ids)
         todo = reuse_todo(todo, preserved, force_ids, completed)
     event.update(fields=len(fields), blocked_gates=[telemetry.clean_text(f["label"], report_secrets(), REPORT_LABEL_LIMIT) for f in fields if f["blocked"]][:REPORT_LABEL_LIMIT])
+    record_pending(event, fields)
     print(f"  fields {len(fields)} | proposals {len(todo)} | blocked {sum(f['blocked'] for f in fields)}")
     if dry:
         for f in fields:
@@ -630,6 +729,7 @@ def fill_page(page, profile, dry, event=None):
         return fields
     fill_script = FILL_JS if plain_workday() else FILL_JS_DIALOG_ONLY
     retries = 0
+    transient_retries = 0
     for round_number in range(FILL_ROUNDS):
         if not todo:
             break
@@ -676,7 +776,9 @@ def fill_page(page, profile, dry, event=None):
             kind = failed.get("failure_kind") or failed.get("reason_code") or failed["status"]
             message = f"Field {telemetry.clean_text(field['label'], secrets)!r} ({telemetry.clean_text(kind)}). Continue manually; see field_results."
             raise (DriverStopped if telemetry.failure_action(failed) == "human" else DriverFailed)(message)
-        if bad and retries >= RERENDER_RETRY_CAP:
+        transient = bool(bad) and all((result.get("failure_kind") or result.get("reason_code")) in telemetry.TRANSIENT_FAILURES for result in bad)
+        retry_cap = min(TRANSIENT_RETRY_CAP, RERENDER_RETRY_CAP) if transient else RERENDER_RETRY_CAP
+        if bad and transient_retries + retries >= retry_cap:
             event[telemetry.FILL_STOP_KEY] = "retry_cap"
             raise DriverFailed("Rerender retry cap reached. Review field_results manually.")
         if not counts.get("filled") and not bad:
@@ -691,11 +793,23 @@ def fill_page(page, profile, dry, event=None):
         if bad:
             progressed = any(field["id"] in expected_ids and field["current"] not in ("", False) for field in fields
                              if next((old["current"] in ("", False) for old in todo if old["id"] == field["id"]), False))
-            if not progressed or not telemetry.row_identity_stable(previous, fields):
+            stable = telemetry.row_identity_stable(previous, fields)
+            fresh = {field["id"]: field for field in fields}
+            safe_answers = all(field["id"] in fresh and not fresh[field["id"]].get("blocked")
+                               and not fresh[field["id"]].get("disabled")
+                               and field.get("proposal") == fresh[field["id"]].get("proposal") for field in todo)
+            if transient:
+                stable = stable and len(previous) == len(fields)
+                safe_answers = safe_answers and all(field.get("current") == fresh.get(field["id"], {}).get("current")
+                                                     for field in previous if field["id"] not in expected_ids)
+            if not stable or not safe_answers or not transient and not progressed:
                 event[telemetry.FILL_STOP_KEY] = "unstable_identity_or_no_progress"
                 raise DriverFailed("Rerender has no verified progress or stable row identity. Review field_results manually.")
-            retries += 1
-            event[telemetry.RETRY_KEY] = retries
+            if transient:
+                transient_retries += 1
+            else:
+                retries += 1
+            telemetry.record_retry(event, bad, transient_retries + retries, secrets)
         todo = remaining
     else:
         if todo:
@@ -722,18 +836,20 @@ def wait_for_person(page, profile):
     return False
 
 
+def verify_workday_attachments(page, args, report, event=None, review=False):
+    try:
+        workday_attachments.verify(page, args, report, event, review=review,
+                                   guard=lambda: require_writable_step(page), boundary_js=PAGE_BOUNDARY_JS)
+    except workday_attachments.AttachmentMismatch as error:
+        raise DriverStopped(str(error)) from error
+
+
 def check_review(page, args, report):
-    """Read-only: compare attachment names on the Review page with the files this run was given."""
-    expected = [Path(path).name for path in (args.resume, args.cover) if path]
-    if not expected or not plain_workday():
+    """Require attachment names and rounded sizes to match before reporting Review success."""
+    if not plain_workday():
         return
-    result = review_attachment_check(page, expected)
-    for key in ("expected", "found", "missing", "unexpected"):
-        if len(result[key]) > telemetry.FIELD_LIMIT:
-            result["truncated"] = True
-        result[key] = [telemetry.clean_text(name, report_secrets()) for name in result[key][:telemetry.FIELD_LIMIT]]
-    report.data["review_attachments"] = result
-    print("  Review attachments:", "match" if result["ok"] else f"MISMATCH missing {result['missing']} unexpected {result['unexpected']}")
+    verify_workday_attachments(page, args, report, review=True)
+    print("  Review attachments: match")
 
 
 def record_upload(event, file_name, path, status):
@@ -742,16 +858,17 @@ def record_upload(event, file_name, path, status):
 
 def drive(page, args, report):
     """Walk pages until Review or a stop; every stop is a DriverStopped the caller turns into a report."""
+    transition_title = None
     for _ in range(MAX_PAGES):
-        title = step_title(page)
+        title = transition_title or step_title(page)
         event = report.new_page(title)
         if dialog_open(page):
             event[telemetry.NEXT_KEY] = {"reason": "dialog_opened", "after": page_state(page)}
             raise DriverStopped("A dialog is open. Stopping so nothing is discarded or submitted.")
         print(title)
         if FINAL_STEP_PATTERN.search(title) and not args.dry:
-            print("  Review page reached. Nothing is filled here. Check it and submit yourself.")
             check_review(page, args, report)
+            print("  Review page reached. Nothing is filled here. Check it and submit yourself.")
             raise ReviewReached()
         if not title and plain_workday() and not args.dry:
             raise DriverStopped("The current step is unknown. Continue manually.")
@@ -766,17 +883,31 @@ def drive(page, args, report):
             if not result.ok:
                 raise DriverStopped(f"Oracle history: {result.reason}; field={result.field}")
         try:
+            if transition_title and plain_workday() and not FINAL_STEP_PATTERN.search(title):
+                wait_form_ready(page, profile, title, event)
+            if not args.dry and plain_workday() and (args.resume or args.cover):
+                verify_workday_attachments(page, args, report, event)
             fields = run_page(page, profile, args.dry, event)
         except DriverStopped:
             try:
                 state = page_state(page)
                 if state["dialog"]:
                     event[telemetry.NEXT_KEY] = {"reason": "dialog_opened", "after": state}
-                report.record_unanswered(scan(page, profile, bind_rows(page, profile)), page.url)
+                remaining = scan(page, profile, bind_rows(page, profile))
+                report.record_unanswered(remaining, page.url)
+                record_pending(event, remaining)
             except Exception:
                 pass
             raise
         report.record_unanswered(fields, page.url)
+        record_pending(event, fields)
+        if not args.dry and not fields and plain_workday() and not event.get("known_fieldless"):
+            wait_form_ready(page, profile, title, event)
+            fields = run_page(page, profile, args.dry, event)
+            if not fields and not event.get("known_fieldless"):
+                raise DriverStopped(f"No form fields scanned on {event['title']}. Continue manually.")
+            report.record_unanswered(fields, page.url)
+            record_pending(event, fields)
         if not args.dry:
             if portal_settings()["oracle"]:
                 result = oracle_attach.apply(page, args.resume, args.cover, args.no_cover)
@@ -784,13 +915,13 @@ def drive(page, args, report):
                     print("  attach:", line)
                 if not result.ok:
                     raise DriverStopped(f"Oracle attachment: {result.reason}; field={result.field}")
-            if portal_settings()["single"]:
+            if portal_settings()["single"] and not portal_settings().get("successfactors"):
                 for slot, path in (("resume", args.resume), ("cover", args.cover)):
                     line = single_upload.upload(page, slot, path)
                     if line:
                         print("  upload:", line)
                         record_upload(event, Path(path).name, path, line)
-            if not portal_settings()["oracle"] and not portal_settings()["single"]:
+            if not portal_settings()["oracle"] and not portal_settings()["single"] and not (plain_workday() and (args.resume or args.cover)):
                 for slot in (UPLOAD_SLOTS if reuse_active() else UPLOAD_SLOTS[:1]):
                     try:
                         record = upload_resume(page, getattr(args, slot), event, replace_mode=reuse_active(), slot=slot)
@@ -806,17 +937,27 @@ def drive(page, args, report):
         if args.dry:
             raise ReviewReached("Dry run finished; nothing was written.")
         latest = scan(page, profile, bind_rows(page, profile)) if getattr(args, "batch", False) else fields
-        batch_gaps = getattr(args, "batch", False) and any(
-            field.get(REQUIRED_KEY) and field.get("current") in ("", False) and field.get(TYPE_KEY) != "file" for field in latest)
+        if not latest and plain_workday():
+            latest = wait_form_ready(page, profile, title, event)
+        record_pending(event, latest)
+        if event["manual_required"]:
+            raise DriverStopped(pending_stop(event))
+        batch_gaps = getattr(args, "batch", False) and bool(unanswered(latest))
         if batch_gaps or not wait_for_person(page, profile):
             remaining = scan(page, profile)
             report.record_unanswered(remaining, page.url)
-            event["pending_required"] = [telemetry.clean_text(f["label"], report_secrets(), REPORT_LABEL_LIMIT) for f in unanswered(remaining)][:REPORT_LABEL_LIMIT]
-            raise DriverStopped("Required answers are still missing. Stopping here for you.")
-        report.record_unanswered([], page.url)
+            record_pending(event, remaining)
+            raise DriverStopped(pending_stop(event))
         event["learned"] = learn(page, profile, fields)
         if event["learned"]:
             print(f"  learned {event['learned']} answer(s)")
+        resolved = scan(page, profile)
+        if not resolved and plain_workday():
+            resolved = wait_form_ready(page, profile, title, event)
+        record_pending(event, resolved)
+        report.record_unanswered(resolved, page.url)
+        if event["pending_required"] or event["manual_required"]:
+            raise DriverStopped(pending_stop(event))
         if portal_settings()["single"]:
             raise ReviewReached("Single-page form filled; submit stays manual.")
         if dialog_open(page):
@@ -840,6 +981,7 @@ def drive(page, args, report):
         event[telemetry.NEXT_KEY] = outcome
         if outcome["reason"] != "step_changed":
             raise DriverStopped(f"Next stopped: {outcome['reason']}. See next_outcome and continue manually.")
+        transition_title = outcome["after"]["title"]
 
 
 def parse_args(argv=None):
@@ -847,7 +989,7 @@ def parse_args(argv=None):
     parser.add_argument("--resume", type=Path, help="Reviewed resume file to attach on the upload step.")
     parser.add_argument("--cover", type=Path, help="Reviewed cover letter; Workday reuse and Oracle can replace an existing attachment.")
     parser.add_argument("--no-cover", action="store_true", help="Oracle: remove any attached cover letter.")
-    parser.add_argument("--portal", choices=["workday", "oracle", *SINGLE_PAGE_HOSTS], default="workday")
+    parser.add_argument("--portal", choices=["workday", "oracle", "successfactors", *SINGLE_PAGE_HOSTS], default="workday")
     parser.add_argument("--dry", action="store_true", help="Scan and print proposals only; write and click nothing.")
     parser.add_argument("--fresh", action="store_true", help="Use the original empty-form behavior for Workday.")
     parser.add_argument("--job-url", help="Select the tab by normalized job URL.")
@@ -861,6 +1003,8 @@ def execute(args, url=None, target_id=None):
     """Run once and return its report; the caller persists the report."""
     getattr(sys.stdout, "reconfigure", lambda **_: None)(errors="replace")  # page labels can hold symbols the console codepage lacks
     token = PORTAL_CONTEXT.set(settings_for(args.portal))
+    if args.portal == "successfactors":
+        portal_settings()["host"] = urlsplit(url or getattr(args, "job_url", None) or "").hostname or ""
     secrets_token = REPORT_SECRETS.set(set())
     mode = reuse.FRESH if getattr(args, "fresh", False) or args.portal != "workday" else reuse.REUSE
     mode_token = RUN_MODE.set(mode)
@@ -869,7 +1013,13 @@ def execute(args, url=None, target_id=None):
         with sync_playwright() as p:
             browser = p.chromium.connect_over_cdp(CDP_URL)
             try:
-                drive(page_of(browser, url or getattr(args, "job_url", None), target_id or getattr(args, "target_id", None)), args, report)
+                page = page_of(browser, url or getattr(args, "job_url", None), target_id or getattr(args, "target_id", None))
+                try:
+                    drive(page, args, report)
+                except ReviewReached:
+                    if not args.dry and report.data["review_attachments"] is None:
+                        check_review(page, args, report)
+                    raise
             finally:
                 browser.close()
         raise DriverStopped("Page limit reached.")

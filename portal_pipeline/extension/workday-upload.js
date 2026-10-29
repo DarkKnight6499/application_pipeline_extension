@@ -14,6 +14,7 @@
   const DELETE_LABEL = /^(?:delete|remove)(?:\s+(?:file|attachment|resume|cv|cover\s*letter))?(?:\s+.+\.(?:pdf|docx?|rtf|txt|odt))?$/i;
   const UNSAFE_DELETE_LABEL = /submit|finish|sign|attest|certif|login|captcha|verif/i;
   const FILENAME_PATTERN = /[^\s"'()<>:\\\/]+\.(?:pdf|docx?|rtf|txt|odt)\b/gi;
+  const ITEM_SELECTOR = '[data-automation-id="file-upload-item"]';
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
   const escapeRegExp = text => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -25,23 +26,44 @@
     const size = SIZE_PATTERN.exec(text);
     const unit = size?.[2].toLowerCase();
     const shown = size ? Number(size[1]) * (unit === "mb" ? 1048576 : unit.startsWith("b") ? 1 : 1024) : null;
-    const slack = unit === "mb" ? 1048576 : unit?.startsWith("b") ? 0 : 1024;
-    const mismatch = exact && shown !== null && Math.abs(shown - byteLength) > slack;
+    const precision = size?.[1].split(".")[1]?.length || 0;
+    const slack = unit?.startsWith("b") ? 0 : (unit === "mb" ? 1048576 : 1024) * 0.5 * 10 ** -precision;
+    const mismatch = exact && shown !== null && (slack === 0 ? shown !== byteLength : byteLength < shown - slack || byteLength >= shown + slack);
     const rejected = [...container.querySelectorAll(REJECTION_SELECTOR)].some(node =>
       node.getClientRects().length && !node.closest('[hidden],[aria-hidden=true]') && node.textContent.trim());
-    return {confirmed: exact && shown !== null && !mismatch && !rejected, size_mismatch: mismatch, rejected,
+    const ambiguous = container.querySelectorAll(ITEM_SELECTOR).length > 1;
+    return {confirmed: exact && shown !== null && !mismatch && !rejected && !ambiguous, size_mismatch: mismatch, rejected, ambiguous,
       observed_filename: exact ? name.slice(0, NAME_LIMIT) : (text.match(/[^\s"'()<>:\\\/]+\.(?:pdf|docx?|rtf|txt|odt)\b/i)?.[0] || "").slice(0, NAME_LIMIT), observed_size: shown};
   }
 
-  function find(root = document) {
+  function owner(node) {
+    let fallback = null;
+    for (let parent = node.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
+      if (!parent.querySelectorAll) continue;
+      if (parent.querySelectorAll('input[type="file"]').length > 1) break;
+      const clone = parent.cloneNode?.(true);
+      clone?.querySelectorAll(ITEM_SELECTOR + ',input,button,[role="button"],script,style').forEach(child => child.remove());
+      const text = [parent.getAttribute("aria-label"), clone ? clone.textContent : parent.textContent].filter(Boolean).join(" ").trim();
+      const identity = parent.getAttribute("data-automation-id") || "";
+      if (/^formField-(coverLetter|attachments)$/i.test(identity) || /\bcover\s*letter\b/i.test(text) || /^attachments\b/i.test(text)) return {slot: "cover", container: parent};
+      if (/^formField-resume$/i.test(identity) || SLOT_PATTERNS.resume.test(text)) return {slot: "resume", container: parent};
+      if (!fallback && /\bupload a file\b/i.test(text)) fallback = {slot: "resume", container: parent};
+    }
+    return fallback;
+  }
+
+  function find(root = document, slot = "resume") {
     const inputs = root.querySelectorAll(INPUT_SELECTOR);
+    const owned = [...inputs].filter(input => owner(input)?.slot === slot);
+    if (owned.length) return owned.length === 1 ? owned[0] : null;
     return inputs.length === 1 ? inputs[0] : null;
   }
 
   function refindContainer(previous, slot = "resume") {
     const sameSlot = node => node && !(slot === "resume" ? /cover letter/i.test(node.textContent) && !/(resume|cv)/i.test(node.textContent) : !SLOT_PATTERNS.cover.test(node.textContent)) &&
       (previous.id ? node.id === previous.id : node.getAttribute("data-automation-id") === previous.getAttribute("data-automation-id"));
-    const live = find()?.parentElement?.closest(CONTAINER_SELECTOR);
+    const input = find(document, slot);
+    const live = owner(input || {})?.container || input?.parentElement?.closest(CONTAINER_SELECTOR);
     if (sameSlot(live)) return live;
     if (previous.isConnected) return previous;
     const candidates = [...document.querySelectorAll(CONTAINER_SELECTOR)].filter(sameSlot);
@@ -62,10 +84,12 @@
       throw new Error("Provide all resume attachment fields.");
     }
     const {name, mime, base64, sha256} = attachment;
-    let container = input.parentElement?.closest(CONTAINER_SELECTOR);
+    const ownership = owner(input);
+    let container = ownership?.container || input.parentElement?.closest(CONTAINER_SELECTOR);
     if (!container) throw new Error("The upload container is unavailable. Rescan before attaching.");
-    if (slot === "resume" && /cover letter/i.test(container.textContent) && !/(resume|cv)/i.test(container.textContent)) throw new Error("This looks like a cover letter upload, not the resume. Attach it manually.");
-    if (slot === "cover" && (!SLOT_PATTERNS.cover.test(container.textContent) || SLOT_PATTERNS.resume.test(container.textContent))) throw new Error("The cover letter slot is ambiguous. Attach it manually.");
+    if (ownership && ownership.slot !== slot) throw new Error("The attachment slot changed. Attach it manually.");
+    if (!ownership && slot === "resume" && /cover letter/i.test(container.textContent) && !/(resume|cv)/i.test(container.textContent)) throw new Error("This looks like a cover letter upload, not the resume. Attach it manually.");
+    if (!ownership && slot === "cover" && (!SLOT_PATTERNS.cover.test(container.textContent) || SLOT_PATTERNS.resume.test(container.textContent))) throw new Error("The cover letter slot is ambiguous. Attach it manually.");
     const bytes = Uint8Array.from(atob(base64), character => character.charCodeAt(0));
     const digest = await crypto.subtle.digest("SHA-256", bytes);
     const checksum = [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, "0")).join("");
@@ -73,14 +97,14 @@
     guard();
     if (!input.isConnected || !container.contains(input)) throw new Error("The upload input is unavailable. Rescan before attaching.");
     const files = [...input.files];
-    if (input.multiple) throw new Error("Multiple attachments require manual review.");
+    if (files.length > 1 || container.querySelectorAll(ITEM_SELECTOR).length > 1) throw new Error("Multiple attachments require manual review.");
     if (files.some(file => file.name !== name)) throw new Error("A different file is already attached. Replace it manually.");
     for (const file of files) {
       const existing = [...new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer()))].map(value => value.toString(16).padStart(2, "0")).join("");
       if (existing !== sha256) throw new Error("A different file with this name is already attached. Replace it manually.");
     }
     guard();
-    if (!input.isConnected || input.multiple || !container.contains(input) || input.files.length !== files.length ||
+    if (!input.isConnected || container.querySelectorAll(ITEM_SELECTOR).length > 1 || !container.contains(input) || input.files.length !== files.length ||
         [...input.files].some((file, index) => file !== files[index])) throw new Error("The upload input changed. Rescan before attaching.");
     const initial = observation(container, name, bytes.length);
     if (files.length && initial.confirmed) return finish(initial, "already attached");
@@ -106,7 +130,7 @@
       latest = container.isConnected ? observation(container, name, bytes.length) : {confirmed: false};
       latest.container_replaced = replaced;
       latest.stale_filename = stale;
-      if (latest.rejected || stale) return finish({...latest, confirmed: false});
+      if (latest.rejected || latest.ambiguous || stale) return finish({...latest, confirmed: false});
       if (latest.confirmed) return finish(latest, files.length ? "already attached" : "confirmed");
       const remaining = deadline - performance.now();
       if (remaining <= 0) return finish(latest);
@@ -115,6 +139,9 @@
   }
 
   function slotContainers(slot) {
+    const owned = [...new Set([...document.querySelectorAll(INPUT_SELECTOR)].map(owner)
+      .filter(state => state?.slot === slot).map(state => state.container))];
+    if (owned.length) return owned;
     const other = slot === "resume" ? "cover" : "resume";
     const candidates = [...document.querySelectorAll(SLOT_CONTAINER_SELECTOR)].filter(node => {
       const label = [node.getAttribute("aria-label"), node.textContent,
@@ -145,8 +172,9 @@
         node.type !== "submit" && node.type !== "image";
     });
     const input = inputs[0];
-    const ambiguous = inputs.length !== 1 || !input?.isConnected || input.matches(":disabled") || input.multiple ||
+    const ambiguous = inputs.length !== 1 || !input?.isConnected || input.matches(":disabled") ||
       input.getAttribute("aria-disabled") === "true" || names.length > 1 || files.length > 1 ||
+      container.querySelectorAll(ITEM_SELECTOR).length > 1 ||
       (names.length && files.length && names[0] !== files[0].name) || (attached && deletions.length !== 1) || (!attached && deletions.length);
     return {status: ambiguous ? "ambiguous" : "ready", container, input, attached, deletion: deletions[0], names, files};
   }

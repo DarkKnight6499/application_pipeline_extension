@@ -209,12 +209,15 @@ class BatchTests(unittest.TestCase):
         browser = mock.MagicMock()
         playwright = mock.MagicMock()
         playwright.chromium.connect_over_cdp.return_value = browser
+        page = mock.MagicMock()
+        page.evaluate.return_value = {"slots": {"resume": {"inputs": [], "items": []}, "cover": {"inputs": [], "items": []}},
+                                      "items": [], "unknown_inputs": []}
         seen = []
         def drive(page, args, report):
             seen.append(workday_run.portal_settings()["host"])
             raise workday_run.ReviewReached()
         with patch.object(workday_run, "sync_playwright", return_value=contextlib.nullcontext(playwright)), \
-             patch.object(workday_run, "page_of"), patch.object(workday_run, "drive", side_effect=drive):
+             patch.object(workday_run, "page_of", return_value=page), patch.object(workday_run, "drive", side_effect=drive):
             for portal in ("lever", "workday"):
                 result = workday_run.execute(workday_run.parse_args(["--portal", portal]))
                 self.assertEqual(result.data["exit_code"], 0)

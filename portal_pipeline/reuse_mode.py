@@ -25,7 +25,7 @@ PHONE_LABEL = re.compile(r"phone|mobile|telephone", re.I)
 DATE_LABEL = re.compile(r"date|available.from|birth", re.I)
 DATE_FORMATS = ("%Y-%m-%d", "%m/%d/%Y", "%m-%d-%Y", "%Y/%m/%d", "%B %d, %Y", "%b %d, %Y")
 MONTH_FORMATS = ("%Y-%m", "%m/%Y", "%B %Y", "%b %Y", "%b. %Y")
-HISTORY_IDENTITIES = {"employment": ("company", "title"), "education": ("school", "degree")}
+HISTORY_IDENTITIES = {"employment": ("company", "title"), "education": ("school",)}
 HISTORY_LABELS = {
     "company": {"company", "company name", "employer", "employer name"},
     "title": {"title", "job title", "role title", "position title"},
@@ -110,9 +110,27 @@ def record_classifications(event, fields, force_ids=()):
             event[DIFFS_KEY].append(difference(field))
 
 
+LEGAL_SUFFIXES = {"limited", "ltd", "inc", "incorporated", "llc", "corp", "corporation", "co", "company", "plc", "llp", "lp"}
+
+
+SCHOOL_STOP_WORDS = {"the", "of", "university", "college", "school", "institute", "state", "business", "and", "at"}
+
+
+def identity_value(value, key=""):
+    """Normalize a history identity; trailing legal words differ between portals and profiles (Acme Bank vs Acme Bank Limited)."""
+    words = [w.strip(".,") for w in " ".join(unicodedata.normalize("NFKC", str(value or "")).casefold().split()).split()]
+    if key == "school":
+        # Portals and profiles name the same school differently (Northfield, the State University... vs Northfield Business School).
+        core = [re.sub(r"[^a-z0-9]", "", w) for w in words if w.strip(".,") not in SCHOOL_STOP_WORDS]
+        return next((w for w in core if w), "")
+    while len(words) > 1 and words[-1] in LEGAL_SUFFIXES:
+        words.pop()
+    return normalize(" ".join(words))
+
+
 def profile_identity(profile, group, index):
     record = profile.get(group, [])[index]
-    return tuple(normalize(record.get(key) or profile.get(VALUES_KEY, {}).get(f"{group}.{index}.{key}", {}).get(VALUE_KEY, ""))
+    return tuple(identity_value(record.get(key) or profile.get(VALUES_KEY, {}).get(f"{group}.{index}.{key}", {}).get(VALUE_KEY, ""), key)
                  for key in HISTORY_IDENTITIES[group])
 
 
@@ -133,8 +151,8 @@ def history_plan(fields, profile):
             identity = []
             for key in identity_keys:
                 candidates = [member for member in members if str(member.get(KEY_KEY) or "").split(".")[-1] == key
-                              or str(member.get(LABEL_KEY) or "").strip().casefold() in HISTORY_LABELS[key]]
-                identity.append(normalize(displayed_value(candidates[0])) if len(candidates) == 1 else "")
+                              or str(member.get(LABEL_KEY) or "").strip().rstrip("*").strip().casefold() in HISTORY_LABELS[key]]
+                identity.append(identity_value(displayed_value(candidates[0]), key) if len(candidates) == 1 else "")
             matches = [index for index in range(len(profile.get(group, [])))
                        if all(identity) and tuple(identity) == profile_identity(profile, group, index)]
             if len(matches) > 1 or matches and matches[0] in used:

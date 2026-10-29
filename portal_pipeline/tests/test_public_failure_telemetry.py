@@ -164,6 +164,16 @@ class TelemetryTests(unittest.TestCase):
         record = telemetry.field_record(field(row={"id": "row", "index": 0}), {"value": SECRET}, {}, {SECRET})
         self.assertEqual(record[telemetry.ROW_BINDING_KEY]["index"], 0)
 
+    def test_ordinary_question_and_real_identity_collision(self):
+        question = "Invented required question"
+        self.assertEqual(telemetry.clean_text(question, {"SyntheticGivenName"}), question)
+        self.assertEqual(telemetry.clean_text(question, {"Invented"}), "[redacted] required question")
+        secrets = {"SyntheticGivenName", "212-555-0199", "private answer"}
+        text = "SyntheticGivenName 212-555-0199 private answer person@example.test token=synthetic-private-token " + "a1" * 20
+        cleaned = telemetry.clean_text(text, secrets)
+        for value in (*secrets, "person@example.test", "synthetic-private-token", "a1" * 20):
+            self.assertNotIn(value, cleaned)
+
     def test_cap_retains_latest_failure(self):
         event = {telemetry.FIELD_RECORDS_KEY: [{"status": "filled"}] * telemetry.FIELD_LIMIT}
         telemetry.append_results(event, [field()], [{"value": SECRET}],

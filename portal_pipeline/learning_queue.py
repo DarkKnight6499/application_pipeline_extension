@@ -20,6 +20,7 @@ UNANSWERED_KEY, REPORTS_KEY = "unanswered", "reports"
 PORTAL_KEY, JOB_KEY = "portal", "job"
 VARIANTS_KEY, REQUIRED_KEY = "variants", "required"
 BLOCKED_KEY, SCHEMA_KEY = "blocked", "schema_version"
+VISIBLE_KEY = "visible"
 URL_KEY, TARGET_KEY, DRY_KEY = "url", "target_id", "dry"
 REPORT_PATH_KEY, FOLDER_KEY = "report_path", "folder"
 AUTHOR_KEY, AUTHOR = "author", "Yazad Madan"
@@ -38,7 +39,7 @@ CURRENT_PAGE_LIMIT = "Dry scans cover only the current page. Later pages and con
 def eligible(field, include_optional=False):
     from workday_run import IMMIGRATION_LABEL, UNLEARNABLE_LABELS
     label = str(field.get(LABEL_KEY) or "")
-    return (bool(normalize_label(label)) and (include_optional or field.get(REQUIRED_KEY, True) is True)
+    return (bool(normalize_label(label)) and (include_optional or field.get(REQUIRED_KEY, True) is True or field.get(VISIBLE_KEY) is True)
             and field.get(RECORD_KEY) is None and not field.get(BLOCKED_KEY)
             and str(field.get(TYPE_KEY, "")).lower() not in NEVER_LEARN_TYPES
             and not answer_memory.is_protected(field)

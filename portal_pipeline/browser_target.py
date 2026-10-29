@@ -1,10 +1,14 @@
 """Author: Yazad Madan. Bind one driver to one browser tab."""
-from urllib.parse import urlsplit, urlunsplit
+import re
+from urllib.parse import unquote, urlsplit, urlunsplit
 
 # Config
 TARGET_INFO_COMMAND = "Target.getTargetInfo"
 TARGET_INFO_KEY = "targetInfo"
 TARGET_ID_KEY = "targetId"
+JOB_PATH_MARKERS = frozenset({"job", "jobs", "position", "positions", "requisition"})
+JOB_SUFFIXES = frozenset({"apply", "application", "usemylastapplication", "applymanually"})
+REQUISITION_PATTERN = re.compile(r"(?:^|[_-])((?:jr|req|r)[_-]?\d+)$", re.I)
 
 
 def sync_playwright():
@@ -15,6 +19,30 @@ def sync_playwright():
 def normalize_url(url):
     parts = urlsplit(str(url))
     return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path.rstrip("/"), "", ""))
+
+
+def job_identity(url):
+    parts = [unquote(part).casefold() for part in urlsplit(str(url)).path.split("/") if part]
+    for index, part in enumerate(parts):
+        if part in JOB_PATH_MARKERS:
+            job_parts = parts[index + 1:]
+            job_parts = job_parts[:next((i for i, item in enumerate(job_parts) if item in JOB_SUFFIXES), len(job_parts))]
+            if job_parts:
+                slug = job_parts[-1]
+                match = REQUISITION_PATTERN.search(slug)
+                return (slug[:match.start()] if match else slug), (match.group(1) if match else "")
+    return "", ""
+
+
+def same_job_url(expected, candidate):
+    original, current = urlsplit(str(expected)), urlsplit(str(candidate))
+    if (original.scheme.lower(), original.netloc.lower()) != (current.scheme.lower(), current.netloc.lower()):
+        return False
+    slug, requisition = job_identity(expected)
+    other_slug, other_requisition = job_identity(candidate)
+    if requisition and other_requisition:
+        return requisition == other_requisition
+    return bool(slug and other_slug and slug == other_slug)
 
 
 def target_id_of(page):
@@ -30,7 +58,7 @@ def select_tab(browser, url=None, target_id=None, predicate=None):
     if target_id:
         tabs = [page for page in tabs if target_id_of(page) == target_id]
     elif url:
-        tabs = [page for page in tabs if normalize_url(page.url) == normalize_url(url)]
+        tabs = [page for page in tabs if normalize_url(page.url) == normalize_url(url) or same_job_url(url, page.url)]
     if predicate:
         tabs = [page for page in tabs if predicate(page.url)]
     if len(tabs) != 1:

@@ -11,7 +11,8 @@ from unittest.mock import MagicMock, patch
 # Config
 SOURCE_DIR = Path(__file__).resolve().parents[1]
 TEST_DIR = SOURCE_DIR / "tests"
-PROFILE = {"values": {"first_name": {"value": "Invented", "source": "synthetic"}}, "employment": [], "education": [], "answers": {}, "consents": {}, "aliases": {}, "pickers": {}}
+GIVEN_NAME = "SyntheticGivenName"
+PROFILE = {"values": {"first_name": {"value": GIVEN_NAME, "source": "synthetic"}}, "employment": [], "education": [], "answers": {}, "consents": {}, "aliases": {}, "pickers": {}}
 STEP = '<div data-automation-id="progressBarActiveStep">{title}</div>'
 NEXT = ('<button data-automation-id="pageFooterNextButton" type="button" onclick="document.querySelector(\'[data-automation-id=progressBarActiveStep]\').textContent=\'Review\'">'
         'Save and Continue</button>')
@@ -71,7 +72,7 @@ class ReportFixtureTests(SyntheticBrowserTest):
         self.assertEqual(data["exit_code"], 0, data)
         self.assertEqual(data["pages"][0]["filled"], 1, data)
         self.assertEqual([page["title"] for page in data["pages"]], ["My Information", "Review"])
-        self.assertEqual(self.page.locator("#first").input_value(), "Invented")
+        self.assertEqual(self.page.locator("#first").input_value(), GIVEN_NAME)
 
     def test_unanswered_required_field_is_a_human_gate(self):
         data = self.drive(STEP.format(title="My Information") + FIRST_NAME + REQUIRED_GAP + NEXT)
@@ -89,7 +90,13 @@ class ReportFixtureTests(SyntheticBrowserTest):
 
     def test_report_holds_no_field_values(self):
         data = self.drive(STEP.format(title="My Information") + FIRST_NAME + NEXT)
-        self.assertNotIn("Invented", json.dumps(data))
+        self.assertNotIn(GIVEN_NAME, json.dumps(data))
+
+    def test_question_containing_actual_name_stays_redacted(self):
+        question = REQUIRED_GAP.replace("Invented", GIVEN_NAME)
+        data = self.drive(STEP.format(title="My Information") + FIRST_NAME + question + NEXT)
+        self.assertEqual(data["pages"][0]["pending_required"], ["[redacted] required question"])
+        self.assertNotIn(GIVEN_NAME, json.dumps(data))
 
 
 class ApplyLaunchOrderTests(unittest.TestCase):

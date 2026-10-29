@@ -14,6 +14,7 @@
     [/(^|\.)oraclecloud\.com$/, "oracle", "prepared"],
     [/(^|\.)taleo\.net$/, "taleo", "prepared"],
     [/(^|\.)(successfactors\.(com|eu)|sapsf\.(com|eu)|jobs2web\.com)$/, "successfactors", "prepared"],
+    [/^careers\.provident\.bank$/, "successfactors", "prepared"],
     [/(^|\.)smartrecruiters\.com$/, "smartrecruiters", "prepared"],
     [/(^|\.)(brassring|kenexa)\.com$/, "brassring", "prepared"],
     [/(^|\.)eightfold\.ai$/, "eightfold", "prepared"],

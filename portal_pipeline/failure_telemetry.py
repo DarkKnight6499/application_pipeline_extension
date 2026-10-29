@@ -17,6 +17,8 @@ NEXT_KEY = "next_outcome"
 REVISION_KEY = "source_revision"
 FILL_STOP_KEY = "fill_stop_reason"
 RETRY_KEY = "rerender_retries"
+RETRY_EVENTS_KEY = "retry_events"
+TRANSIENT_FAILURES = frozenset({"identity_changed", "node_replaced"})
 DOM_STATE_KEY = "dom_state"
 ROW_BINDING_KEY = "row_binding"
 VALUE_KIND_KEY = "attempted_value_kind"
@@ -31,14 +33,17 @@ ROW_KEYS = ("id", "group", "index")
 FAILURE_ACTIONS = {
     "structure_changed": "retry", "node_replaced": "retry", "fill_aborted": "retry",
     "unsupported_control": "human", "human_gate": "human", "refused": "human",
-    "validation_error": "hard", "reverted": "hard", "identity_changed": "hard",
+    "validation_error": "hard", "reverted": "hard", "identity_changed": "retry",
     "row_identity_changed": "hard", "collateral_change": "hard", "error": "hard",
     "missing_result": "hard", "result_mismatch": "hard",
+    "attachment_mismatch": "hard",
 }
 SECRET_PATTERN = re.compile(r"""(?i)\b(password|passwd|api[_ -]?key|access[_ -]?token|token|secret|authorization|cookie|verification code)["']?\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;}]+)""")
 BEARER_PATTERN = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/-]+=*")
 EMAIL_PATTERN = re.compile(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}")
 TOKEN_PATTERN = re.compile(r"\b(?=[A-Za-z0-9_-]{32,}\b)(?=[A-Za-z0-9_-]*[0-9])(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]+\b")
+INLINE_SUCCESS = re.compile(r"successfully\s+(?:uploaded|attached|saved)|(?:upload|attachment)\s+(?:was\s+)?(?:successful|complete(?:d)?)\b", re.I)
+INLINE_FAILURE = re.compile(r"\b(?:error|failed|failure|invalid|rejected|unable|required|must)\b", re.I)
 
 
 def clean_text(value, secrets=(), limit=TEXT_LIMIT):
@@ -90,6 +95,23 @@ def source_revision(directory):
 def failure_action(result):
     kind = result.get("failure_kind") or result.get("reason_code") or result.get("status")
     return FAILURE_ACTIONS.get(kind, "hard")
+
+
+def record_retry(event, results, attempt, secrets=()):
+    event[RETRY_KEY] = attempt
+    records = event.setdefault(RETRY_EVENTS_KEY, [])
+    for result in results:
+        if len(records) >= FIELD_LIMIT:
+            event["retry_events_truncated"] = True
+            break
+        records.append({"attempt": attempt, "field_id": clean_text(result.get("id"), secrets),
+                        "failure_kind": clean_text(result.get("failure_kind") or result.get("reason_code"), secrets),
+                        "reason": clean_text(result.get("reason") or result.get("message"), secrets)})
+
+
+def is_inline_error(message):
+    text = str(message or "").strip()
+    return bool(text) and (not INLINE_SUCCESS.search(text) or bool(INLINE_FAILURE.search(text)))
 
 
 def bounded_dom(state):
@@ -166,7 +188,9 @@ def upload_reason(state):
 def next_reason(before, after, timed_out=False):
     if after.get("dialog"):
         return "dialog_opened"
-    if after.get("inline_errors") and after.get("inline_errors") != before.get("inline_errors"):
+    errors = [text for text in after.get("inline_errors", []) if is_inline_error(text)]
+    previous = [text for text in before.get("inline_errors", []) if is_inline_error(text)]
+    if errors and errors != previous:
         return "inline_validation_error"
     if after.get("title") and after.get("title") != before.get("title"):
         return "step_changed"

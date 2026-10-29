@@ -3,6 +3,8 @@
   if (globalThis.PortalEngine) return;
   // Config
   const DIAGNOSTIC_COUNT_LIMIT = 1000000;
+  const INLINE_SUCCESS = /successfully\s+(?:uploaded|attached|saved)|(?:upload|attachment)\s+(?:was\s+)?(?:successful|complete(?:d)?)\b/i;
+  const INLINE_FAILURE = /\b(?:error|failed|failure|invalid|rejected|unable|required|must)\b/i;
   const VALIDITY_KEYS = ["valid", "valueMissing", "typeMismatch", "patternMismatch", "tooLong", "tooShort", "rangeUnderflow", "rangeOverflow", "stepMismatch", "badInput", "customError"];
   const protectedTerms = /\b(password|passcode|captcha|one.?time|otp|ssn|social security|credit card|bank account|routing number|signature|attest|certify|certification of|consent|agree|accept terms|privacy policy|declaration)\b/i;
   const demographicTerms = /\b(gender|race|ethnicity|veteran|disability|sexual orientation)\b/i;
@@ -244,6 +246,9 @@
   }
 
   const isMenu = element => !!globalThis.PortalWorkdayMenu?.matches(element);
+  const requiredFor = (element, label) => !!element.required || element.getAttribute("aria-required") === "true"
+    || (isMenu(element) && /\*\s*$/.test(label));
+  const isInlineError = text => !!String(text || "").trim() && (!INLINE_SUCCESS.test(text) || INLINE_FAILURE.test(text));
   const isCustom = element => (element.getAttribute("role") === "combobox" && element.tagName !== "SELECT") || isMenu(element);
   const dropdown = element => isMenu(element) ? PortalWorkdayMenu : globalThis.PortalOracleGrid?.matches(element) ? PortalOracleGrid : globalThis.PortalGreenhouseSelect?.matches(element) ? PortalGreenhouseSelect : globalThis.PortalListbox;
 
@@ -354,7 +359,7 @@
       let key = blocked ? null : classify(label, identity, section);
       const datePart = !blocked && !key && record ? datePartName(element) : null;
       if (datePart) key = `${record.group}.${datePart}`;
-      const required = element.required || element.getAttribute("aria-required") === "true";
+      const required = requiredFor(element, label);
       if (!blocked && type === "checkbox" && PortalClassifier.isAttestationCheckbox({type, label, key, required, checked: element.checked}) && !consentRecorded(element)) { blocked = true; key = null; }
       if (key?.includes(".")) {
         const [group, name] = key.split(".");
@@ -375,7 +380,8 @@
       const lookup = pickerKind === "field_of_study" ? profile.values[(key || "").replace("field_of_study", "degree")]?.value : proposal.value;
       const candidates = pickerKind && lookup ? pickerCandidates(profile, pickerKind, lookup) : [];
       const field = {id, label, key, candidates, section: key?.split(".")[0] || section, type, current, options, record,
-                     required: element.required || element.getAttribute("aria-required") === "true" || globalThis.PortalGreenhouse?.uploadGroup(element)?.getAttribute("aria-required") === "true",
+                     has_value: blocked ? !!String(read({element, members, field: {type}}) || "").trim() : !!String(current || "").trim(),
+                     visible: true, required: required || globalThis.PortalGreenhouse?.uploadGroup(element)?.getAttribute("aria-required") === "true",
                      blocked, disabled: unavailable(element),
                      adapter: customInfo?.supported ? (dropdown(element) === globalThis.PortalGreenhouseSelect ? "greenhouse-select" : isMenu(element) ? "workday-menu" : dropdown(element) === globalThis.PortalOracleGrid ? "oracle-grid" : "aria-listbox") : null, manual_reason: customInfo?.reason || "",
                      dropdown_state: customInfo?.dropdown_state || null,
@@ -457,9 +463,9 @@
     const container = base?.closest(errorScope) || base;
     const grouped = container?.matches("fieldset,[role=group],[role=radiogroup]");
     if (container && !container.matches("body,form,html") && (grouped || container.querySelectorAll("input,select,textarea,[role=combobox]").length <= 1)) {
-      container.querySelectorAll('[role=alert],[id$="-error"]').forEach(node => {
+      container.querySelectorAll('[role=alert],[id$="-error"],[data-automation-id*=error]').forEach(node => {
         const text = node.textContent.trim();
-        if (text && visible(node)) found.push(text);
+        if (isInlineError(text) && visible(node)) found.push(text);
       });
     }
     return found.join(" ");
@@ -486,7 +492,7 @@
       const {element, members, field} = control;
       checkCollateral();
       checkCurrent(control);
-      if (fingerprint(element) !== control.fingerprint) throw new Error("Question or control identity changed. Rescan before filling.");
+      if (fingerprint(element) !== control.fingerprint) throw codedError("identity_changed", "Question or control identity changed. Rescan before filling. (fingerprint)");
       if (demographicContext(element) && answerKey(selection.value) !== answerKey(storedFor(element))) throw new Error("A demographic field fills only with its stored answer. Choose it manually.");
       if (field.record?.index === null) throw new Error(field.record.error || "Choose a profile record or manual answers for this row before filling.");
       const current = field.type === "combobox" ? read(control) : field.type === "radio" ? members.find(item => item.checked)?.value || ""
@@ -667,23 +673,47 @@
     const state = {aborted: false};
     const liveProtected = control => control.field.blocked || control.members.some(protectedControl);
     const checkCollateral = () => {
-      const surface = visibleControls();
-      const changedMembership = [...controls.values()].some(control => control.field.type === "radio" &&
-        (radioMembers(control.element).length !== control.members.length || radioMembers(control.element).some(item => !control.members.includes(item))));
-      if (surface.length !== registeredSurface.length || surface.some(element => !registeredSurface.includes(element)) || changedMembership) {
-        state.aborted = true;
-        state.failure_kind = "structure_changed";
-        const describe = element => (element.getAttribute("data-automation-id") || element.id || element.getAttribute("aria-label") || element.tagName).slice(0, 40);
-        const added = surface.filter(element => !registeredSurface.includes(element)).map(describe).slice(0, 3).join(",");
-        const removed = registeredSurface.filter(element => !surface.includes(element)).map(describe).slice(0, 3).join(",");
-        throw codedError("structure_changed", `The visible form structure changed (+${added || "none"} -${removed || "none"}). Stop and rescan before filling more fields.`);
-      }
       const collateral = [...baseline].filter(([id, value]) => (!selectedIds.has(id) || liveProtected(controls.get(id))) && read(controls.get(id)) !== value);
       if (collateral.length) {
         state.aborted = true;
         state.failure_kind = "collateral_change";
         const labels = collateral.map(([id]) => liveProtected(controls.get(id)) ? "a protected field" : controls.get(id).field.label);
         throw codedError("collateral_change", "An unselected field changed: " + labels.join(", ") + ". Review the form manually.");
+      }
+      const surface = visibleControls();
+      const changedMembership = [...controls.values()].some(control => control.field.type === "radio" &&
+        (radioMembers(control.element).length !== control.members.length || radioMembers(control.element).some(item => !control.members.includes(item))));
+      // Workday redraws some inputs (history Location) as new nodes with the same id; rebind unselected ones instead of aborting.
+      const rebindReplaced = () => {
+        const key = element => element.getAttribute("data-automation-id") || element.id || "";
+        const gone = [...controls.values()].filter(control => !surface.includes(control.element));
+        const pool = surface.filter(element => !registeredSurface.includes(element));
+        if (changedMembership || !gone.length || gone.length !== pool.length || surface.length !== registeredSurface.length) return false;
+        const pairs = [];
+        for (const control of gone) {
+          const same = pool.filter(element => key(element) && key(element) === key(control.element));
+          if (control.field.type === "radio" || control.element.isConnected || same.length !== 1) return false;
+          pairs.push([control, same[0]]);
+          pool.splice(pool.indexOf(same[0]), 1);
+        }
+        pairs.forEach(([control, element]) => {
+          control.members = control.members.map(member => member === control.element ? element : member);
+          Object.assign(control, {element, fingerprint: fingerprint(element), identity: controlIdentity(element)});
+        });
+        registeredSurface = surface;
+        return true;
+      };
+      if ((surface.length !== registeredSurface.length || surface.some(element => !registeredSurface.includes(element)) || changedMembership) && !rebindReplaced()) {
+        state.aborted = true;
+        const detached = [...controls.values()].filter(control => !surface.includes(control.element));
+        const replacements = surface.filter(element => !registeredSurface.includes(element));
+        const selectedReplacement = !changedMembership && detached.length > 0 && detached.length === replacements.length
+          && detached.every(control => selectedIds.has(control.field.id) && !control.element.isConnected);
+        state.failure_kind = selectedReplacement ? "node_replaced" : "structure_changed";
+        const describe = element => (element.getAttribute("data-automation-id") || element.id || element.getAttribute("aria-label") || element.tagName).slice(0, 40);
+        const added = surface.filter(element => !registeredSurface.includes(element)).map(describe).slice(0, 3).join(",");
+        const removed = registeredSurface.filter(element => !surface.includes(element)).map(describe).slice(0, 3).join(",");
+        throw codedError(state.failure_kind, `The visible form structure changed (+${added || "none"} -${removed || "none"}). Stop and rescan before filling more fields.`);
       }
     };
     const checkHistory = control => {
@@ -703,8 +733,13 @@
       checkPortal(control);
       if (field.blocked || members.some(protectedControl)) throw new Error("This field is manual only.");
       if (unavailable(element)) throw new Error("This field cannot be edited.");
-      const changed = field.type === "combobox" ? controlIdentity(element) !== control.identity : fingerprint(element) !== control.fingerprint;
-      if (changed) throw codedError("identity_changed", "Question or control identity changed. Rescan before filling.");
+      const identityOnly = field.type === "combobox" || isCustom(element);
+      const changed = identityOnly ? controlIdentity(element) !== control.identity : fingerprint(element) !== control.fingerprint;
+      if (changed) {
+        const was = control.identity, now = controlIdentity(element);
+        const parts = now.split("|").map((part, index) => part === was.split("|")[index] ? "" : `#${index}:${was.split("|")[index]?.slice(0, 40)}=>${part.slice(0, 40)}`).filter(Boolean).join(" ");
+        throw codedError("identity_changed", "Question or control identity changed. Rescan before filling." + (parts ? ` (${parts})` : ""));
+      }
     };
     const verify = (control, expected) => (adapter ? adapter.verify(control, expected) : verifyCore(control, expected));
     for (const selection of selections) {
@@ -764,5 +799,5 @@
 
   // Adapters delegate to these legacy bodies, which stay otherwise private to the engine closure.
   const core = {scan: scanCore, propose: proposeCore, fill: fillField, verify: verifyCore};
-  globalThis.PortalEngine = {scan, fill, optionMatch, inspect, profileRecords, core, isLongform};
+  globalThis.PortalEngine = {scan, fill, optionMatch, inspect, profileRecords, core, isLongform, requiredFor, isInlineError};
 })();

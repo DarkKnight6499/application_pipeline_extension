@@ -90,7 +90,7 @@ def save_memory(data, data_dir=DATA_DIR):
 
 
 def update_memory(update, data_dir=DATA_DIR):
-    """Reload and update under one lock so concurrent reviewed answers merge."""
+    """Reload and update under one lock so concurrent reviewed answers merge. Saves only when update returns truthy (a count or True)."""
     with memory_lock(data_dir):
         data = load_memory(data_dir)
         result = update(data)

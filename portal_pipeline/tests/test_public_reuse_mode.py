@@ -227,6 +227,25 @@ class ReuseTests(unittest.TestCase):
         assert plan[reuse.EXTRAS_KEY] == [{"group": "employment", "id": "extra"}]
         assert plan[reuse.MISSING_KEY] == {"employment": [], "education": []}
 
+    def test_legal_suffix_difference_still_binds_the_carried_row(self):
+        profile = {"values": {}, "employment": [{"company": "Acme Bank Limited", "title": "Manager"}], "education": []}
+        plan = reuse.history_plan(row("acme", company="Acme Bank", title="Manager"), profile)
+        assert plan[reuse.BINDINGS_KEY] == {"acme": 0}
+        assert plan[reuse.MISSING_KEY]["employment"] == []
+        assert plan[reuse.EXTRAS_KEY] == []
+
+    def test_starred_portal_labels_still_bind_the_carried_row(self):
+        profile = {"values": {}, "employment": [{"company": "Examplesoft", "title": "Risk Analyst"}], "education": []}
+        fields = row("n", company="Examplesoft", title="Risk Analyst")
+        for f in fields:
+            f["label"] = f["label"] + "*"
+        plan = reuse.history_plan(fields, profile)
+        assert plan[reuse.BINDINGS_KEY] == {"n": 0} and plan[reuse.MISSING_KEY]["employment"] == []
+
+    def test_school_names_match_on_first_significant_word(self):
+        assert reuse.identity_value("Northfield, the State University of Ohio - Dayton", "school") == reuse.identity_value("NORTHFIELD BUSINESS SCHOOL", "school")
+        assert reuse.identity_value("Eastbrook Valley State University", "school") != reuse.identity_value("Northfield Business School", "school")
+
     def test_matching_rows_do_not_add_or_rewrite(self):
         fields = row("match", company="Example Inc", title="Analyst")
         with patch.object(driver, "scan", return_value=fields), patch.object(driver, "has_heading", return_value=True), \
