@@ -172,6 +172,7 @@ class AssistTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.service.accept(dict(label=label, answer=ANSWER))
 
+
     def test_sensitive_answer_and_signature_are_never_accepted_or_filled(self):
         for label in ("Gender?", "Signature"):
             with self.assertRaises(ValueError):

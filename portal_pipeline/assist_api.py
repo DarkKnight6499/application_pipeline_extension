@@ -13,6 +13,7 @@ from urllib.parse import urlsplit
 
 import answer_memory
 import corrections
+import dropdown_mappings
 import essay_tracks
 import intent_layer
 import learning_queue
@@ -255,13 +256,16 @@ class AssistService:
             raise ValueError("Options must be a bounded list of strings.")
 
     def answer(self, body):
+        return dropdown_mappings.response(self, body, self._answer(body))
+
+    def _answer(self, body):
         self.validate(body)
         label = body[QUESTION_COLUMN]
         with self.lock:
             with (self.data / LOG_FILENAME).open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps({QUESTION_COLUMN: label}, ensure_ascii=True) + "\n")
             context = label + " " + " ".join(body.get(OPTIONS_COLUMN, []))
-            blocked = any(pattern.search(context) for pattern in BLOCKED_DRAFT) or question_alias.blocked(body)
+            blocked = any(pattern.search(context) for pattern in BLOCKED_DRAFT) or question_alias.blocked(body) or dropdown_mappings.blocked(body)
             if corrections.blocked(body):
                 self.queue_question(body, True)
                 return {"status": "none", "source": "manual", "answer": "", "candidates": []}
@@ -274,7 +278,7 @@ class AssistService:
                 essay = essay_tracks.answer(self.data, body)
                 if essay:
                     return essay
-            if not NEVER_FILL.search(label) and not question_alias.blocked(body):
+            if not NEVER_FILL.search(label) and not question_alias.blocked(body) and not dropdown_mappings.blocked(body):
                 value = self.company_answer(body)
                 source = "company_kb"
                 if not value:
@@ -291,7 +295,7 @@ class AssistService:
                     return {"status": "stored", "source": source, "answer": value,
                             "candidates": intent_layer.expand(value)}
             self.queue_question(body, blocked)
-        if blocked or question_alias.blocked(body):
+        if blocked or question_alias.blocked(body) or dropdown_mappings.blocked(body):
             miss_log.try_record(self.data, body)
             return {"status": "none", "source": "manual", "answer": "", "candidates": []}
         value = self.draft(body)
@@ -314,11 +318,18 @@ class AssistService:
         self.validate(body)
         label, answer = body[QUESTION_COLUMN], body.get(ANSWER_COLUMN)
         if (not isinstance(answer, str) or not answer.strip() or len(answer) > answer_memory.MAX_ANSWER
-                or NEVER_FILL.search(label) or question_alias.blocked(body) or corrections.blocked(body)):
+                or NEVER_FILL.search(label) or question_alias.blocked(body) or corrections.blocked(body) or dropdown_mappings.blocked(body)):
             raise ValueError("Answer is empty, too long, or protected.")
         scoped = bool(body.get(HOST_COLUMN))
         directory = self.company_scope(body)[0] if scoped else self.data
-        self.update_reviewed(lambda memory: question_alias.accept_reviewed(self, body, memory, scoped), directory, scoped)
+
+        def save(memory):
+            previous, _ = dropdown_mappings.stored_answer(self, body)
+            if previous and previous != answer and body.get(PREVIOUS_ANSWER) != previous:
+                raise ValueError("Stored answer changed. Review it before replacing it.")
+            return question_alias.accept_reviewed(self, body, memory, scoped)
+
+        self.update_reviewed(save, directory, scoped)
         return {"status": "stored"}
 
     @staticmethod
@@ -364,9 +375,13 @@ class AssistService:
             for pair in pairs:
                 label, answer = pair[QUESTION_COLUMN], pair[ANSWER_COLUMN].strip()
                 context = label + " " + " ".join(pair.get(OPTIONS_COLUMN, []))
-                if (not answer or NEVER_FILL.search(label) or question_alias.blocked(pair) or corrections.blocked(pair)
+                if (not answer or NEVER_FILL.search(label) or question_alias.blocked(pair) or corrections.blocked(pair) or dropdown_mappings.blocked(pair)
                         or any(pattern.search(context) for pattern in BLOCKED_DRAFT)):
                     results.append({QUESTION_COLUMN: label, "status": "skipped", "stored": False})
+                    continue
+                mapping = dropdown_mappings.review(self, body, pair, dry_run)
+                if mapping is not None:
+                    results.append(mapping)
                     continue
                 previous = question_alias.previous_answer(self, {**body, QUESTION_COLUMN: label}, memory)
                 status = "new" if previous is None else "same" if previous == answer else "changed"

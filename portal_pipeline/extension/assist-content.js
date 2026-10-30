@@ -119,7 +119,13 @@
     return [];
   }
 
-  function match(options, candidates) {
+  function match(options, candidates, mappedOptions = []) {
+    for (const mapped of mappedOptions) {
+      if (typeof mapped !== 'string' || !normalize(mapped)) continue;
+      const exact = options.filter(option => normalize(option.text) === normalize(mapped));
+      if (exact.length === 1) return exact[0];
+      if (exact.length > 1) return null;
+    }
     for (const candidate of candidates) {
       const wanted = normalize(candidate);
       if (!wanted) continue;
@@ -173,7 +179,8 @@
         || label.length > MAX_LEARN_LABEL || answer.length > MAX_LEARN_ANSWER
         || !(state.filled === answer || state.corrected === answer || (state.user === answer && answer !== state.initial))) continue;
       rows.push({element, label, answer, options, corrected: state.corrected === answer,
-        type: element.type || element.tagName.toLowerCase()});
+        manual: state.filled !== answer && (state.user === answer || state.corrected === answer),
+        type: element.getAttribute('role') === 'combobox' ? 'combobox' : element.type || element.tagName.toLowerCase()});
     }
     return rows.sort((a, b) => Number(b.corrected) - Number(a.corrected));
   }
@@ -274,18 +281,18 @@
     if (element.getAttribute('role') === 'combobox' && element.tagName !== 'SELECT') {
       if (!popup(element)) safeClick(element);
       const deadline = Date.now() + POPUP_TIMEOUT_MS;
-      while (!match(choices(element), result.candidates) && Date.now() < deadline) {
+      while (!match(choices(element), result.candidates, result.mapped_options) && Date.now() < deadline) {
         await wait(60);
         if (!mayWrite()) return null;
       }
-      const option = match(choices(element), result.candidates);
+      const option = match(choices(element), result.candidates, result.mapped_options);
       if (!option || !mayWrite()) return null;
       safeClick(option.node);
       for (const type of ['input', 'change', 'blur']) element.dispatchEvent(new Event(type, {bubbles: true}));
       return {kind: 'combobox', value: option.text};
     }
     if (element.tagName === 'SELECT' || ['radio', 'checkbox'].includes(element.type)) {
-      const option = match(choices(element), result.candidates);
+      const option = match(choices(element), result.candidates, result.mapped_options);
       if (!option) return null;
       if (element.tagName === 'SELECT') nativeSet(element, 'value', option.node.value);
       else nativeSet(option.node, 'checked', element.type === 'radio' || option.checked);
@@ -439,7 +446,7 @@
       const url = location.href;
       const company = companyHint();
       const context = {host: location.hostname, url, company_hint: company};
-      const pairs = rows.map(({label, answer, options, type}) => ({label, answer, options, type}));
+      const pairs = rows.map(({label, answer, options, type, manual}) => ({label, answer, options, type, manual}));
       pending = true;
       learn.disabled = true;
       try {
@@ -451,13 +458,17 @@
           const row = rows[index];
           if (item.label !== row.label) throw new Error('Learning question changed');
           if (item.status === 'skipped') return;
-          if (!['new', 'same', 'changed'].includes(item.status) || item.answer !== row.answer) throw new Error('Invalid learning answer');
+          if (!['new', 'same', 'changed', 'dropdown'].includes(item.status) || item.answer !== row.answer) throw new Error('Invalid learning answer');
+          const mapping = item.status === 'dropdown';
+          if (mapping && (typeof item.mapping_answer !== 'string' || !row.manual)) throw new Error('Invalid dropdown review');
           const line = document.createElement('div');
           const checkbox = document.createElement('input');
           checkbox.type = 'checkbox';
           checkbox.checked = true;
           const label = document.createElement('label');
-          label.append(checkbox, document.createTextNode(`${row.label}\n${row.answer}\nCompany: ${result.scope}${row.corrected ? '\ncorrected' : ''}${item.status === 'changed' ? '\nchanged' : ''}`));
+          const description = mapping ? `dropdown: ${item.mapping_answer} = ${row.answer}\nVendor: ${item.vendor}${item.previous_option && item.previous_option !== row.answer ? `\nPrevious option: ${item.previous_option}` : ''}`
+            : `${row.answer}\nCompany: ${result.scope}${row.corrected ? '\ncorrected' : ''}`;
+          label.append(checkbox, document.createTextNode(`${row.label}\n${description}${item.status === 'changed' ? '\nchanged' : ''}`));
           line.append(label);
           let aliasCheckbox;
           if (typeof item.similar_to === 'string' && ['company', 'global'].includes(item.similar_scope)) {
@@ -471,7 +482,9 @@
             line.append(similar, aliasLabel);
           }
           review.append(line);
-          selected.push({row, checkbox, aliasCheckbox, pair: {...pairs[index], previous_answer: item.previous_answer,
+          selected.push({row, checkbox, aliasCheckbox, pair: {...pairs[index], ...(mapping
+            ? {mapping_answer: item.mapping_answer, previous_option: item.previous_option}
+            : {previous_answer: item.previous_answer}),
             ...(aliasCheckbox ? {similar_to: item.similar_to, similar_scope: item.similar_scope} : {})}});
         });
         if (!selected.length) { review.textContent = 'No eligible answers to learn.'; return; }
@@ -487,7 +500,7 @@
           const current = learnRows();
           if (location.href !== url || companyHint() !== company || ticked.some(({row}) =>
             !current.some(item => item.element === row.element && item.label === row.label && item.answer === row.answer
-              && JSON.stringify(item.options) === JSON.stringify(row.options)))) {
+              && item.manual === row.manual && JSON.stringify(item.options) === JSON.stringify(row.options)))) {
             review.textContent = 'Page answers changed. Click Learn page again.';
             return;
           }
@@ -498,7 +511,7 @@
             const saved = await request('portal-assist-learn', {...context, dry_run: false,
               pairs: ticked.map(item => ({...item.pair, use_alias: item.aliasCheckbox?.checked === true}))});
             const count = saved.results.filter(item => item.stored).length;
-            review.textContent = `Stored ${count} answers.${count < ticked.length ? ' KB changed. Click Learn page again.' : ''}`;
+            review.textContent = `Stored ${count} answers or mappings.${count < ticked.length ? ' KB or mapping changed. Click Learn page again.' : ''}`;
           } catch (error) { review.textContent = `Learn failed: ${error.message}`; }
           finally { pending = false; confirm.disabled = false; }
         });
