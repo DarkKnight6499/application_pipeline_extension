@@ -13,6 +13,7 @@
   const ACTION = /^(?:next|continue|submit|apply)(?:\b|$)/i;
   const DEBOUNCE_MS = 180;
   const SETTLE_MS = 180;
+  const STATUS_HIDE_MS = 8000;
   const CORRECTION_DEBOUNCE_MS = 180;
   const POPUP_TIMEOUT_MS = 1800;
   const MISS_LABEL_LIMIT = 300;
@@ -459,6 +460,18 @@
     savedSummary.hidden = true;
     shadow.append(savePage, savedSummary);
     (document.body || document.documentElement).append(host);
+    // Status text hides itself after a few seconds; an open review with a Confirm button stays.
+    const autoHide = (box, ms) => {
+      let timer;
+      new MutationObserver(() => {
+        clearTimeout(timer);
+        if (box.hidden || box.querySelector('button')) return;
+        timer = setTimeout(() => { if (!box.querySelector('button')) box.hidden = true; }, ms);
+      }).observe(box, {childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['hidden']});
+    };
+    autoHide(savedSummary, STATUS_HIDE_MS);
+    autoHide(review, STATUS_HIDE_MS);
+    autoHide(summary, STATUS_HIDE_MS * 3);
     savePage.addEventListener('click', async event => {
       event.preventDefault();
       event.stopPropagation();
