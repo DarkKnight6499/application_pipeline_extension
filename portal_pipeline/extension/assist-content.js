@@ -467,7 +467,7 @@
     learn.title = 'Review current answers before saving them for this company.';
     const review = document.createElement('div');
     review.hidden = true;
-    review.style.cssText = 'max-height:70vh;overflow-y:auto';  // long lists scroll inside the panel
+    review.style.cssText = 'max-height:55vh;overflow-y:auto';  // long lists scroll inside the panel
     learn.hidden = true;  // Save page now opens this review itself
     shadow.append(learn, review);
     const savePage = document.createElement('button');
@@ -491,7 +491,7 @@
     new MutationObserver(() => {
       const open = !review.hidden && !!review.querySelector('button');
       host.style.setProperty('top', open ? '8px' : '40%', 'important');
-      host.style.setProperty('max-height', open ? '96vh' : '58vh', 'important');
+      host.style.setProperty('max-height', open ? '75vh' : '58vh', 'important');
     }).observe(review, {childList: true, subtree: true, attributes: true, attributeFilter: ['hidden']});
     autoHide(savedSummary, STATUS_HIDE_MS);
     autoHide(review, STATUS_HIDE_MS);
