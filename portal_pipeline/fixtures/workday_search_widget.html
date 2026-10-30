@@ -1,0 +1,35 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Search widget fixture</title>
+<div data-automation-id="formField-schoolName">
+  <label for="school">School or University*</label>
+  <div data-automation-id="multiSelectContainer">
+    <input id="school" type="text" autocomplete="off">
+    <div id="results"><div id="empty">No Items</div></div>
+  </div>
+</div>
+<script>
+// Mirrors Workday: typing alone lists nothing, Enter runs the search and renders promptOption rows.
+const box = document.getElementById("school"), results = document.getElementById("results");
+const schools = ["Rutgers University-Newark", "Rutgers University-New Brunswick", "Northfield State University"];
+box.addEventListener("keydown", event => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  const text = box.value.toLowerCase();
+  results.innerHTML = "";
+  schools.filter(name => name.toLowerCase().includes(text)).forEach(name => {
+    const option = document.createElement("div");
+    option.setAttribute("data-automation-id", "promptOption");
+    option.textContent = name;
+    option.onclick = () => {
+      const chip = document.createElement("div");
+      chip.setAttribute("data-automation-id", "selectedItem");
+      chip.textContent = name;
+      box.parentElement.append(chip);
+      results.innerHTML = "";
+      box.value = "";
+    };
+    results.append(option);
+  });
+});
+</script>

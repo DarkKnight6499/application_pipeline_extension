@@ -11,6 +11,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlsplit
+from uuid import uuid4
 
 from browser_target import select_tab, sync_playwright, target_id_of
 from shared_storage import file_lock
@@ -163,15 +164,26 @@ def choose_last_application(page):
     return True, "Clicked the uniquely matched last application control."
 
 
-def open_job(job, dry=False):
-    """Open one tab and return its stable target id after the posting navigation."""
+def open_job(job, dry=False, new_window=False):
+    """Open one page, optionally in its own window, and return its stable target id."""
     notes = []
     last_used = reuse.UNKNOWN
     url = job["url"] if dry else job["url"].rstrip("/") + APPLY_PATH_SUFFIX.get(job["portal"], "")
     with sync_playwright() as p:
         browser = p.chromium.connect_over_cdp(workday_run.CDP_URL)
         try:
-            page = browser.contexts[0].new_page()
+            context = browser.contexts[0]
+            if new_window:
+                session = browser.new_browser_cdp_session()
+                window_url = "about:blank#" + uuid4().hex
+                try:
+                    with context.expect_page(predicate=lambda page: page.url == window_url) as opened:
+                        session.send("Target.createTarget", {"url": window_url, "newWindow": True})
+                    page = opened.value
+                finally:
+                    session.detach()
+            else:
+                page = context.new_page()
             page.goto(url, wait_until="domcontentloaded", timeout=60000)
             page.wait_for_timeout(PAGE_WAIT_MS)
             if dry:
@@ -232,7 +244,8 @@ def login_step(job, wait=time.sleep, clock=time.monotonic):
             browser.close()
 
 
-def run(url=None, folder=None, open_page=True, launch=False, dry=False, batch=False, target_id=None, report_path=None, fresh=False):
+def run(url=None, folder=None, open_page=True, launch=False, dry=False, batch=False, target_id=None, report_path=None, fresh=False,
+        new_window=False):
     """Returns the exit code: 0 Review reached, 2 human gate, 3 failure; writes data/runs/<id>.json."""
     job = resolve(url, folder, target_id=target_id)
     job[reuse.MODE_KEY] = reuse.REUSE if job["portal"] == "workday" and not fresh else reuse.FRESH
@@ -246,7 +259,10 @@ def run(url=None, folder=None, open_page=True, launch=False, dry=False, batch=Fa
         lock = file_lock(LOGIN_LOCK_PREFIX + (urlsplit(job[URL_KEY]).hostname or "").lower()) if batch and not dry else contextlib.nullcontext()
         with lock:
             if open_page and (not dry or launch):
-                opened = open_job(job, dry=True) if dry else open_job(job)
+                if new_window:
+                    opened = open_job(job, dry=dry, new_window=True)
+                else:
+                    opened = open_job(job, dry=True) if dry else open_job(job)
                 if isinstance(opened, dict):
                     notes += opened[NOTES_KEY]
                     job.update({URL_KEY: opened[URL_KEY], TARGET_KEY: opened[TARGET_KEY]})
@@ -287,6 +303,7 @@ def parse_args(argv=None):
     parser.add_argument("url", nargs="?", help="Job link; optional when the folder has apply.json.")
     parser.add_argument("--folder", type=Path, help="Application folder holding the resume and cover letter.")
     parser.add_argument("--no-open", action="store_true", help="Use the tab that is already open instead of opening the link.")
+    parser.add_argument("--new-window", action="store_true", help="Open the job in a separate browser window.")
     parser.add_argument("--launch", action="store_true", help="Start the dedicated Edge if needed, wait for manual login, then drive the form.")
     parser.add_argument("--dry", action="store_true", help="Scan and print proposals only; nothing is written to the portal.")
     parser.add_argument("--fresh", action="store_true", help="Use the empty-form path instead of reusing a previous Workday application.")
@@ -299,7 +316,7 @@ def parse_args(argv=None):
 def main(argv=None):
     args = parse_args(argv)
     return run(args.url, args.folder, open_page=not args.no_open, launch=args.launch, dry=args.dry,
-               batch=args.batch, target_id=args.target_id, report_path=args.report_path, fresh=args.fresh)
+               batch=args.batch, target_id=args.target_id, report_path=args.report_path, fresh=args.fresh, new_window=args.new_window)
 
 
 if __name__ == "__main__":

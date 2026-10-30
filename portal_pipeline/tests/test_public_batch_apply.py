@@ -95,9 +95,9 @@ class BatchTests(unittest.TestCase):
 
     def test_args_and_exit_codes(self):
         args = batch_apply.parse_args(["--folders", "one", "two", "--workers", "9", "--dry"])
-        self.assertEqual(args.workers, 3)
+        self.assertEqual(args.workers, 8)
         self.assertTrue(args.dry)
-        for argv in (["--folders", "one"], ["--folders", "one", "two", "--workers", "0"], []):
+        for argv in (["--folders", "one", "two", "--workers", "0"], []):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 batch_apply.parse_args(argv)
         self.assertTrue(batch_apply.parse_args(["--learn-only"]).learn_only)

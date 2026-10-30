@@ -31,7 +31,7 @@ def test_structure_abort_after_a_fill_rescans_and_continues(monkeypatch):
     a, b = field("A"), field("B")
     scans = [[a, b], [field("A", "x"), b], [field("A", "x"), field("B", "x")]]
     setup(monkeypatch, scans)
-    page = FakePage([[{"id": "A", "status": "filled"}, {"id": "B", "status": "failed", "message": CHANGED}],
+    page = FakePage([[{"id": "A", "status": "filled"}, {"id": "B", "status": "failed", "failure_kind": "structure_changed", "message": CHANGED}],
                      [{"id": "B", "status": "filled"}]])
     w.run_page(page, {}, False, {})
     assert not page.script_results
@@ -46,6 +46,6 @@ def test_other_failures_still_stop(monkeypatch):
 
 def test_structure_abort_without_progress_stops_after_rescan(monkeypatch):
     setup(monkeypatch, [[field("A")], [field("A")]])
-    page = FakePage([[{"id": "A", "status": "failed", "message": CHANGED}]])
+    page = FakePage([[{"id": "A", "status": "failed", "failure_kind": "structure_changed", "message": CHANGED}]])
     with pytest.raises(w.DriverFailed):
         w.run_page(page, {}, False, {})

@@ -18,7 +18,7 @@ window.changeCount = 0;
 window.confirmUpload = true;
 document.getElementById("upload").addEventListener("change", event => {
   window.changeCount += 1;
-  if (window.confirmUpload) document.getElementById("confirmation").textContent = event.target.files[0].name;
+  if (window.confirmUpload) { const file = event.target.files[0]; document.getElementById("confirmation").textContent = file.name + " " + file.size + " bytes"; }
 });
 </script>'''
 
@@ -106,7 +106,7 @@ class WorkdayUploadTests(SyntheticBrowserTest):
 
     def test_delayed_confirmation_is_polled(self):
         self.open_upload_page(confirm=False)
-        self.page.evaluate("document.getElementById('resume').addEventListener('change', event => { const name = event.target.files[0].name; setTimeout(() => { document.getElementById('confirmation').textContent = name; }, 200); })")
+        self.page.evaluate("document.getElementById('resume').addEventListener('change', event => { const file = event.target.files[0]; setTimeout(() => { document.getElementById('confirmation').textContent = file.name + ' ' + file.size + ' bytes'; }, 200); })")
         self.assertEqual(self.upload(), ATTACHMENT["name"])
 
     def test_confirmation_outside_container_does_not_count(self):

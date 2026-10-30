@@ -87,7 +87,7 @@
     const ownership = owner(input);
     let container = ownership?.container || input.parentElement?.closest(CONTAINER_SELECTOR);
     if (!container) throw new Error("The upload container is unavailable. Rescan before attaching.");
-    if (ownership && ownership.slot !== slot) throw new Error("The attachment slot changed. Attach it manually.");
+    if (ownership && ownership.slot !== slot) throw new Error("The attachment slot changed to " + ownership.slot + ". Attach it manually.");
     if (!ownership && slot === "resume" && /cover letter/i.test(container.textContent) && !/(resume|cv)/i.test(container.textContent)) throw new Error("This looks like a cover letter upload, not the resume. Attach it manually.");
     if (!ownership && slot === "cover" && (!SLOT_PATTERNS.cover.test(container.textContent) || SLOT_PATTERNS.resume.test(container.textContent))) throw new Error("The cover letter slot is ambiguous. Attach it manually.");
     const bytes = Uint8Array.from(atob(base64), character => character.charCodeAt(0));

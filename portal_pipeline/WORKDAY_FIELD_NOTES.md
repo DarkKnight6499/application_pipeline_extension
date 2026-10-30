@@ -40,11 +40,23 @@ Author: Yazad Madan. Operational facts only. Update in place when a new portal b
 
 ## Intent layer (built 2026-10-29)
 - `intent_layer.py` maps a question to an intent id (`prev_worked_here`, `sponsorship_h1b_only`, `sponsorship_opt_listed`, `non_compete`, and 20 more). One stored answer per intent serves every company. Answers sit in answer memory under `intent:<id>` (local, gitignored); only the patterns are in the repo.
-- Lookup order in `step_pass.resolve`: company KB, exact text in answer memory, self-ID rules, intent. Answers YES and NO expand to the portal's own wording (Yes, Opt In, I agree).
+- Lookup order in `step_pass.resolve`: exact text in answer memory, company KB, then intent. A stored answer never replaces a different filled value (logged as CONFLICT) unless `--overwrite` is passed. Answers YES and NO expand to the portal's own wording (Yes, Opt In, I agree).
 - New question: answer it once, then `py -3 intent_layer.py learn "<question text>" "<answer>"`. Unclassified questions stay exact-text only. Add a pattern to `INTENT_PATTERNS` and a case to `tests/test_public_intent_layer.py` when a repeating question is not classified.
 - `answer_memory.update_memory(fn)` saves only when `fn` returns a truthy value. A function that returns nothing silently saves nothing.
 
 ## Process lessons
 - Never run `git stash push <file>` then `git stash pop` in one chain. When the push fails, the pop applies an older stash. Check `git stash list` first.
 - Do not kill processes by a broad pattern. List by script name first, then stop by PID.
-- Open items: two failing tests in `tests/test_public_workday_upload.py` (`same_file_already_attached_does_not_dispatch_again`), not yet compared against HEAD; BBH step 4 multiselect ethnicity not matched by `step_pass`; date widget typing not yet built into `step_pass`.
+- Open items: two failing tests in `tests/test_public_workday_upload.py` (`same_file_already_attached_does_not_dispatch_again`), not yet compared against HEAD; BBH step 4 multiselect ethnicity not matched by `step_pass`. `step_pass` now also uploads the resume (`--resume`), fills blank history rows (`--history-file`), writes a run report (`--report-path`) and full unknowns (`--unknowns-out`).
+
+## Learned 2026-10-29 (Tyson, Visa, Capital One, RBC)
+- Prefill differs per tenant. Visa and Capital One carried work rows and dates from Simplify. Tyson was blank: type title, company, location, role description, then dates.
+- Date widgets: focus the month box, then per part `ControlOrMeta+A`, type digits, `Tab`. A typing delay produced a wrong month ("05" read as 2). `step_pass` now skips date fields that already hold values.
+- Search-type fields (school, field of study): type the text, press Enter, wait, click the `promptOption`. Typing alone shows "No Items". Rutgers appears as Rutgers University-Newark.
+- Education degree list is per tenant (Tyson: M.S.). Resume must be uploaded by `set_input_files` and checked against the shown KB size (11,822 bytes shows 11.54 KB).
+- Unclassified questions are not saved by `intent_layer.py learn` (it returns None and stores nothing). Store exact-text answers with `answer_memory.remember`. Classified intents still need the right stored answer: `sponsorship_opt_listed` held No and overwrote a correct Yes until fixed.
+- Sponsorship by wording: OPT/F-1/CPT listed means Yes (Visa, Capital One). Generic "sponsor or renewal of work authorization" means No (Tyson). RBC "now or in the future" left No by Yazad.
+- Salary dropdown with no JD range: lowest band. Work type: full time.
+- "I accept" voluntary-disclosure checkbox is auto-ticked (`ACK_LABEL` now includes `^i accept`).
+- "Are you a protected Veteran?" with Yes/No/I do not wish to answer: answer No. The generic veteran rule does not match it.
+- Visa: Opt-In for SMS, Opt-In for AI review tool. Going back from Review uses `pageFooterBackButton`; the pass re-sets answers from memory on the way forward, so fix memory first.

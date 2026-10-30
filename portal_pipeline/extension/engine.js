@@ -692,7 +692,7 @@
         const pairs = [];
         for (const control of gone) {
           const same = pool.filter(element => key(element) && key(element) === key(control.element));
-          if (control.field.type === "radio" || control.element.isConnected || same.length !== 1) return false;
+          if (selectedIds.has(control.field.id) || control.field.type === "radio" || control.element.isConnected || same.length !== 1) return false;
           pairs.push([control, same[0]]);
           pool.splice(pool.indexOf(same[0]), 1);
         }

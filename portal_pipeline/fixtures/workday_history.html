@@ -1,0 +1,60 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>History rows fixture</title>
+<!-- Add buttons append blank rows shaped like Workday's My Experience step. -->
+<section id="work-section">
+  <h3>Work Experience</h3>
+  <div id="work-rows"></div>
+  <button type="button" data-automation-id="add-button" id="add-work">Add</button>
+</section>
+<section id="edu-section">
+  <h3>Education</h3>
+  <div id="edu-rows"></div>
+  <button type="button" data-automation-id="add-button" id="add-edu">Add</button>
+</section>
+<p id="add-clicks">0</p>
+<script>
+let clicks = 0;
+const field = (id, label, inner) => `<div data-automation-id="formField-${id}"><label>${label}</label>${inner}</div>`;
+const text = (name, value = "") => `<input type="text" name="${name}" value="${value}">`;
+const dateBox = (name) => `<input type="text" id="${name}-dateSectionMonth-input" data-automation-id="dateSectionMonth-input" placeholder="MM">` +
+  `<input type="text" id="${name}-dateSectionYear-input" data-automation-id="dateSectionYear-input" placeholder="YYYY">`;
+function addWork(index, values = {}) {
+  const row = document.createElement("div");
+  row.setAttribute("data-automation-id", "workExperience-" + index);
+  row.innerHTML = field("jobTitle", "Job Title*", text("title", values.title || "")) +
+    field("companyName", "Company*", text("company", values.company || "")) +
+    field("location", "Location", text("location")) +
+    field("currentlyWorkHere", "I currently work here", '<input type="checkbox" name="current">') +
+    field("startDate", "From*", dateBox("start" + index)) + field("endDate", "To", dateBox("end" + index)) +
+    field("roleDescription", "Role Description*", '<textarea name="description"></textarea>');
+  document.getElementById("work-rows").append(row);
+}
+function addEdu(index, values = {}) {
+  const row = document.createElement("div");
+  row.setAttribute("data-automation-id", "education-" + index);
+  row.innerHTML = field("schoolName", "School or University*", '<div data-automation-id="multiSelectContainer"><input type="text" name="school"><div class="results"></div></div>') +
+    field("fieldOfStudy", "Field of Study", text("field")) +
+    field("firstYearAttended", "From", text("firstYear")) + field("lastYearAttended", "To (Actual or Expected)", text("lastYear"));
+  document.getElementById("edu-rows").append(row);
+  const box = row.querySelector("input[name=school]"), results = row.querySelector(".results");
+  if (values.school) {
+    const chip = document.createElement("div"); chip.setAttribute("data-automation-id", "selectedItem"); chip.textContent = values.school;
+    box.parentElement.append(chip);
+  }
+  box.addEventListener("keydown", event => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    results.innerHTML = "";
+    ["Rutgers University-Newark", "Northfield State University"].filter(n => n.toLowerCase().includes(box.value.toLowerCase())).forEach(name => {
+      const option = document.createElement("div"); option.setAttribute("data-automation-id", "promptOption"); option.textContent = name;
+      option.onclick = () => { const chip = document.createElement("div"); chip.setAttribute("data-automation-id", "selectedItem"); chip.textContent = name; box.parentElement.append(chip); results.innerHTML = ""; box.value = ""; };
+      results.append(option);
+    });
+  });
+}
+document.getElementById("add-work").onclick = () => { clicks++; addWork(document.querySelectorAll("#work-rows > div").length + 1); document.getElementById("add-clicks").textContent = clicks; };
+document.getElementById("add-edu").onclick = () => { clicks++; addEdu(document.querySelectorAll("#edu-rows > div").length + 1); document.getElementById("add-clicks").textContent = clicks; };
+window.seedWork = values => addWork(document.querySelectorAll("#work-rows > div").length + 1, values);
+window.seedEdu = values => addEdu(document.querySelectorAll("#edu-rows > div").length + 1, values);
+</script>
