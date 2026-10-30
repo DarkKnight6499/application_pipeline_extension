@@ -6,7 +6,7 @@ const ASSIST_TIMEOUT_MS = 100000;
 const applicationRestrictions = new Set();
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
-    if (["portal-assist-answer", "portal-assist-accept", "portal-assist-learn"].includes(message.type)) {
+    if (["portal-assist-answer", "portal-assist-accept", "portal-assist-learn", "portal-assist-miss"].includes(message.type)) {
       if (!sender.tab || sender.id !== chrome.runtime.id || typeof sender.url !== "string")
         throw new Error("Assist requires an extension content script.");
       const target = new URL(sender.url);
@@ -15,7 +15,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const {assistToken: ASSIST_TOKEN} = await chrome.storage.local.get("assistToken");
       if (!ASSIST_TOKEN) throw new Error("Save the assist token first: see README, Assist setup.");
       const route = message.type.slice("portal-assist-".length);
-      const body = {...message.body, host: target.hostname, url: target.href};
+      const miss = route === "miss";
+      const body = miss ? {label: message.body?.label, type: message.body?.type, options: message.body?.options,
+        company_hint: message.body?.company_hint, host: target.hostname}
+        : {...message.body, host: target.hostname, url: target.href};
       const response = await fetch(`http://127.0.0.1:${ASSIST_PORT}/assist/${route}`, {
         method: "POST", headers: {"X-Assist-Token": ASSIST_TOKEN, "Content-Type": "application/json"},
         body: JSON.stringify(body), signal: AbortSignal.timeout(ASSIST_TIMEOUT_MS)

@@ -54,7 +54,7 @@ class AssistElement {
 }
 
 async function contentChecks() {
-  const source = fs.readFileSync(path.join(EXTENSION, 'assist-content.js'), 'utf8');
+  const source = fs.readFileSync(path.join(EXTENSION, 'assist-content.js'), 'utf8').replace(/\r\n/g, '\n');
   const marker = '  scan();\n})();';
   assert.equal(source.split(marker).length, 2);
   const instrumented = source.replace(marker,

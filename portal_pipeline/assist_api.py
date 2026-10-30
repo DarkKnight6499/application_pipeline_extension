@@ -14,6 +14,7 @@ from urllib.parse import urlsplit
 import answer_memory
 import intent_layer
 import learning_queue
+import miss_log
 from shared_storage import atomic_json, file_lock
 
 # Config
@@ -272,10 +273,16 @@ class AssistService:
                             "candidates": intent_layer.expand(value)}
             self.queue_question(body, blocked)
         if blocked or answer_memory.is_protected(body):
+            miss_log.try_record(self.data, body)
             return {"status": "none", "source": "manual", "answer": "", "candidates": []}
         value = self.draft(body)
+        if not value:
+            miss_log.try_record(self.data, body)
         return {"status": "draft" if value else "none", "source": "claude" if value else "miss",
                 "answer": value or "", "candidates": [value] if value else []}
+
+    def miss(self, body):
+        return {"status": "logged" if miss_log.record(self.data, body) else "skipped"}
 
     def accept(self, body):
         self.validate(body)
@@ -396,11 +403,11 @@ def handle(handler, service):
             return True
         handler.connection.settimeout(10)
         body = json.loads(handler.rfile.read(size))
-        if path not in {"/assist/answer", "/assist/accept", "/assist/learn"}:
+        if path not in {"/assist/answer", "/assist/accept", "/assist/learn", "/assist/miss"}:
             handler.send(404, {"error": "Not found."})
         else:
             result = {"/assist/answer": service.answer, "/assist/accept": service.accept,
-                      "/assist/learn": service.learn}[path](body)
+                      "/assist/learn": service.learn, "/assist/miss": service.miss}[path](body)
             handler.send(200, result, extra={"Access-Control-Allow-Origin": handler.headers["Origin"], "Vary": "Origin"})
     except (ValueError, TypeError, UnicodeError):
         handler.send(400, {"error": "Invalid assist request."})

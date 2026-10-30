@@ -12,6 +12,9 @@
   const DEBOUNCE_MS = 180;
   const SETTLE_MS = 180;
   const POPUP_TIMEOUT_MS = 1800;
+  const MISS_LABEL_LIMIT = 300;
+  const MISS_OPTION_LIMIT = 40;
+  const MISS_OPTION_TEXT_LIMIT = 120;
   const PLACEHOLDER = /^(?:select(?:\s+(?:one|an? option))?|choose(?:\s+.*)?|please select(?:\s+.*)?|[-*\s]*)$/i;
   const TEXT_TYPES = ['text', 'tel', 'number'];
   const SEGMENT = /\b(?:month|day|year|mm|dd|yyyy)\b/i;
@@ -205,6 +208,17 @@
     });
   }
 
+  function reportMiss(element, label) {
+    try {
+      const dropdown = element.tagName === 'SELECT' || element.getAttribute('role') === 'combobox';
+      void request('portal-assist-miss', {label: label.replace(/\s+/g, ' ').trim().slice(0, MISS_LABEL_LIMIT),
+        type: element.getAttribute('role') === 'combobox' ? 'combobox' : element.type || element.tagName.toLowerCase(),
+        host: location.hostname, company_hint: companyHint(),
+        options: dropdown ? choices(element).slice(0, MISS_OPTION_LIMIT).map(option => option.text.slice(0, MISS_OPTION_TEXT_LIMIT)) : []})
+        .catch(() => {});
+    } catch (_) { /* Logging must not change a fill outcome. */ }
+  }
+
   async function fill(element, result, mayWrite) {
     if (!mayWrite()) return null;
     if (element.getAttribute('role') === 'combobox' && element.tagName !== 'SELECT') {
@@ -298,9 +312,15 @@
           type: element.getAttribute('role') === 'combobox' ? 'combobox' : element.type || element.tagName.toLowerCase(),
           host: location.hostname, url, company_hint: companyHint()});
         if (!mayWrite()) return 'field changed';
-        if (!['stored', 'draft'].includes(result.status) || typeof result.answer !== 'string' || !Array.isArray(result.candidates)) return 'no answer';
+        if (!['stored', 'draft'].includes(result.status) || typeof result.answer !== 'string' || !Array.isArray(result.candidates)) {
+          reportMiss(element, label);
+          return 'no answer';
+        }
         written = await fill(element, result, mayWrite);
-        if (!written) return 'no match';
+        if (!written) {
+          reportMiss(element, label);
+          return 'no match';
+        }
         await wait(SETTLE_MS);
         if (!unchanged(element, written)) return 'not retained';
         const state = fieldStates.get(element);
