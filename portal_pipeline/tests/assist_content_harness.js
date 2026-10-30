@@ -58,7 +58,7 @@ async function contentChecks() {
   const marker = '  scan();\n})();';
   assert.equal(source.split(marker).length, 2);
   const instrumented = source.replace(marker,
-    '  globalThis.testAssist = {match, nativeSet, nonempty, fill, labelFor, members, safeClick, scan, groupOf, learnRows, currentAnswer};\n})();');
+    '  globalThis.testAssist = {match, nativeSet, nonempty, fill, labelFor, members, safeClick, scan, groupOf, learnRows, currentAnswer, essayContext};\n})();');
   const shadows = [];
   const requests = [];
   const listeners = {};
@@ -84,6 +84,25 @@ async function contentChecks() {
     MutationObserver: class { observe() {} }});
   vm.runInContext(instrumented, context);
   const api = context.testAssist;
+  assert.deepEqual(JSON.parse(JSON.stringify(api.essayContext())), {});
+  const heading = {closest: () => null, cloneNode: () => ({textContent: 'Quantitative Research Analyst', querySelectorAll: () => []})};
+  document.querySelector = selector => selector.includes('h1') ? heading : null;
+  assert.equal(api.essayContext().job_title, 'Quantitative Research Analyst');
+  heading.cloneNode = () => ({textContent: 'x'.repeat(2000), querySelectorAll: () => []});
+  assert.equal(api.essayContext().job_title.length, 300);
+  assert.equal(api.essayContext().page_snippet.length, 1500);
+  heading.cloneNode = () => {
+    const copy = {textContent: 'ALM Analyst PRIVATE_FORM_VALUE'};
+    copy.querySelectorAll = selector => {
+      assert.match(selector, /input,textarea,select/);
+      return [{remove() { copy.textContent = 'ALM Analyst'; }}];
+    };
+    return copy;
+  };
+  assert.equal(api.essayContext().page_snippet, 'ALM Analyst');
+  heading.closest = () => ({});
+  assert.deepEqual(JSON.parse(JSON.stringify(api.essayContext())), {});
+  heading.closest = () => null;
   const options = [{text: 'NO'}, {text: 'Yes, please'}, {text: 'Yesterday'}];
   assert.equal(api.match(options, ['No']).text, 'NO');
   assert.equal(api.match(options, ['Yes']).text, 'Yes, please');
@@ -156,6 +175,9 @@ async function contentChecks() {
   assert.equal(badge.textContent, 'has value');
   await button.listeners.click(event(true));
   assert.equal(field.value, 'Example answer'); assert.equal(badge.textContent, 'stored');
+  assert.equal(requests.at(-1).body.job_title, 'ALM Analyst');
+  assert.equal(requests.at(-1).body.page_snippet, 'ALM Analyst');
+  assert.equal(JSON.stringify(requests.at(-1)).includes('PRIVATE_FORM_VALUE'), false);
   assert.equal(save.hidden, true);
 
   field.value = ''; delayResponse = true;
@@ -234,7 +256,7 @@ async function contentChecks() {
   const learnFields = [untouched, scripted, edited, filled, hidden, blank, long, password, file, generic, ...protectedFields];
   let navigationClicks = 0;
   const navigation = ['Next', 'Continue', 'Submit'].map(innerText => ({innerText, click() { navigationClicks += 1; }}));
-  document.querySelector = selector => selector.includes('companyName') ? null : navigation[0];
+  document.querySelector = selector => selector.includes('companyName') || selector.includes('h1') ? null : navigation[0];
   document.querySelectorAll = selector => selector.includes('input[type="text"]') ? learnFields : navigation;
   api.scan();
   const trust = node => listeners.input({target: node, isTrusted: true});
@@ -348,12 +370,15 @@ async function workerChecks() {
   vm.runInContext(source, context);
   const send = (message, sender) => new Promise(resolve => listener(message, sender, resolve));
   const sender = {id: 'synthetic-extension', frameId: 0, tab: {}, url: APPLICATION_URL};
-  const message = {type: 'portal-assist-answer', body: {label: 'Example question', host: 'forged.example', url: 'forged'}};
+  const message = {type: 'portal-assist-answer', body: {label: 'Example question', host: 'forged.example', url: 'forged',
+    job_title: 'ALM Analyst', page_snippet: 'ALM Analyst'}};
   const answer = await send(message, sender);
   assert.equal(answer.ok, true);
   assert.equal(calls[0].url, 'http://127.0.0.1:8766/assist/answer');
   assert.equal(calls[0].options.headers['X-Assist-Token'], SYNTHETIC_TOKEN);
   assert.equal(JSON.parse(calls[0].options.body).url, APPLICATION_URL);
+  assert.equal(JSON.parse(calls[0].options.body).job_title, 'ALM Analyst');
+  assert.equal(JSON.parse(calls[0].options.body).page_snippet, 'ALM Analyst');
   assert.equal(JSON.stringify(answer).includes(SYNTHETIC_TOKEN), false);
   for (const invalid of [{...sender, id: 'other-extension'}, {...sender, tab: null},
     {...sender, url: 'https://unrelated.example/apply'}, {...sender, url: 'http://example.myworkdayjobs.com/apply'}]) {

@@ -12,6 +12,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import answer_memory
+import essay_tracks
 import intent_layer
 import learning_queue
 import miss_log
@@ -239,6 +240,7 @@ class AssistService:
     def validate(self, body):
         if not isinstance(body, dict):
             raise ValueError("Request must be a JSON object.")
+        essay_tracks.validate_context(body)
         label = body.get(QUESTION_COLUMN)
         if not isinstance(label, str) or not label.strip() or len(label) > MAX_LABEL:
             raise ValueError("Question must be a bounded nonempty string.")
@@ -258,6 +260,10 @@ class AssistService:
                 handle.write(json.dumps({QUESTION_COLUMN: label}, ensure_ascii=True) + "\n")
             context = label + " " + " ".join(body.get(OPTIONS_COLUMN, []))
             blocked = any(pattern.search(context) for pattern in BLOCKED_DRAFT)
+            if not blocked and not answer_memory.is_protected(body):
+                essay = essay_tracks.answer(self.data, body)
+                if essay:
+                    return essay
             if not NEVER_FILL.search(label) and not answer_memory.is_protected(body):
                 value = self.company_answer(body)
                 source = "company_kb"

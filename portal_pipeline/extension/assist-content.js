@@ -15,6 +15,10 @@
   const MISS_LABEL_LIMIT = 300;
   const MISS_OPTION_LIMIT = 40;
   const MISS_OPTION_TEXT_LIMIT = 120;
+  const MAX_JOB_TITLE = 300;
+  const MAX_PAGE_SNIPPET = 1500;
+  const JOB_HEADING_SELECTOR = '[data-automation-id="jobPostingHeader"],h1,[role="heading"][aria-level="1"]';
+  const HEADING_VALUES = 'input,textarea,select,output,[contenteditable],[role="textbox"],[role="combobox"],[role="spinbutton"],[role="listbox"]';
   const PLACEHOLDER = /^(?:select(?:\s+(?:one|an? option))?|choose(?:\s+.*)?|please select(?:\s+.*)?|[-*\s]*)$/i;
   const TEXT_TYPES = ['text', 'tel', 'number'];
   const SEGMENT = /\b(?:month|day|year|mm|dd|yyyy)\b/i;
@@ -219,6 +223,15 @@
     } catch (_) { /* Logging must not change a fill outcome. */ }
   }
 
+  function essayContext() {
+    const heading = document.querySelector(JOB_HEADING_SELECTOR);
+    if (!heading || heading.closest(HEADING_VALUES)) return {};
+    const copy = heading.cloneNode(true);
+    for (const node of copy.querySelectorAll(HEADING_VALUES)) node.remove();
+    const snippet = (copy.textContent || '').replace(/\s+/g, ' ').trim().slice(0, MAX_PAGE_SNIPPET);
+    return {job_title: snippet.slice(0, MAX_JOB_TITLE), page_snippet: snippet};
+  }
+
   async function fill(element, result, mayWrite) {
     if (!mayWrite()) return null;
     if (element.getAttribute('role') === 'combobox' && element.tagName !== 'SELECT') {
@@ -310,7 +323,7 @@
       try {
         const result = await request('portal-assist-answer', {label, options: choices(element).map(option => option.text),
           type: element.getAttribute('role') === 'combobox' ? 'combobox' : element.type || element.tagName.toLowerCase(),
-          host: location.hostname, url, company_hint: companyHint()});
+          host: location.hostname, url, company_hint: companyHint(), ...essayContext()});
         if (!mayWrite()) return 'field changed';
         if (!['stored', 'draft'].includes(result.status) || typeof result.answer !== 'string' || !Array.isArray(result.candidates)) {
           reportMiss(element, label);
