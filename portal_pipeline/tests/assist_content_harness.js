@@ -236,7 +236,7 @@ async function contentChecks() {
   city.group = zip.group = pair;
   assert.equal(api.groupOf(city).length, 1);
 
-  // Learning requires a trusted edit or retained Fill, never a site-only write.
+  // Learning covers every visible answer, typed, filled or already on the page (Simplify, last application); the review step gates saving.
   keep.isConnected = empty.isConnected = false;
   const untouched = new Input(); untouched.labels = [{innerText: 'Prefilled project'}]; untouched.value = 'Site prefill';
   const scripted = new Input(); scripted.labels = [{innerText: 'Site project'}];
@@ -267,8 +267,9 @@ async function contentChecks() {
   password.value = file.value = 'Never store'; trust(password); trust(file);
   generic.value = 'choice'; trust(generic);
   for (const node of protectedFields) { node.value = 'Never learn'; trust(node); }
-  assert.deepEqual(Array.from(api.learnRows(), row => row.label), ['Preferred project']);
+  assert.deepEqual(Array.from(api.learnRows(), row => [row.label, row.source]), [['Prefilled project', 'prefilled'], ['Site project', 'prefilled'], ['Preferred project', 'typed']]);
 
+  untouched.getClientRects = () => []; scripted.getClientRects = () => [];  // the flow below follows the typed field only
   const [, , , learn, review] = shadows[0].children;
   assert.equal(learn.textContent, 'Learn page');
   assert.equal(learn.type, 'button');
@@ -280,7 +281,7 @@ async function contentChecks() {
   assert.equal(confirm.type, 'button');
   const reviewLabel = reviewLine.children[0];
   assert.equal(reviewLabel.children[0].checked, true);
-  assert.match(reviewLabel.children[1].textContent, /Company: Example Corp\nchanged/);
+  assert.match(reviewLabel.children[1].textContent, /Company: Example Corp\nSource: typed\nchanged/);
   reviewLabel.children[0].checked = false;
   const beforeUntick = requests.length;
   await confirm.listeners.click(event(false));
@@ -291,15 +292,16 @@ async function contentChecks() {
   assert.equal(requests.at(-1).body.pairs[0].previous_answer, 'Older answer');
   assert.match(review.textContent, /Stored 1 answers/);
 
-  untouched.value = 'Edited prefill'; trust(untouched);
+  untouched.getClientRects = () => [{}];  // a page value is listed as prefilled and can be unticked
   await learn.listeners.click(event(false));
   assert.equal(review.children.length, 3);
+  assert.match(review.children[0].children[0].children[1].textContent, /Source: prefilled/);
   review.children[0].children[0].children[0].checked = false;
   await review.children.at(-1).listeners.click(event(false));
   assert.equal(requests.at(-1).body.pairs.length, 1);
   assert.equal(requests.at(-1).body.pairs[0].label, 'Preferred project');
-  assert.equal(untouched.value, 'Edited prefill');
-  untouched.isConnected = false;
+  assert.equal(untouched.value, 'Site prefill');
+  untouched.getClientRects = () => []; untouched.isConnected = false;
 
   await learn.listeners.click(event(false));
   const beforeChanged = requests.length;
@@ -323,7 +325,7 @@ async function contentChecks() {
   context.PortalAutomationFilling = false;
   delayResponse = false;
   edited.value = 'Site rewrite';
-  assert.equal(api.learnRows().length, 0);
+  assert.deepEqual(Array.from(api.learnRows(), row => [row.answer, row.source]), [['Site rewrite', 'prefilled']]);
 
   // A Fill answer remains eligible even when it equals the first-scan value.
   const fillSame = new Input(); fillSame.labels = [{innerText: 'Retained project'}]; fillSame.value = 'Example answer';
@@ -336,7 +338,7 @@ async function contentChecks() {
   fillSame.value = 'User revision'; listeners.change({target: fillSame, isTrusted: true});
   assert.deepEqual(Array.from(api.learnRows(), row => row.answer), ['User revision']);
   fillSame.value = 'Example answer'; trust(fillSame);
-  assert.equal(api.learnRows().length, 0);
+  assert.deepEqual(Array.from(api.learnRows(), row => row.source), ['prefilled']);
 
   const many = Array.from({length: 81}, (_, index) => {
     const node = new Input(); node.labels = [{innerText: `Project ${index}`}]; return node;

@@ -176,10 +176,13 @@
       const options = choices(element).map(option => option.text);
       if (!visible(element) || element.disabled || element.readOnly || !state || !label || !answer
         || FORBIDDEN.test(label) || LEARN_BLOCKED.test([label, ...options].join(' '))
-        || label.length > MAX_LEARN_LABEL || answer.length > MAX_LEARN_ANSWER
-        || !(state.filled === answer || state.corrected === answer || (state.user === answer && answer !== state.initial))) continue;
-      rows.push({element, label, answer, options, corrected: state.corrected === answer,
-        manual: state.filled !== answer && (state.user === answer || state.corrected === answer),
+        || label.length > MAX_LEARN_LABEL || answer.length > MAX_LEARN_ANSWER) continue;
+      // Values already on the page count too: Simplify and the last application are trusted, and the review step still gates saving.
+      const corrected = state.corrected === answer;
+      const typed = state.user === answer && answer !== state.initial;
+      const source = corrected ? 'corrected' : state.filled === answer ? 'filled' : typed ? 'typed' : 'prefilled';
+      rows.push({element, label, answer, options, corrected, source,
+        manual: state.filled !== answer && (typed || corrected),
         type: element.getAttribute('role') === 'combobox' ? 'combobox' : element.type || element.tagName.toLowerCase()});
     }
     return rows.sort((a, b) => Number(b.corrected) - Number(a.corrected));
@@ -454,9 +457,11 @@
         if (automation() || location.href !== url || companyHint() !== company) return;
         if (!Array.isArray(result.results) || result.results.length !== rows.length) throw new Error('Invalid learning review');
         const selected = [];
+        let known = 0;
         result.results.forEach((item, index) => {
           const row = rows[index];
           if (item.label !== row.label) throw new Error('Learning question changed');
+          if (item.status === 'same' && typeof item.similar_to !== 'string') { known += 1; return; }  // already stored, nothing to review
           if (item.status === 'skipped') return;
           if (!['new', 'same', 'changed', 'dropdown'].includes(item.status) || item.answer !== row.answer) throw new Error('Invalid learning answer');
           const mapping = item.status === 'dropdown';
@@ -467,7 +472,7 @@
           checkbox.checked = true;
           const label = document.createElement('label');
           const description = mapping ? `dropdown: ${item.mapping_answer} = ${row.answer}\nVendor: ${item.vendor}${item.previous_option && item.previous_option !== row.answer ? `\nPrevious option: ${item.previous_option}` : ''}`
-            : `${row.answer}\nCompany: ${result.scope}${row.corrected ? '\ncorrected' : ''}`;
+            : `${row.answer}\nCompany: ${result.scope}${row.corrected ? '\ncorrected' : ''}\nSource: ${row.source}`;
           label.append(checkbox, document.createTextNode(`${row.label}\n${description}${item.status === 'changed' ? '\nchanged' : ''}`));
           line.append(label);
           let aliasCheckbox;
@@ -487,7 +492,7 @@
             : {previous_answer: item.previous_answer}),
             ...(aliasCheckbox ? {similar_to: item.similar_to, similar_scope: item.similar_scope} : {})}});
         });
-        if (!selected.length) { review.textContent = 'No eligible answers to learn.'; return; }
+        if (!selected.length) { review.textContent = known ? `Nothing new to learn (${known} already stored).` : 'No eligible answers to learn.'; return; }
         const confirm = document.createElement('button');
         confirm.type = 'button';
         confirm.textContent = 'Confirm';
