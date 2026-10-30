@@ -144,7 +144,16 @@
     return null;
   }
 
+  // Workday multiselect pickers hold their value as pills; the search input itself stays empty.
+  function pills(element) {
+    const box = element.closest?.('[data-automation-id="multiselectInputContainer"]');
+    const scope = box && box.querySelector('[data-automation-id="selectedItem"]') ? box : box?.parentElement;
+    return scope ? [...scope.querySelectorAll('[data-automation-id="selectedItem"] [data-automation-id="promptOption"]')]
+      .map(node => node.getAttribute('data-automation-label') || text(node)).filter(Boolean) : [];
+  }
+
   function nonempty(element) {
+    if (pills(element).length) return true;
     if (element.type === 'radio') return members(element).some(node => node.checked);
     if (element.type === 'checkbox') return element.checked || element.indeterminate;
     if (element.tagName === 'SELECT') return [...element.selectedOptions].some(option => option.value !== '' && !PLACEHOLDER.test(option.text));
@@ -164,6 +173,8 @@
     if (element.type === 'checkbox') return element.indeterminate ? '' : element.checked ? 'Yes' : 'No';
     if (element.tagName === 'SELECT') return [...element.selectedOptions].filter(option =>
       option.value !== '' && !PLACEHOLDER.test(option.text)).map(option => option.text).join('; ');
+    const chosen = pills(element);
+    if (chosen.length) return chosen.join('; ');
     const parts = groupOf(element, capture);
     if (parts.length > 1) return parts.every(node => node.value.trim()) ? parts.map(node => node.value.trim()).join('/') : '';
     const value = String('value' in element ? element.value : text(element)).trim();
