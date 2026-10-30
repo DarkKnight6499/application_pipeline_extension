@@ -6,7 +6,7 @@ const ASSIST_TIMEOUT_MS = 100000;
 const applicationRestrictions = new Set();
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
-    if (["portal-assist-answer", "portal-assist-accept", "portal-assist-learn", "portal-assist-miss", "portal-assist-correction"].includes(message.type)) {
+    if (["portal-assist-answer", "portal-assist-accept", "portal-assist-learn", "portal-assist-miss", "portal-assist-correction", "portal-assist-dump"].includes(message.type)) {
       if (!sender.tab || sender.id !== chrome.runtime.id || typeof sender.url !== "string")
         throw new Error("Assist requires an extension content script.");
       const target = new URL(sender.url);
@@ -15,16 +15,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const {assistToken: ASSIST_TOKEN} = await chrome.storage.local.get("assistToken");
       if (!ASSIST_TOKEN) throw new Error("Save the assist token first: see README, Assist setup.");
       const route = message.type.slice("portal-assist-".length);
+      if (!message.body || typeof message.body !== "object" || Array.isArray(message.body))
+        throw new Error("Assist requires a request object.");
       const miss = route === "miss";
       const body = miss ? {label: message.body?.label, type: message.body?.type, options: message.body?.options,
         company_hint: message.body?.company_hint, host: target.hostname}
         : route === "correction" ? {label: message.body?.label, type: message.body?.type,
           options: message.body?.options, company_hint: message.body?.company_hint, host: target.hostname,
           wrong_value: message.body?.wrong_value, user_value: message.body?.user_value}
+        : route === "dump" ? {pairs: message.body.pairs, company_hint: message.body.company_hint,
+          host: target.hostname, url: target.href}
         : {...message.body, host: target.hostname, url: target.href};
+      const serialized = JSON.stringify(body);
+      if (encodeURIComponent(serialized).replace(/%[0-9A-F]{2}|[^%]/g, 'x').length > 64 * 1024)
+        throw new Error("Assist request exceeds 64 KB.");
       const response = await fetch(`http://127.0.0.1:${ASSIST_PORT}/assist/${route}`, {
         method: "POST", headers: {"X-Assist-Token": ASSIST_TOKEN, "Content-Type": "application/json"},
-        body: JSON.stringify(body), signal: AbortSignal.timeout(ASSIST_TIMEOUT_MS)
+        body: serialized, signal: AbortSignal.timeout(ASSIST_TIMEOUT_MS)
       });
       const value = await response.json();
       if (!response.ok) throw new Error(value.error || "Assist request failed.");

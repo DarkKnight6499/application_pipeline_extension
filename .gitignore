@@ -3,6 +3,10 @@
 **/node_modules/
 .venv/
 portal_pipeline/data/
+**/page_questions.jsonl
+**/questions_processed.json
+**/conflicts.json
+**/questions_sort_errors.log
 portal_pipeline/test-results/
 Portal_Trial/out/
 *.docx

@@ -2,6 +2,7 @@
 (() => {
   // Config
   const FIELD_SELECTOR = 'input:not([type]),input[type="text"],input[type="email"],input[type="tel"],input[type="url"],input[type="search"],textarea,select,input[type="radio"],input[type="checkbox"],[role="combobox"]';
+  const CAPTURE_SELECTOR = 'input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),textarea,select,[role="combobox"]';
   const GROUP_SELECTOR = 'fieldset,[role="radiogroup"],[role="group"],[data-automation-id="formField"],.form-field,.field';
   const FORBIDDEN = /\b(password|passcode|captcha|verification code|ssn|social security|signature|sign|signed|initials|attest\w*|certify|declaration|I (confirm|affirm|declare)|truthful|accurate and complete|true and (correct|accurate))\b/i;
   const LEARN_BLOCKED = /\b(?:(?:work|employment)\s+(?:authori[sz]ation|eligibility)|(?:authori[sz]\w*|eligib\w*|right|permit\w*|permission|allow\w*|legally)\b.{0,60}\b(?:work|employment)|visa|sponsor\w*|immigration|citizen\w*|nationality|work permit|opt|cpt|h[ -]?1b|disab\w*|accommodation\w*|veteran\w*|military|armed forces|national guard|reservist\w*|reserves|active duty|service member|uniformed services|gender|sex|male|female|non[ -]?binary|transgender|race|racial|ethnic\w*|hispanic|latino|black|white|asian|indigenous|native american|pacific islander|sexual orientation|lgbtq\w*|pronouns?|self[ -]?(?:id\w*|identification|disclosure)|demographic\w*|religio\w*|marital status|national origin|eeo|decline to (?:identify|answer|disclose))\b/i;
@@ -81,12 +82,13 @@
   const descriptor = node => [ariaLabel(node), node.placeholder, node.name, node.id].join(' ');
 
   // Split date or similar segments (month/day/year inputs) are one field, not three.
-  function groupOf(element) {
+  function groupOf(element, capture = false) {
     const textInput = node => node.tagName === 'INPUT' && TEXT_TYPES.includes(node.type) && node.getAttribute('role') !== 'combobox';
     if (!textInput(element)) return [element];
     const container = element.closest(GROUP_SELECTOR);
     if (!container) return [element];
-    const parts = [...container.querySelectorAll(FIELD_SELECTOR)].filter(node => textInput(node) && visible(node) && !node.disabled && !node.readOnly);
+    const parts = [...container.querySelectorAll(capture ? CAPTURE_SELECTOR : FIELD_SELECTOR)].filter(node =>
+      textInput(node) && visible(node) && (capture || (!node.disabled && !node.readOnly)));
     return parts.length > 1 && parts.includes(element) && parts.every(node => SEGMENT.test(descriptor(node))) ? parts : [element];
   }
 
@@ -152,7 +154,7 @@
     return !!element.value?.trim();
   }
 
-  function currentAnswer(element) {
+  function currentAnswer(element, capture = false) {
     if (['password', 'file'].includes(element.type)) return '';
     if (element.type === 'radio') {
       const checked = members(element).find(node => node.checked);
@@ -161,22 +163,38 @@
     if (element.type === 'checkbox') return element.indeterminate ? '' : element.checked ? 'Yes' : 'No';
     if (element.tagName === 'SELECT') return [...element.selectedOptions].filter(option =>
       option.value !== '' && !PLACEHOLDER.test(option.text)).map(option => option.text).join('; ');
-    const parts = groupOf(element);
+    const parts = groupOf(element, capture);
     if (parts.length > 1) return parts.every(node => node.value.trim()) ? parts.map(node => node.value.trim()).join('/') : '';
     const value = String('value' in element ? element.value : text(element)).trim();
     return element.getAttribute('role') === 'combobox' && PLACEHOLDER.test(value) ? '' : value;
   }
 
-  function learnRows() {
+  function captureElements() {
+    const seen = new Set();
+    return [...document.querySelectorAll(CAPTURE_SELECTOR)].filter(element => {
+      if (!visible(element) || element.closest('[data-portal-panel]') || element.parentElement?.closest('[role="combobox"]')) return false;
+      const parts = element.type === 'radio' ? members(element) : groupOf(element, true);
+      if (parts.some(node => seen.has(node))) return false;
+      parts.forEach(node => seen.add(node));
+      return true;
+    });
+  }
+
+  function learnRows(capture = false) {
     const rows = [];
-    for (const [element] of controls) {
-      const label = labelFor(element);
-      const answer = currentAnswer(element);
-      const state = fieldStates.get(element);
+    for (const element of capture ? captureElements() : controls.keys()) {
+      const label = labelFor(element) || (capture ? ownLabel(element) : '');
+      if (capture && ['password', 'file'].includes(element.type)) {
+        rows.push({element, label, type: element.type});
+        continue;
+      }
+      const answer = currentAnswer(element, capture);
+      const state = fieldStates.get(element) || {initial: answer};
       const options = choices(element).map(option => option.text);
-      if (!visible(element) || element.disabled || element.readOnly || !state || !label || !answer
-        || FORBIDDEN.test(label) || LEARN_BLOCKED.test([label, ...options].join(' '))
-        || label.length > MAX_LEARN_LABEL || answer.length > MAX_LEARN_ANSWER) continue;
+      if (!visible(element) || !label || !answer) continue;
+      if (!capture && (element.disabled || element.readOnly || FORBIDDEN.test(label)
+        || LEARN_BLOCKED.test([label, ...options].join(' '))
+        || label.length > MAX_LEARN_LABEL || answer.length > MAX_LEARN_ANSWER)) continue;
       // Values already on the page count too: Simplify and the last application are trusted, and the review step still gates saving.
       const corrected = state.corrected === answer;
       const typed = state.user === answer && answer !== state.initial;
@@ -188,8 +206,8 @@
     return rows.sort((a, b) => Number(b.corrected) - Number(a.corrected));
   }
 
-  function correctionEdit(element, state) {
-    const answer = currentAnswer(element);
+  function correctionEdit(element, state, capture = false) {
+    const answer = currentAnswer(element, capture);
     clearTimeout(state.correctionTimer);
     if (state.assistValue && answer !== state.assistValue) {
       state.corrected = answer;
@@ -433,7 +451,36 @@
     const review = document.createElement('div');
     review.hidden = true;
     shadow.append(learn, review);
+    const savePage = document.createElement('button');
+    savePage.type = 'button';
+    savePage.textContent = 'Save page';
+    savePage.title = 'Save every visible labelled answer locally. Password and file inputs are not answers and are excluded.';
+    const savedSummary = document.createElement('div');
+    savedSummary.hidden = true;
+    shadow.append(savePage, savedSummary);
     (document.body || document.documentElement).append(host);
+    savePage.addEventListener('click', async event => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (pending || automation()) return;
+      scan();
+      const rows = learnRows(true);
+      savedSummary.hidden = false;
+      if (rows.length > MAX_LEARN_PAIRS) {
+        savedSummary.textContent = 'Save failed: more than 80 fields. Save a smaller page.';
+        return;
+      }
+      pending = true;
+      savePage.disabled = true;
+      try {
+        const pairs = rows.map(({label, answer, source, type, options}) => ({label, answer, source, type, options}));
+        const result = await request('portal-assist-dump', {pairs, company_hint: companyHint()});
+        if (!['saved', 'excluded_by_type', 'duplicate', 'flagged_sensitive'].every(key => Number.isSafeInteger(result?.[key]) && result[key] >= 0))
+          throw new Error('Invalid save counts');
+        savedSummary.textContent = `saved ${result.saved}, skipped ${result.excluded_by_type} blocked by type (password/file inputs are not answers), duplicate ${result.duplicate}, sensitive ${result.flagged_sensitive}`;
+      } catch (_) { savedSummary.textContent = 'Save failed. Check the local helper and request size (64 KB).'; }
+      finally { pending = false; savePage.disabled = false; }
+    });
     learn.addEventListener('click', async event => {
       event.preventDefault();
       event.stopPropagation();
@@ -449,7 +496,7 @@
       const url = location.href;
       const company = companyHint();
       const context = {host: location.hostname, url, company_hint: company};
-      const pairs = rows.map(({label, answer, options, type, manual}) => ({label, answer, options, type, manual}));
+      const pairs = rows.map(({label, answer, options, type, manual, source}) => ({label, answer, options, type, manual, source}));
       pending = true;
       learn.disabled = true;
       try {
@@ -580,9 +627,12 @@
       else entry.host.hidden = !(focused === element && visible(element));
     }
     if (!dock) dock = makeDock();
-    dock.host.hidden = controls.size === 0 || automation();
+    dock.host.hidden = automation() || captureElements().length === 0;
     place();
     if (automation()) return;
+    for (const element of captureElements()) {
+      if (!fieldStates.has(element)) fieldStates.set(element, {initial: currentAnswer(element, true)});
+    }
     const radioSeen = new Set();
     for (const element of document.querySelectorAll(FIELD_SELECTOR)) {
       if (!fieldStates.has(element)) fieldStates.set(element, {initial: currentAnswer(element)});
@@ -616,10 +666,11 @@
   });
   for (const type of ['input', 'change']) document.addEventListener?.(type, event => {
     if (!event.isTrusted || automation()) return;
-    for (const [element] of controls) {
-      if (groupOf(element).includes(event.target) || members(element).includes(event.target)) {
+    for (const element of new Set([...controls.keys(), ...captureElements()])) {
+      const capture = !controls.has(element);
+      if (groupOf(element, capture).includes(event.target) || members(element).includes(event.target)) {
         const state = fieldStates.get(element);
-        if (state) correctionEdit(element, state);
+        if (state) correctionEdit(element, state, capture);
       }
     }
   }, true);

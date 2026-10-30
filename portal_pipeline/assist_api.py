@@ -12,12 +12,14 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import answer_memory
+import assist_jobs
 import corrections
 import dropdown_mappings
 import essay_tracks
 import intent_layer
 import learning_queue
 import miss_log
+import page_questions
 import question_alias
 from shared_storage import atomic_json, file_lock
 
@@ -100,7 +102,6 @@ class AssistService:
             raise ValueError("Assist data and read-only reference must not overlap.")
         self.data.mkdir(parents=True, exist_ok=True)
         self.token_path = self.data / TOKEN_FILENAME
-        self.lock = threading.RLock()
         self.kb_module = None
         if token:
             self.token = token
@@ -212,6 +213,10 @@ class AssistService:
         return facts
 
     def draft(self, body):
+        with assist_jobs.JOB_SLOTS:
+            return self._draft(body)
+
+    def _draft(self, body):
         try:
             facts = json.dumps(self.profile_facts(), ensure_ascii=True)
             if len(facts) > PROFILE_LIMIT:
@@ -261,40 +266,39 @@ class AssistService:
     def _answer(self, body):
         self.validate(body)
         label = body[QUESTION_COLUMN]
-        with self.lock:
-            with (self.data / LOG_FILENAME).open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps({QUESTION_COLUMN: label}, ensure_ascii=True) + "\n")
-            context = label + " " + " ".join(body.get(OPTIONS_COLUMN, []))
-            blocked = any(pattern.search(context) for pattern in BLOCKED_DRAFT) or question_alias.blocked(body) or dropdown_mappings.blocked(body)
-            if corrections.blocked(body):
-                self.queue_question(body, True)
-                return {"status": "none", "source": "manual", "answer": "", "candidates": []}
-            if not blocked:
-                corrected = corrections.suggestion(self.data, body)
-                if corrected:
-                    return {"status": "draft", "reason": "corrected", "source": "corrections",
-                            "answer": corrected, "candidates": intent_layer.expand(corrected)}
-            if not blocked and not answer_memory.is_protected(body):
-                essay = essay_tracks.answer(self.data, body)
-                if essay:
-                    return essay
-            if not NEVER_FILL.search(label) and not question_alias.blocked(body) and not dropdown_mappings.blocked(body):
-                value = self.company_answer(body)
-                source = "company_kb"
+        with file_lock(self.data / LOG_FILENAME), (self.data / LOG_FILENAME).open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps({QUESTION_COLUMN: label}, ensure_ascii=True) + "\n")
+        context = label + " " + " ".join(body.get(OPTIONS_COLUMN, []))
+        blocked = any(pattern.search(context) for pattern in BLOCKED_DRAFT) or question_alias.blocked(body) or dropdown_mappings.blocked(body)
+        if corrections.blocked(body):
+            self.queue_question(body, True)
+            return {"status": "none", "source": "manual", "answer": "", "candidates": []}
+        if not blocked:
+            corrected = corrections.suggestion(self.data, body)
+            if corrected:
+                return {"status": "draft", "reason": "corrected", "source": "corrections",
+                        "answer": corrected, "candidates": intent_layer.expand(corrected)}
+        if not blocked and not answer_memory.is_protected(body):
+            essay = essay_tracks.answer(self.data, body)
+            if essay:
+                return essay
+        if not NEVER_FILL.search(label) and not question_alias.blocked(body) and not dropdown_mappings.blocked(body):
+            value = self.company_answer(body)
+            source = "company_kb"
+            if not value:
+                memory = answer_memory.load_memory(self.data)
+                value = intent_layer.lookup(memory, label)
+                source = "intent"
                 if not value:
-                    memory = answer_memory.load_memory(self.data)
-                    value = intent_layer.lookup(memory, label)
-                    source = "intent"
-                    if not value:
-                        value = answer_memory.lookup(memory, label)
-                        source = "answer_memory"
-                if not value:
-                    value = question_alias.lookup(self, body)
-                    source = "question_alias"
-                if value:
-                    return {"status": "stored", "source": source, "answer": value,
-                            "candidates": intent_layer.expand(value)}
-            self.queue_question(body, blocked)
+                    value = answer_memory.lookup(memory, label)
+                    source = "answer_memory"
+            if not value:
+                value = question_alias.lookup(self, body)
+                source = "question_alias"
+            if value:
+                return {"status": "stored", "source": source, "answer": value,
+                        "candidates": intent_layer.expand(value)}
+        self.queue_question(body, blocked)
         if blocked or question_alias.blocked(body) or dropdown_mappings.blocked(body):
             miss_log.try_record(self.data, body)
             return {"status": "none", "source": "manual", "answer": "", "candidates": []}
@@ -306,6 +310,15 @@ class AssistService:
 
     def miss(self, body):
         return {"status": "logged" if miss_log.record(self.data, body) else "skipped"}
+
+    def dump(self, body):
+        result = page_questions.capture(self, body)
+        if result["saved"]:
+            try:
+                assist_jobs.schedule(self)
+            except Exception as error:
+                assist_jobs.log_error(self.data, error)
+        return result
 
     def correction(self, body):
         self.validate(body)
@@ -333,10 +346,14 @@ class AssistService:
         return {"status": "stored"}
 
     @staticmethod
-    def save_reviewed(memory, label, answer, scoped):
+    def save_reviewed(memory, label, answer, scoped, source="assist-reviewed"):
         memory["author"] = "Yazad Madan"
-        return (not scoped and intent_layer.learn(memory, label, answer, source="assist-reviewed")) or answer_memory.remember(
-            memory, label, answer, source="assist-reviewed")
+        saved = (not scoped and intent_layer.learn(memory, label, answer, source=source)) or answer_memory.remember(
+            memory, label, answer, source=source)
+        if saved and not scoped and intent_layer.classify(label):
+            key = answer_memory.normalize_label(intent_layer.key_for(intent_layer.classify(label)))
+            memory["answers"][key]["question_label"] = label
+        return saved
 
     @staticmethod
     def update_reviewed(update, directory, scoped=True):
@@ -365,7 +382,9 @@ class AssistService:
             key = answer_memory.normalize_label(label)
             if (len(label) > MAX_LEARN_LABEL or not isinstance(answer, str) or len(answer) > MAX_LEARN_ANSWER
                     or not key or key in seen or (previous is not None and
-                    (not isinstance(previous, str) or len(previous) > MAX_LEARN_ANSWER))):
+                    (not isinstance(previous, str) or len(previous) > MAX_LEARN_ANSWER))
+                    or not isinstance(pair.get(page_questions.SOURCE, "typed"), str)
+                    or pair.get(page_questions.SOURCE, "typed") not in page_questions.SOURCES):
                 raise ValueError("Invalid or duplicate learning pair.")
             seen.add(key)
         results = []
@@ -394,11 +413,15 @@ class AssistService:
                                 PREVIOUS_ANSWER: previous, "scope": company, "stored": store, **alias})
             return wrote
 
-        with self.lock, answer_memory.memory_lock(directory), answer_memory.memory_lock(self.data):
-            if dry_run:
-                review(answer_memory.load_memory(directory))
-            else:
+        if dry_run:
+            review(answer_memory.load_memory(directory))
+        else:
+            with answer_memory.memory_lock(directory), answer_memory.memory_lock(self.data):
                 self.update_reviewed(review, directory)
+            confirmed = [{**pair, page_questions.SOURCE: pair.get(page_questions.SOURCE, "typed")}
+                         for pair, result in zip(pairs, results) if result.get("stored")]
+            if confirmed:
+                self.dump({**body, LEARN_PAIRS: confirmed})
         return {"results": results, "scope": company, "dry_run": dry_run}
 
 
@@ -445,12 +468,12 @@ def handle(handler, service):
             return True
         handler.connection.settimeout(10)
         body = json.loads(handler.rfile.read(size))
-        if path not in {"/assist/answer", "/assist/accept", "/assist/learn", "/assist/miss", "/assist/correction"}:
+        if path not in {"/assist/answer", "/assist/accept", "/assist/learn", "/assist/miss", "/assist/correction", "/assist/dump"}:
             handler.send(404, {"error": "Not found."})
         else:
             result = {"/assist/answer": service.answer, "/assist/accept": service.accept,
                       "/assist/learn": service.learn, "/assist/miss": service.miss,
-                      "/assist/correction": service.correction}[path](body)
+                      "/assist/correction": service.correction, "/assist/dump": service.dump}[path](body)
             handler.send(200, result, extra={"Access-Control-Allow-Origin": handler.headers["Origin"], "Vary": "Origin"})
     except (ValueError, TypeError, UnicodeError):
         handler.send(400, {"error": "Invalid assist request."})

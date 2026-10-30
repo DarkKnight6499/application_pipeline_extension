@@ -126,8 +126,35 @@ Assist setup: on that page click the extension's "service worker" link, and in i
 Then refresh the application page.
 Click Fill beside a question. Shift-click explicitly permits overwriting an existing value.
 Stored answers precede drafts. A draft is not saved until you click Save this answer beside its field.
-Missing answers enter the local learning queue. Sensitive questions require a reviewed stored answer and never trigger drafting.
+Missing answers enter the local learning queue. Eligibility, self-ID, signatures, and attestations remain manual even when stored. Sensitive questions never trigger drafting.
 Drafting uses the logged-in `claude` CLI with built-in and MCP tools disabled and a 90 second timeout ([CLI flags](https://code.claude.com/docs/en/cli-reference)). No API key is required.
 Configure the read-only knowledge and profile paths in `assist_api.py`; Resume files are never written.
 The token stays in the extension worker. Question logs and the learning queue remain under ignored `data/`.
 Signatures, attestations, navigation, and submission remain manual. DOM readback does not prove remote saving.
+
+### Save page and sort captured questions
+
+The left dock's **Save page** button, below **Learn page**, saves all visible labelled answers in one click without a review list. Learn page retains its reviewed saving flow. Confirm also appends successfully stored checked rows to the same capture file, preserving each source (legacy clients without a source use typed). Save page captures profile, eligibility, self-ID, signature, attestation, and SSN-labelled answers locally. Password and file inputs are not answers: their values are never read or sent, and the dock counts their exclusions. Save page refuses automation and never navigates or submits.
+
+Captures append to ignored `portal_pipeline/data/page_questions.jsonl`, one JSON object per answer. Read or tail this file directly for chat review. It contains personal answers and must remain local. `assist_questions.jsonl` is the existing, unrelated log of labels asked through `/assist/answer`; it remains unchanged. Raw captures never supply Fill answers.
+
+```powershell
+py -3 -B portal_pipeline/questions_sort.py report
+py -3 -B portal_pipeline/questions_sort.py report --json
+py -3 -B portal_pipeline/questions_sort.py promote
+py -3 -B portal_pipeline/questions_sort.py resolve --label "Describe your preferred project" --answer "Synthetic project answer"
+```
+
+Successful appends trigger background promotion 30 seconds after the last append. Change `SORT_DEBOUNCE_SECONDS` in `assist_jobs.py` for local tuning. One background sort runs per data directory in each helper process; dumps due during a run coalesce into one follow-up. Drafts and all sorter commands share a process-local limit of three jobs. Dump responses never wait for sorting. Pending timers are not durable; after a helper restart, use `promote` to process any remaining captures.
+
+Every successful sorter command atomically replaces `conflicts.json` with an author, schema version, and `conflicts` list. Each conflict includes label variants, distinct answers, companies, stored scopes, and resolution status. An empty list clears old conflicts. Background errors append only UTC time and exception type to `questions_sort_errors.log`; no answer values or errors reach the dump response.
+
+Put optional `--data <assist-data-directory>` before the command. `AGREE` requires two distinct named companies and no captured or stored contradiction. `SINGLE` saves only into each observed company/host scope. Unnamed hosts cannot establish agreement between companies. Conservative question aliases merge presentation variants; changed meanings remain separate. Sources prefilled, filled, typed, and corrected count equally, once per company. Answer normalization preserves punctuation, ignores case and whitespace, and follows existing Yes/No option equivalents.
+
+`promote` uses the same reviewed-answer writer as Save this answer, with sources `questions-promoted` and `questions-single`. Existing conflicting answers are never replaced automatically. Only unresolved `CONFLICT` groups need a chat choice. `resolve` explicitly sets the shared answer and preserves differing company answers in their scopes. Resolved conflicts remain visible with `resolved: true`; new sightings or changed shared answers reopen them. Multiple different answers within one company, or an existing conflicting company value, require manual company review.
+
+`SENSITIVE (captured, never auto-filled)` lists captured answers and companies separately. Neither promote nor resolve writes these groups into answer stores. There is no sensitive override flag. Server flags use the full question and options before truncation; Fill and existing answer routes retain their blockers.
+
+Limits: 80 pairs and 64 KiB per request; label 300 characters, answer 2000, company 150, type 40, and 40 options of 120 characters. Oversized field values within an accepted request are truncated, with `truncated` and `truncated_fields`; oversized requests fail without partial capture. The file stores author, schema_version, UTC ts, company, host, vendor, label, answer, source, type, options, page_id, sensitive, and truncation flags. Truncated identity fields also get a `pair_digest` so different original values are not deduplicated by their shared prefix. Exact company/label/answer duplicates within seven days are skipped. Counts in the dock and response include saved, duplicate, excluded_by_type, and flagged_sensitive; the last count covers newly saved sensitive rows. No values appear in those responses or errors.
+
+`questions_processed.json` holds fingerprints and resolution state, without answers. Repeated promotion skips unchanged groups. Sorting runs outside write locks. Each promotion re-reads captures and checks stores and resolution state under the final write locks; changed snapshots retry outside the locks. A conflicting or sensitive row received during sorting blocks that promotion. It never edits the capture file. Reports include label variants, answers and companies, distinct-company sightings, raw capture counts, first/last UTC timestamps, stored answers, truncation, and resolution flags. All local data, capture/state filenames, conflicts, and sorter error logs are Git-ignored. See [Save page validation](../docs/TRIAL_ERRORS.md#october-30-2026-save-page-questions) for synthetic evidence and limits.
