@@ -12,6 +12,7 @@
   const ACTION = /^(?:next|continue|submit|apply)(?:\b|$)/i;
   const DEBOUNCE_MS = 180;
   const SETTLE_MS = 180;
+  const CORRECTION_DEBOUNCE_MS = 180;
   const POPUP_TIMEOUT_MS = 1800;
   const MISS_LABEL_LIMIT = 300;
   const MISS_OPTION_LIMIT = 40;
@@ -170,10 +171,45 @@
       if (!visible(element) || element.disabled || element.readOnly || !state || !label || !answer
         || FORBIDDEN.test(label) || LEARN_BLOCKED.test([label, ...options].join(' '))
         || label.length > MAX_LEARN_LABEL || answer.length > MAX_LEARN_ANSWER
-        || !(state.filled === answer || (state.user === answer && answer !== state.initial))) continue;
-      rows.push({element, label, answer, options, type: element.type || element.tagName.toLowerCase()});
+        || !(state.filled === answer || state.corrected === answer || (state.user === answer && answer !== state.initial))) continue;
+      rows.push({element, label, answer, options, corrected: state.corrected === answer,
+        type: element.type || element.tagName.toLowerCase()});
     }
-    return rows;
+    return rows.sort((a, b) => Number(b.corrected) - Number(a.corrected));
+  }
+
+  function correctionEdit(element, state) {
+    const answer = currentAnswer(element);
+    clearTimeout(state.correctionTimer);
+    if (state.assistValue && answer !== state.assistValue) {
+      state.corrected = answer;
+      state.correctionPending = !!state.fillContext && answer !== state.reportedUser;
+    } else {
+      state.corrected = null;
+      state.correctionPending = false;
+    }
+    state.user = answer;
+    state.filled = null;
+  }
+
+  function correctionBlur(element, state) {
+    clearTimeout(state.correctionTimer);
+    if (state.user === state.assistValue && currentAnswer(element) === state.user) state.reportedUser = state.assistValue;
+    if (!state.correctionPending || !state.fillContext) return;
+    const context = state.fillContext;
+    const answer = state.user;
+    state.correctionTimer = setTimeout(() => {
+      if (automation() || !element.isConnected || !visible(element) || element.disabled || element.readOnly
+        || state.fillContext !== context || !state.correctionPending || state.user !== answer
+        || currentAnswer(element) !== answer || labelFor(element) !== context.label
+        || location.href !== context.url || companyHint() !== context.company_hint) return;
+      const options = [...new Set([...context.options, ...choices(element).map(option => option.text)])];
+      if (!answer || answer.length > MAX_LEARN_ANSWER || context.label.length > MAX_LEARN_LABEL
+        || FORBIDDEN.test(context.label) || LEARN_BLOCKED.test([context.label, ...options].join(' '))) return;
+      state.correctionPending = false;
+      state.reportedUser = answer;
+      void request('portal-assist-correction', {...context, options, user_value: answer}).catch(() => {});
+    }, CORRECTION_DEBOUNCE_MS);
   }
 
   function nativeSet(element, property, value) {
@@ -338,7 +374,17 @@
         await wait(SETTLE_MS);
         if (!unchanged(element, written)) return 'not retained';
         const state = fieldStates.get(element);
-        if (state) state.filled = currentAnswer(element);
+        if (state) {
+          clearTimeout(state.correctionTimer);
+          state.filled = currentAnswer(element);
+          state.assistValue = state.filled;
+          state.reportedUser = state.filled;
+          state.user = state.corrected = null;
+          state.correctionPending = false;
+          state.fillContext = {label, type: element.getAttribute('role') === 'combobox' ? 'combobox'
+            : element.type || element.tagName.toLowerCase(), host: location.hostname, url,
+            company_hint: companyHint(), options: choices(element).map(option => option.text), wrong_value: state.filled};
+        }
         draft = result.status === 'draft' ? {label, answer: result.answer} : null;
         save.hidden = !draft;
         return result.status;
@@ -411,7 +457,7 @@
           checkbox.type = 'checkbox';
           checkbox.checked = true;
           const label = document.createElement('label');
-          label.append(checkbox, document.createTextNode(`${row.label}\n${row.answer}\nCompany: ${result.scope}${item.status === 'changed' ? '\nchanged' : ''}`));
+          label.append(checkbox, document.createTextNode(`${row.label}\n${row.answer}\nCompany: ${result.scope}${row.corrected ? '\ncorrected' : ''}${item.status === 'changed' ? '\nchanged' : ''}`));
           line.append(label);
           let aliasCheckbox;
           if (typeof item.similar_to === 'string' && ['company', 'global'].includes(item.similar_scope)) {
@@ -547,6 +593,7 @@
   document.addEventListener?.('focusin', event => {
     if (event.target === dock?.host || [...controls.values()].some(entry => entry.host === event.target)) return;
     focused = [...controls.keys()].find(element => groupOf(element).includes(event.target) || element.contains?.(event.target)) || null;
+    if (event.isTrusted && focused) clearTimeout(fieldStates.get(focused)?.correctionTimer);
     scan();
   });
   for (const type of ['input', 'change']) document.addEventListener?.(type, event => {
@@ -554,7 +601,16 @@
     for (const [element] of controls) {
       if (groupOf(element).includes(event.target) || members(element).includes(event.target)) {
         const state = fieldStates.get(element);
-        if (state) { state.user = currentAnswer(element); state.filled = null; }
+        if (state) correctionEdit(element, state);
+      }
+    }
+  }, true);
+  document.addEventListener?.('blur', event => {
+    if (!event.isTrusted || automation()) return;
+    for (const [element] of controls) {
+      if (groupOf(element).includes(event.target) || members(element).includes(event.target)) {
+        const state = fieldStates.get(element);
+        if (state) correctionBlur(element, state);
       }
     }
   }, true);

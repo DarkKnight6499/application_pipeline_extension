@@ -171,6 +171,12 @@ class AssistTests(unittest.TestCase):
         for label in ("Gender?", "Signature"):
             with self.assertRaises(ValueError):
                 self.service.accept(dict(label=label, answer=ANSWER))
+
+    def test_sensitive_answer_and_signature_are_never_accepted_or_filled(self):
+        for label in ("Gender?", "Signature"):
+            with self.assertRaises(ValueError):
+                self.service.accept(dict(label=label, answer=ANSWER))
+            self.assertEqual(self.service.answer(self.payload(label))["status"], "none")
         self.draft.assert_not_called()
 
     def test_repeated_miss_has_one_queue_entry(self):

@@ -12,6 +12,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import answer_memory
+import corrections
 import essay_tracks
 import intent_layer
 import learning_queue
@@ -261,6 +262,14 @@ class AssistService:
                 handle.write(json.dumps({QUESTION_COLUMN: label}, ensure_ascii=True) + "\n")
             context = label + " " + " ".join(body.get(OPTIONS_COLUMN, []))
             blocked = any(pattern.search(context) for pattern in BLOCKED_DRAFT) or question_alias.blocked(body)
+            if corrections.blocked(body):
+                self.queue_question(body, True)
+                return {"status": "none", "source": "manual", "answer": "", "candidates": []}
+            if not blocked:
+                corrected = corrections.suggestion(self.data, body)
+                if corrected:
+                    return {"status": "draft", "reason": "corrected", "source": "corrections",
+                            "answer": corrected, "candidates": intent_layer.expand(corrected)}
             if not blocked and not answer_memory.is_protected(body):
                 essay = essay_tracks.answer(self.data, body)
                 if essay:
@@ -294,11 +303,18 @@ class AssistService:
     def miss(self, body):
         return {"status": "logged" if miss_log.record(self.data, body) else "skipped"}
 
+    def correction(self, body):
+        self.validate(body)
+        context = body[QUESTION_COLUMN] + " " + " ".join(body.get(OPTIONS_COLUMN, []))
+        if any(pattern.search(context) for pattern in BLOCKED_DRAFT):
+            return {"status": "skipped"}
+        return {"status": "recorded" if corrections.record(self.data, body) else "skipped"}
+
     def accept(self, body):
         self.validate(body)
         label, answer = body[QUESTION_COLUMN], body.get(ANSWER_COLUMN)
         if (not isinstance(answer, str) or not answer.strip() or len(answer) > answer_memory.MAX_ANSWER
-                or NEVER_FILL.search(label) or question_alias.blocked(body)):
+                or NEVER_FILL.search(label) or question_alias.blocked(body) or corrections.blocked(body)):
             raise ValueError("Answer is empty, too long, or protected.")
         scoped = bool(body.get(HOST_COLUMN))
         directory = self.company_scope(body)[0] if scoped else self.data
@@ -348,7 +364,7 @@ class AssistService:
             for pair in pairs:
                 label, answer = pair[QUESTION_COLUMN], pair[ANSWER_COLUMN].strip()
                 context = label + " " + " ".join(pair.get(OPTIONS_COLUMN, []))
-                if (not answer or NEVER_FILL.search(label) or question_alias.blocked(pair)
+                if (not answer or NEVER_FILL.search(label) or question_alias.blocked(pair) or corrections.blocked(pair)
                         or any(pattern.search(context) for pattern in BLOCKED_DRAFT)):
                     results.append({QUESTION_COLUMN: label, "status": "skipped", "stored": False})
                     continue
@@ -414,11 +430,12 @@ def handle(handler, service):
             return True
         handler.connection.settimeout(10)
         body = json.loads(handler.rfile.read(size))
-        if path not in {"/assist/answer", "/assist/accept", "/assist/learn", "/assist/miss"}:
+        if path not in {"/assist/answer", "/assist/accept", "/assist/learn", "/assist/miss", "/assist/correction"}:
             handler.send(404, {"error": "Not found."})
         else:
             result = {"/assist/answer": service.answer, "/assist/accept": service.accept,
-                      "/assist/learn": service.learn, "/assist/miss": service.miss}[path](body)
+                      "/assist/learn": service.learn, "/assist/miss": service.miss,
+                      "/assist/correction": service.correction}[path](body)
             handler.send(200, result, extra={"Access-Control-Allow-Origin": handler.headers["Origin"], "Vary": "Origin"})
     except (ValueError, TypeError, UnicodeError):
         handler.send(400, {"error": "Invalid assist request."})
