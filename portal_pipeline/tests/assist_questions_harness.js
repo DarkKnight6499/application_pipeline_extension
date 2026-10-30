@@ -29,6 +29,7 @@ class Element {
   addEventListener(type, callback) { this.listeners[type] = callback; }
   attachShadow() { this.shadow = new Element('div'); return this.shadow; }
   remove() { this.isConnected = false; }
+  click() { return this.listeners.click?.({preventDefault() {}, stopPropagation() {}}); }
 }
 
 async function contentChecks() {
@@ -90,8 +91,9 @@ async function contentChecks() {
   assert.equal(save.type, 'button');
   const before = fields.filter(field => !['password', 'file'].includes(field.type)).map(field => field.value);
   await save.listeners.click(EVENT);
-  assert.equal(requests.length, 1);
   assert.equal(requests[0].type, 'portal-assist-dump');
+  assert.equal(requests[1].type, 'portal-assist-learn');  // Save page chains the reviewed Learn list
+  assert.equal(requests[1].body.dry_run, true);
   const rows = requests[0].body.pairs;
   assert.equal(rows.length, fields.length - 2);
   assert.equal(rows.find(row => row.label === 'Typed project').source, 'typed');
@@ -107,10 +109,10 @@ async function contentChecks() {
   assert.equal(summary.hidden, false);
   assert.equal(save.disabled, false);
   assert.deepEqual(fields.filter(field => !['password', 'file'].includes(field.type)).map(field => field.value), before);
-  assert.equal(dock.shadow.children[4].children.length, 0);
+  assert.ok(dock.shadow.children[4].children.length > 0);  // chained Learn review is open
   context.PortalAutomationFilling = true;
   await save.listeners.click(EVENT);
-  assert.equal(requests.length, 1);
+  assert.equal(requests.length, 2);
   document.querySelectorAll = () => { throw Error('No scan during automation'); };
   api.scan();
   context.PortalAutomationFilling = false;

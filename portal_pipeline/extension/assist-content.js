@@ -466,11 +466,12 @@
     learn.title = 'Review current answers before saving them for this company.';
     const review = document.createElement('div');
     review.hidden = true;
+    learn.hidden = true;  // Save page now opens this review itself
     shadow.append(learn, review);
     const savePage = document.createElement('button');
     savePage.type = 'button';
     savePage.textContent = 'Save page';
-    savePage.title = 'Save every visible labelled answer locally. Password and file inputs are not answers and are excluded.';
+    savePage.title = 'Save every visible labelled answer locally, then review new or changed answers to learn for this company.';
     const savedSummary = document.createElement('div');
     savedSummary.hidden = true;
     shadow.append(savePage, savedSummary);
@@ -500,14 +501,18 @@
       }
       pending = true;
       savePage.disabled = true;
+      let captured = false;
       try {
         const pairs = rows.map(({label, answer, source, type, options}) => ({label, answer, source, type, options}));
         const result = await request('portal-assist-dump', {pairs, company_hint: companyHint()});
         if (!['saved', 'excluded_by_type', 'duplicate', 'flagged_sensitive'].every(key => Number.isSafeInteger(result?.[key]) && result[key] >= 0))
           throw new Error('Invalid save counts');
         savedSummary.textContent = `saved ${result.saved}, skipped ${result.excluded_by_type} blocked by type (password/file inputs are not answers), duplicate ${result.duplicate}, sensitive ${result.flagged_sensitive}`;
+        captured = true;
       } catch (error) { savedSummary.textContent = error.message === RELOADED ? RELOADED : 'Save failed. Check the local helper and request size (64 KB).'; }
       finally { pending = false; savePage.disabled = false; }
+      // One button: capture everything above, then open the reviewed Learn list for new or changed answers.
+      if (captured && !learn.disabled) learn.click();
     });
     learn.addEventListener('click', async event => {
       event.preventDefault();
