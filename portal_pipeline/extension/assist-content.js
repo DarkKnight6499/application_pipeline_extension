@@ -23,7 +23,7 @@
   const TEXT_TYPES = ['text', 'tel', 'number'];
   const SEGMENT = /\b(?:month|day|year|mm|dd|yyyy)\b/i;
   const STYLE = ':host{all:initial!important;position:absolute!important;z-index:2147483647!important;font:12px Arial,sans-serif!important}button{font:inherit;border:1px solid #777;border-radius:4px;background:#fff;color:#222;padding:2px 6px;cursor:pointer}button:disabled{opacity:.6;cursor:wait}span{font:inherit;color:#333;margin-left:4px}a{font:inherit;color:#165bb4;cursor:pointer;margin-left:4px;text-decoration:underline}';
-  const DOCK_STYLE = ':host{all:initial!important;position:fixed!important;right:0!important;top:40%!important;z-index:2147483647!important;font:12px Arial,sans-serif!important;max-height:58vh;overflow:auto}button{display:block;font:inherit;border:1px solid #777;border-right:0;border-radius:6px 0 0 6px;background:#fff;color:#222;padding:8px 6px;cursor:pointer}button:disabled{opacity:.6;cursor:wait}div{background:#fff;border:1px solid #777;border-right:0;padding:4px 6px;max-width:320px;color:#333;white-space:pre-wrap;overflow-wrap:anywhere}';
+  const DOCK_STYLE = ':host{all:initial!important;position:fixed!important;left:0!important;top:40%!important;z-index:2147483647!important;font:12px Arial,sans-serif!important;max-height:58vh;overflow:auto}button{display:block;width:84px;font:inherit;border:1px solid #777;border-left:0;border-radius:0 6px 6px 0;background:#fff;color:#222;padding:8px 6px;cursor:pointer;margin-bottom:4px}button:disabled{opacity:.6;cursor:wait}div{background:#fff;border:1px solid #777;border-left:0;padding:4px 6px;max-width:320px;color:#333;white-space:pre-wrap;overflow-wrap:anywhere}';
   if (globalThis.PortalAssistLoaded) return;
   globalThis.PortalAssistLoaded = true;
   const controls = new Map();
