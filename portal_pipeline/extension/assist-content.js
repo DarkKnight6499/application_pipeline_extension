@@ -6,6 +6,7 @@
   const FORBIDDEN = /\b(password|passcode|captcha|verification code|ssn|social security|signature|sign|signed|initials|attest\w*|certify|declaration|I (confirm|affirm|declare)|truthful|accurate and complete|true and (correct|accurate))\b/i;
   const LEARN_BLOCKED = /\b(?:(?:work|employment)\s+(?:authori[sz]ation|eligibility)|(?:authori[sz]\w*|eligib\w*|right|permit\w*|permission|allow\w*|legally)\b.{0,60}\b(?:work|employment)|visa|sponsor\w*|immigration|citizen\w*|nationality|work permit|opt|cpt|h[ -]?1b|disab\w*|accommodation\w*|veteran\w*|military|armed forces|national guard|reservist\w*|reserves|active duty|service member|uniformed services|gender|sex|male|female|non[ -]?binary|transgender|race|racial|ethnic\w*|hispanic|latino|black|white|asian|indigenous|native american|pacific islander|sexual orientation|lgbtq\w*|pronouns?|self[ -]?(?:id\w*|identification|disclosure)|demographic\w*|religio\w*|marital status|national origin|eeo|decline to (?:identify|answer|disclose))\b/i;
   const MAX_LEARN_PAIRS = 80;
+  const MAX_PAGE_FIELDS = 200;
   const MAX_LEARN_LABEL = 300;
   const MAX_LEARN_ANSWER = 2000;
   const ACTION = /^(?:next|continue|submit|apply)(?:\b|$)/i;
@@ -450,19 +451,36 @@
       event.stopPropagation();
       if (pending || automation()) return;
       const order = ([a], [b]) => typeof a.compareDocumentPosition === 'function' ? (a.compareDocumentPosition(b) & 4 ? -1 : 1) : 0;
-      const rows = [...controls].filter(([element]) => element.isConnected && visible(element)).sort(order);
+      const name = element => labelFor(element) || ariaLabel(element) || element.placeholder || element.name || element.id || element.type || 'unnamed field';
+      const keyOf = element => `${normalize(labelFor(element) || name(element))}|${element.name || element.id || ''}`;
+      const attempted = new Set();
       let filled = 0;
       let left = 0;
       const misses = [];
       button.disabled = true;
-      for (const [element, entry] of rows) {
-        const status = await entry.run(false);
+      // Sites re-render fields after an earlier answer (country, device type), so the next field is looked up fresh each time.
+      for (let guard = 0; guard < MAX_PAGE_FIELDS; guard += 1) {
+        scan();
+        const next = [...controls].filter(([element]) => element.isConnected && visible(element) && !attempted.has(keyOf(element))).sort(order)[0];
+        if (!next) break;
+        const key = keyOf(next[0]);
+        attempted.add(key);
+        let [element, entry] = next;
+        let label = name(element);
+        let status = await entry.run(false);
+        if (status === 'not retained') {
+          await wait(SETTLE_MS * 3);
+          scan();
+          const fresh = [...controls].find(([node]) => node.isConnected && visible(node) && keyOf(node) === key);
+          if (fresh) { [element, entry] = fresh; label = name(element); status = await entry.run(false); }
+        }
         if (status === 'stored' || status === 'draft') filled += 1;
         else if (status === 'has value') left += 1;
-        else misses.push(`${labelFor(element).slice(0, 60)}: ${status}`);
+        else misses.push(`${label.slice(0, 60)}: ${status}`);
       }
       button.disabled = false;
-      summary.textContent = `filled ${filled}, left alone ${left} (already filled)${misses.length ? '; not filled: ' + misses.join('; ') : ''}`;
+      summary.textContent = [`filled ${filled}, left alone ${left} (already filled)`,
+        ...(misses.length ? ['not filled:', ...misses.map(line => `- ${line}`)] : [])].join('\n');
       summary.hidden = false;
     });
     return {host, button, summary};
