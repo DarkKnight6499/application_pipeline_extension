@@ -294,7 +294,7 @@ class AssistTests(unittest.TestCase):
         pair = {"label": LABEL, "answer": ANSWER}
         invalid = [None, [], {"pairs": "bad"}, {"dry_run": "true"},
                    {"pairs": [pair] * 81}, {"pairs": [{**pair, "label": "x" * 301}]},
-                   {"pairs": [{**pair, "answer": "x" * 2001}]}, {"pairs": [pair, pair]},
+                   {"pairs": [{**pair, "answer": "x" * 2001}]},
                    {"pairs": [pair, {**pair, "answer": 1}]}, {"pairs": [pair, []]},
                    {"pairs": [{**pair, "previous_answer": False}]}]
         for value in invalid:
@@ -302,6 +302,8 @@ class AssistTests(unittest.TestCase):
                 self.service.learn({**self.learning(dry_run=False), **value} if isinstance(value, dict) else value)
         directory, _ = self.service.company_scope(self.learning())
         self.assertFalse(answer_memory.memory_path(directory).exists())
+        repeated = self.service.learn(self.learning([pair, {**pair, "label": LABEL + "*"}]))["results"]
+        self.assertEqual([row["status"] for row in repeated], ["new", "skipped"])
         pairs = [{"label": "x" * 300, "answer": "a" * 2000}]
         self.assertEqual(self.service.learn(self.learning(pairs))["results"][0]["status"], "new")
         pairs = [{"label": f"Project {index}", "answer": ANSWER} for index in range(80)]

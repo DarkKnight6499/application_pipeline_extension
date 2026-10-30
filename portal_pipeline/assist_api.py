@@ -373,26 +373,32 @@ class AssistService:
         dry_run = body.get("dry_run", False)
         if not isinstance(dry_run, bool) or not isinstance(pairs, list) or len(pairs) > MAX_LEARN_PAIRS:
             raise ValueError("Learning requires at most 80 pairs and a boolean dry_run.")
-        seen = set()
-        for pair in pairs:
+        seen, repeated = set(), set()
+        for index, pair in enumerate(pairs):
             self.validate(pair)
             question_alias.validate_pair(pair)
             label, answer = pair[QUESTION_COLUMN], pair.get(ANSWER_COLUMN)
             previous = pair.get(PREVIOUS_ANSWER)
             key = answer_memory.normalize_label(label)
             if (len(label) > MAX_LEARN_LABEL or not isinstance(answer, str) or len(answer) > MAX_LEARN_ANSWER
-                    or not key or key in seen or (previous is not None and
+                    or (previous is not None and
                     (not isinstance(previous, str) or len(previous) > MAX_LEARN_ANSWER))
                     or not isinstance(pair.get(page_questions.SOURCE, "typed"), str)
                     or pair.get(page_questions.SOURCE, "typed") not in page_questions.SOURCES):
-                raise ValueError("Invalid or duplicate learning pair.")
+                raise ValueError("Invalid learning pair.")
+            # A repeated label on one page is skipped, not fatal, so results stay aligned with the page rows.
+            if not key or key in seen:
+                repeated.add(index)
             seen.add(key)
         results = []
 
         def review(memory):
             wrote = False
-            for pair in pairs:
+            for index, pair in enumerate(pairs):
                 label, answer = pair[QUESTION_COLUMN], pair[ANSWER_COLUMN].strip()
+                if index in repeated:
+                    results.append({QUESTION_COLUMN: label, "status": "skipped", "stored": False})
+                    continue
                 context = label + " " + " ".join(pair.get(OPTIONS_COLUMN, []))
                 if (not answer or NEVER_FILL.search(label) or question_alias.blocked(pair) or corrections.blocked(pair) or dropdown_mappings.blocked(pair)
                         or any(pattern.search(context) for pattern in BLOCKED_DRAFT)):
