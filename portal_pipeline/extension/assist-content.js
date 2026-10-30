@@ -13,7 +13,8 @@
   const ACTION = /^(?:next|continue|submit|apply)(?:\b|$)/i;
   const DEBOUNCE_MS = 180;
   const SETTLE_MS = 180;
-  const STATUS_HIDE_MS = 8000;
+  const STATUS_HIDE_MS = 3000;
+  const RELOADED = 'Extension was reloaded. Refresh this page.';
   const CORRECTION_DEBOUNCE_MS = 180;
   const POPUP_TIMEOUT_MS = 1800;
   const MISS_LABEL_LIMIT = 300;
@@ -281,11 +282,14 @@
 
   function request(type, body) {
     return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({type, body}, response => {
-        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-        else if (!response?.ok) reject(new Error(response?.error || 'Assist unavailable'));
-        else resolve(response.value);
-      });
+      // An extension reload orphans this script; sendMessage then throws instead of calling back.
+      try {
+        chrome.runtime.sendMessage({type, body}, response => {
+          if (chrome.runtime.lastError) reject(new Error(/context invalidated/i.test(chrome.runtime.lastError.message) ? RELOADED : chrome.runtime.lastError.message));
+          else if (!response?.ok) reject(new Error(response?.error || 'Assist unavailable'));
+          else resolve(response.value);
+        });
+      } catch (_) { reject(new Error(RELOADED)); }
     });
   }
 
@@ -482,7 +486,7 @@
     };
     autoHide(savedSummary, STATUS_HIDE_MS);
     autoHide(review, STATUS_HIDE_MS);
-    autoHide(summary, STATUS_HIDE_MS * 3);
+    autoHide(summary, STATUS_HIDE_MS * 2);
     savePage.addEventListener('click', async event => {
       event.preventDefault();
       event.stopPropagation();
@@ -502,7 +506,7 @@
         if (!['saved', 'excluded_by_type', 'duplicate', 'flagged_sensitive'].every(key => Number.isSafeInteger(result?.[key]) && result[key] >= 0))
           throw new Error('Invalid save counts');
         savedSummary.textContent = `saved ${result.saved}, skipped ${result.excluded_by_type} blocked by type (password/file inputs are not answers), duplicate ${result.duplicate}, sensitive ${result.flagged_sensitive}`;
-      } catch (_) { savedSummary.textContent = 'Save failed. Check the local helper and request size (64 KB).'; }
+      } catch (error) { savedSummary.textContent = error.message === RELOADED ? RELOADED : 'Save failed. Check the local helper and request size (64 KB).'; }
       finally { pending = false; savePage.disabled = false; }
     });
     learn.addEventListener('click', async event => {
