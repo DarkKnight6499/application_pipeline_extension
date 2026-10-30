@@ -110,3 +110,24 @@ py -B -m unittest discover -s portal_pipeline\tests -v
 Tests use temporary outputs. Import tests create a synthetic tracker and execute the original audit code in place with that synthetic tracker configured by a test wrapper. They do not copy or edit the production audit script. Browser upload approvals are test-only approvals for the local fixture. No real application status is changed.
 
 See [HANDOFF.md](HANDOFF.md) for implementation progress and the next bounded task. Research and GitHub sources are preserved in [PROJECT_PLAN.md](../docs/PROJECT_PLAN.md).
+
+## Per-field Fill assist
+
+Author: Yazad Madan.
+
+Start from the repository root with the normal Python launcher:
+```powershell
+py -3 -B portal_pipeline/server.py --assist-only --port 8766
+```
+Without `py`, use the configured Python executable with the same arguments.
+The first start creates `portal_pipeline/data/assist_token.txt`, which is ignored by Git.
+In normal Edge, open `edge://extensions`, enable Developer mode, choose Load unpacked, and select `portal_pipeline/extension`.
+Assist setup: on that page click the extension's "service worker" link, and in its console run `chrome.storage.local.set({assistToken: "<value from assist_token.txt>"})`. The token never enters source. `ASSIST_PORT` in `extension/background.js` must match the server port.
+Then refresh the application page.
+Click Fill beside a question. Shift-click explicitly permits overwriting an existing value.
+Stored answers precede drafts. A draft is not saved until you click Save this answer beside its field.
+Missing answers enter the local learning queue. Sensitive questions require a reviewed stored answer and never trigger drafting.
+Drafting uses the logged-in `claude` CLI with built-in and MCP tools disabled and a 90 second timeout ([CLI flags](https://code.claude.com/docs/en/cli-reference)). No API key is required.
+Configure the read-only knowledge and profile paths in `assist_api.py`; Resume files are never written.
+The token stays in the extension worker. Question logs and the learning queue remain under ignored `data/`.
+Signatures, attestations, navigation, and submission remain manual. DOM readback does not prove remote saving.

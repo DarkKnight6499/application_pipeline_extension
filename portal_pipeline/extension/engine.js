@@ -788,8 +788,9 @@
   async function fill(selections, options = {}) {
     if (filling) throw new Error("A fill is already running on this page. Wait for its results.");
     filling = true;
+    globalThis.PortalAutomationFilling = true;
     try { return await fillSelected(selections, options); }
-    finally { filling = false; }
+    finally { filling = false; globalThis.PortalAutomationFilling = false; }
   }
 
   function scan(profile, options = {}) {

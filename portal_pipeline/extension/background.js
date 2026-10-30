@@ -1,7 +1,30 @@
-/* Pairing credentials remain in extension storage, outside the page world. */
+/* Author: Yazad Madan. Pairing credentials remain outside the page world. */
+// Config: the token lives in extension storage (key assistToken), never in source.
+const ASSIST_PORT = 8766;
+const ASSIST_HOSTS = /^(?:[^.]+\.)*(?:myworkdayjobs\.com|myworkdaysite\.com|greenhouse\.io|ashbyhq\.com|icims\.com|successfactors\.(?:com|eu)|oraclecloud\.com|smartrecruiters\.com|taleo\.net|jobvite\.com|paylocity\.com|paycomonline\.net|dayforcehcm\.com|ultipro\.com|adp\.com)$|^jobs\.lever\.co$/i;
+const ASSIST_TIMEOUT_MS = 100000;
 const applicationRestrictions = new Set();
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
+    if (["portal-assist-answer", "portal-assist-accept"].includes(message.type)) {
+      if (!sender.tab || sender.id !== chrome.runtime.id || typeof sender.url !== "string")
+        throw new Error("Assist requires an extension content script.");
+      const target = new URL(sender.url);
+      if (target.protocol !== "https:" || !ASSIST_HOSTS.test(target.hostname))
+        throw new Error("Assist is limited to application hosts.");
+      const {assistToken: ASSIST_TOKEN} = await chrome.storage.local.get("assistToken");
+      if (!ASSIST_TOKEN) throw new Error("Save the assist token first: see README, Assist setup.");
+      const accept = message.type === "portal-assist-accept";
+      const body = accept ? {label: message.body?.label, answer: message.body?.answer}
+        : {...message.body, host: target.hostname, url: target.href};
+      const response = await fetch(`http://127.0.0.1:${ASSIST_PORT}/assist/${accept ? "accept" : "answer"}`, {
+        method: "POST", headers: {"X-Assist-Token": ASSIST_TOKEN, "Content-Type": "application/json"},
+        body: JSON.stringify(body), signal: AbortSignal.timeout(ASSIST_TIMEOUT_MS)
+      });
+      const value = await response.json();
+      if (!response.ok) throw new Error(value.error || "Assist request failed.");
+      return value;
+    }
     const paired = async () => {
       const {server, token} = await chrome.storage.local.get(["server", "token"]);
       if (!/^http:\/\/127\.0\.0\.1:\d{1,5}$/.test(server || "") || !token) throw new Error("Pair the extension in its popup first.");

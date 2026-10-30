@@ -66,7 +66,8 @@ class PublicAdapterInvariantTests(SyntheticBrowserTest):
         manifest = json.loads((EXTENSION / "manifest.json").read_text(encoding="utf-8"))
         self.assertEqual(manifest["permissions"], ["activeTab", "scripting", "storage", "sidePanel"])
         self.assertEqual(manifest["host_permissions"], ["http://127.0.0.1/*"])
-        self.assertNotIn("content_scripts", manifest)
+        self.assertEqual(len(manifest["content_scripts"]), 1)
+        self.assertEqual(manifest["content_scripts"][0]["js"], ["assist-content.js"])
         self.assertNotIn("<all_urls>", json.dumps(manifest))
 
     def test_unrouted_adapters_not_in_unconditional_injection_lists(self):

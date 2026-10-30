@@ -19,6 +19,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import answer_memory
+import assist_api
 import answer_sheet
 import application_mode
 import longform
@@ -262,12 +263,22 @@ def memory_profile():
             "pickers": picker_aliases.profile_pickers(picker_aliases.load_aliases())}
 
 
-def make_server(pipeline, port=8766, token=None):
+def make_server(pipeline, port=8766, token=None, assist=None):
     token = token or secrets.token_urlsafe(32)
+    assist_lock = threading.Lock()
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_):
             pass
+
+        def assist_request(self):
+            nonlocal assist
+            if not urlsplit(self.path).path.startswith("/assist/"):
+                return False
+            with assist_lock:
+                if assist is None:
+                    assist = assist_api.AssistService(getattr(pipeline, "data", HERE / "data"))
+            return assist_api.handle(self, assist)
 
         def send(self, status, value, content_type="application/json", extra=None):
             data = json.dumps(value).encode() if content_type == "application/json" else value
@@ -298,6 +309,10 @@ def make_server(pipeline, port=8766, token=None):
             return True
 
         def do_GET(self):
+            if self.assist_request():
+                return
+            if pipeline is None:
+                return self.send(404, {"error": "Assist-only server."})
             if not self.allowed():
                 return
             path = urlsplit(self.path).path
@@ -346,6 +361,10 @@ def make_server(pipeline, port=8766, token=None):
                 self.send(400, {"error": str(error)})
 
         def do_POST(self):
+            if self.assist_request():
+                return
+            if pipeline is None:
+                return self.send(404, {"error": "Assist-only server."})
             if not self.allowed():
                 return
             try:
@@ -437,8 +456,13 @@ def make_server(pipeline, port=8766, token=None):
             except Exception:
                 self.send(500, {"error": "Operation failed. No application was submitted or tracker changed."})
 
+        def do_OPTIONS(self):
+            if not self.assist_request():
+                self.send(404, {"error": "Not found."})
+
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     server.token = token
+    server.assist = assist
     return server
 
 
@@ -446,11 +470,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, default=HERE.parent, help="Existing resume repository, read-only")
     parser.add_argument("--port", type=int, default=8766)
+    parser.add_argument("--assist-only", action="store_true", help="Serve per-field assist without a pipeline session")
     args = parser.parse_args()
-    pipeline = Pipeline(args.source, HERE / "data")
-    server = make_server(pipeline, args.port)
+    pipeline = None if args.assist_only else Pipeline(args.source, HERE / "data")
+    server = make_server(pipeline, args.port, assist=assist_api.AssistService(HERE / "data"))
     print(f"Portal prototype: http://127.0.0.1:{server.server_port}", flush=True)
-    print("Open the dashboard to copy the extension pairing token. Ctrl+C stops the server.", flush=True)
+    if pipeline is not None:
+        print("Open the dashboard to copy the extension pairing token. Ctrl+C stops the server.", flush=True)
+    print(f"Assist token file: {server.assist.token_path}. Save its value with chrome.storage.local.set({{assistToken: '<token>'}}) in the extension service worker console (README, Assist setup).", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

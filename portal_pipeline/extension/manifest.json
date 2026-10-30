@@ -5,6 +5,19 @@
   "description": "Review and fill selected application fields using the local resume pipeline.",
   "permissions": ["activeTab", "scripting", "storage", "sidePanel"],
   "host_permissions": ["http://127.0.0.1/*"],
+  "content_scripts": [{
+    "matches": [
+      "https://*.myworkdayjobs.com/*", "https://*.myworkdaysite.com/*",
+      "https://boards.greenhouse.io/*", "https://job-boards.greenhouse.io/*", "https://*.greenhouse.io/*",
+      "https://jobs.lever.co/*", "https://*.ashbyhq.com/*", "https://*.icims.com/*",
+      "https://*.successfactors.com/*", "https://*.successfactors.eu/*", "https://*.oraclecloud.com/*",
+      "https://*.smartrecruiters.com/*", "https://*.taleo.net/*", "https://*.jobvite.com/*",
+      "https://*.paylocity.com/*", "https://*.paycomonline.net/*", "https://*.dayforcehcm.com/*",
+      "https://*.ultipro.com/*", "https://*.adp.com/*"
+    ],
+    "js": ["assist-content.js"],
+    "run_at": "document_idle"
+  }],
   "background": {"service_worker": "background.js"},
   "action": {"default_popup": "popup.html", "default_title": "Review application fields"}
 }
