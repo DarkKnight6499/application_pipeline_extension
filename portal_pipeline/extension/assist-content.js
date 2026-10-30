@@ -207,6 +207,7 @@
       if (!visible(element) || !label || !answer) continue;
       if (!capture && (element.disabled || element.readOnly || FORBIDDEN.test(label)
         || LEARN_BLOCKED.test([label, ...options].join(' '))
+        || /\d+\s*:/.test(label)  // indexed rows of a repeating section (Work Experience 2: ...) are not reusable answers
         || label.length > MAX_LEARN_LABEL || answer.length > MAX_LEARN_ANSWER)) continue;
       // Values already on the page count too: Simplify and the last application are trusted, and the review step still gates saving.
       const corrected = state.corrected === answer;
@@ -466,6 +467,7 @@
     learn.title = 'Review current answers before saving them for this company.';
     const review = document.createElement('div');
     review.hidden = true;
+    review.style.cssText = 'max-height:70vh;overflow-y:auto';  // long lists scroll inside the panel
     learn.hidden = true;  // Save page now opens this review itself
     shadow.append(learn, review);
     const savePage = document.createElement('button');
@@ -485,6 +487,12 @@
         timer = setTimeout(() => { if (!box.querySelector('button')) box.hidden = true; }, ms);
       }).observe(box, {childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['hidden']});
     };
+    // While a review is open the dock takes the full height so Confirm and the list fit on screen.
+    new MutationObserver(() => {
+      const open = !review.hidden && !!review.querySelector('button');
+      host.style.setProperty('top', open ? '8px' : '40%', 'important');
+      host.style.setProperty('max-height', open ? '96vh' : '58vh', 'important');
+    }).observe(review, {childList: true, subtree: true, attributes: true, attributeFilter: ['hidden']});
     autoHide(savedSummary, STATUS_HIDE_MS);
     autoHide(review, STATUS_HIDE_MS);
     autoHide(summary, STATUS_HIDE_MS * 2);
@@ -576,6 +584,7 @@
         const confirm = document.createElement('button');
         confirm.type = 'button';
         confirm.textContent = 'Confirm';
+        confirm.style.cssText = 'position:sticky;bottom:0;width:100%;font-weight:bold';  // stays visible below a long list
         review.append(confirm);
         confirm.addEventListener('click', async event => {
           event.preventDefault();
