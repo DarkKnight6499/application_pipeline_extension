@@ -70,6 +70,7 @@ BLOCKED_DRAFT_PATTERNS = (
     r"\b(?:gender|sex|male|female|non[ -]?binary|transgender|race|racial|ethnic\w*|hispanic|latino|black|white|asian|indigenous|native american|pacific islander|sexual orientation|lgbtq\w*|pronouns?|self[ -]?(?:id\w*|identification|disclosure)|demographic\w*|religio\w*|marital status|national origin|eeo|decline to (?:identify|answer|disclose))\b",
     # Compensation and relationships require a user-provided response.
     r"\b(?:salary|compensation|remuneration|pay expectations?|expected pay|desired pay|pay requirements?|wage\w*)\b",
+    r"\b(?:(?:expected|desired|anticipated|minimum|target)\s+(?:annual\s+|hourly\s+)?(?:base|rate|pay)|(?:base|hourly|annual)\s+(?:pay|rate)|pay rate)\b",
     r"\b(?:relative\w*|related to|family|spouse|conflict\w*|outside (?:business|employment|activit\w*)|non[ -]?compet\w*|non[ -]?solicit\w*)\b",
     # Regulatory registrations and declarations must never be invented.
     r"\b(?:securities|finra|financial services licen[sc]e|series\s+\d+|broker[ -]?dealer|registered representative)\b",
