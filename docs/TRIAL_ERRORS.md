@@ -1,11 +1,23 @@
 ---
 author: Yazad Madan
-updated: 2026-10-20
+updated: 2026-10-30
 ---
 
 # Trial failures and remaining work
 
 This log distinguishes observed failures from untested compatibility. Keep historical findings even after a fix so future sessions do not repeat the same experiments.
+
+## October 30, 2026: Learn page
+
+Author: Yazad Madan. Learn page reviews current answers in the dock, flags changed answers through a dry run, and stores only checked rows after Confirm. Confirm rechecks the page and answers; a locked server comparison refuses stale KB changes. Limits: 80 pairs, 300 characters per label, 2000 per answer, and the existing 64 KB body cap. Server filtering reuses the draft block patterns and protected-field checks.
+
+Untouched-field rule: snapshot each DOM field on its first scan. A current answer must match its last trusted input/change event and differ from that snapshot, or match a verified Fill write. Prefills and site-only writes are excluded. Replaced nodes start with a new snapshot. Custom widgets without trusted input/change events require a verified Fill.
+
+The old accept route used global answer memory. Page-context accept and Learn now share a writer and local store at `data/company_kb/<hash of host and company>/answer_memory.json`, preceding the read-only reference matcher. With no company hint, scope is the host. Context-free legacy accept stays global. No global promotion or Resume checkout write was added.
+
+Verified: Node content/worker harness, 2 suites; three assist unittest files, 28 tests passed. Coverage includes selection, stale review, provenance, automation, scope isolation, reference preservation, protected questions, bounds, sender validation, and HTTP guards. Python/JavaScript syntax and Git whitespace checks pass. Full pytest could not start: the specified runtime has no pytest module. No import failure required PYTHONPATH.
+
+Unverified: live rendering/events, custom widget edits, real company-module integration, employer compatibility, remote persistence, and full-suite acceptance. No browser was opened. Sources: local code and fabricated fixtures; no external fetch. Manifest permissions are unchanged. No branch, commit, or push was created.
 
 ## Sponsorship toggle landing, October 4, 2026
 

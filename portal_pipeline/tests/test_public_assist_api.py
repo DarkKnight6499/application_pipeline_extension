@@ -185,6 +185,154 @@ class AssistTests(unittest.TestCase):
         self.assertEqual(self.service.answer(self.payload("Are you permitted to work here?"))["status"], "none")
         self.draft.assert_not_called()
 
+    def learning(self, pairs=None, dry_run=True, **context):
+        return {**self.payload(), "pairs": pairs if pairs is not None else [{"label": LABEL, "answer": ANSWER}],
+                "dry_run": dry_run, **context}
+
+    def confirm(self, body):
+        reviewed = self.service.learn(body)
+        pairs = [{**pair, "previous_answer": result["previous_answer"]}
+                 for pair, result in zip(body["pairs"], reviewed["results"]) if result["status"] != "skipped"]
+        return self.service.learn({**body, "dry_run": False, "pairs": pairs})
+
+    def test_learn_dry_run_then_confirm_uses_accept_store_and_lookup(self):
+        body = self.learning()
+        result = self.service.learn(body)
+        self.assertEqual(result["results"][0]["status"], "new")
+        self.assertFalse(result["results"][0]["stored"])
+        directory, scope = self.service.company_scope(body)
+        self.assertEqual(scope, COMPANY)
+        self.assertFalse(answer_memory.memory_path(directory).exists())
+        self.assertTrue(self.confirm(body)["results"][0]["stored"])
+        stored = json.loads(answer_memory.memory_path(directory).read_text())
+        self.assertEqual(stored["author"], "Yazad Madan")
+        self.assertEqual(self.service.answer(self.payload())["answer"], ANSWER)
+        self.assertEqual(self.service.answer(self.payload())["source"], "company_kb")
+        self.service.accept({**self.payload(), "answer": "Reviewed replacement"})
+        self.assertEqual(self.service.learn(body)["results"][0]["previous_answer"], "Reviewed replacement")
+        self.assertEqual(answer_memory.load_memory(self.service.data)["answers"], {})
+        self.draft.assert_not_called()
+
+    def test_learn_same_changed_selected_only_and_stale_review(self):
+        body = self.learning()
+        self.confirm(body)
+        self.assertEqual(self.service.learn(body)["results"][0]["status"], "same")
+        changed = self.learning([{"label": LABEL, "answer": "New reviewed project"}])
+        review = self.service.learn(changed)["results"][0]
+        self.assertEqual(review["status"], "changed")
+        self.assertEqual(self.service.learn({**changed, "dry_run": False})["results"][0]["stored"], False)
+        self.service.learn(self.learning([], dry_run=False))
+        self.assertEqual(self.service.company_answer(self.payload()), ANSWER)
+        self.service.accept({**self.payload(), "answer": "Concurrent review"})
+        stale = self.service.learn({**changed, "dry_run": False, "pairs": [
+            {**changed["pairs"][0], "previous_answer": review["previous_answer"]}]})
+        self.assertFalse(stale["results"][0]["stored"])
+        self.assertEqual(self.service.company_answer(self.payload()), "Concurrent review")
+        self.assertTrue(self.confirm(changed)["results"][0]["stored"])
+        self.assertEqual(self.service.company_answer(self.payload()), "New reviewed project")
+
+    def test_learn_reference_conflict_stays_read_only(self):
+        directory = self.reference / "company_kb"
+        directory.mkdir()
+        path = directory / "example_corp.json"
+        original = json.dumps({"company": COMPANY, "questions": [{"text": LABEL, "answer": "Reference project"}]})
+        path.write_text(original)
+        body = self.learning()
+        self.assertEqual(self.service.learn(body)["results"][0]["status"], "changed")
+        self.confirm(body)
+        self.assertEqual(path.read_text(), original)
+        self.assertEqual(self.service.company_answer(self.payload()), ANSWER)
+
+    def test_learn_company_host_isolation_and_no_global_promotion(self):
+        body = self.learning([{"label": "Are you willing to travel?", "answer": "Example travel choice"}])
+        self.confirm(body)
+        for context in ({"company_hint": "Other Corp"},
+                        {"host": "other.myworkdayjobs.com", "url": "https://other.myworkdayjobs.com/apply"}):
+            self.assertIsNone(self.service.company_answer({**self.payload("Are you willing to travel?"), **context}))
+        self.assertEqual(answer_memory.load_memory(self.service.data)["answers"], {})
+        self.assertEqual(list(self.reference.iterdir()), [])
+
+    def test_learn_host_fallback_and_reject_mismatched_page(self):
+        body = self.learning(company_hint="")
+        self.assertEqual(self.service.learn(body)["scope"], body["host"])
+        self.confirm(body)
+        self.assertEqual(self.service.company_answer({**self.payload(), "company_hint": ""}), ANSWER)
+        for context in ({"host": ""}, {"url": "http://example.myworkdayjobs.com/apply"},
+                        {"url": "https://other.example/apply"}):
+            with self.assertRaises(ValueError):
+                self.service.learn({**body, **context})
+
+    def test_learn_blocks_sensitive_forbidden_empty_and_unsafe_types_on_server(self):
+        labels = ["Password", "Passcode", "Verification code", "SSN", "Social security", "Signature", "Signed",
+                  "I attest this is true", "I certify", "I confirm", "Authorized to work?", "Right to work?",
+                  "Work authorization", "Employment eligibility", "Need sponsorship now?", "Need sponsorship in future?",
+                  "Visa status", "Veteran status", "Disability", "Gender", "Race or ethnicity", "Self identification",
+                  "Nationality", "Pronouns", "Religious affiliation", "Criminal history", "Expected salary"]
+        pairs = [{"label": label, "answer": ANSWER, "previous_answer": None} for label in labels]
+        pairs.extend([{"label": "Empty project", "answer": "  "},
+                      {"label": "Project file", "answer": ANSWER, "type": "file"},
+                      {"label": "Secret project", "answer": ANSWER, "type": "password"},
+                      {"label": "Protected project", "answer": ANSWER, "protected": True},
+                      {"label": "Please select one", "answer": ANSWER, "options": ["Female", "Male"]}])
+        for dry_run in (True, False):
+            result = self.service.learn(self.learning(pairs, dry_run=dry_run))
+            self.assertTrue(all(row["status"] == "skipped" and not row["stored"] for row in result["results"]))
+        directory, _ = self.service.company_scope(self.learning())
+        self.assertFalse(answer_memory.memory_path(directory).exists())
+        self.draft.assert_not_called()
+
+    def test_learn_bounds_and_atomic_validation(self):
+        pair = {"label": LABEL, "answer": ANSWER}
+        invalid = [None, [], {"pairs": "bad"}, {"dry_run": "true"},
+                   {"pairs": [pair] * 81}, {"pairs": [{**pair, "label": "x" * 301}]},
+                   {"pairs": [{**pair, "answer": "x" * 2001}]}, {"pairs": [pair, pair]},
+                   {"pairs": [pair, {**pair, "answer": 1}]}, {"pairs": [pair, []]},
+                   {"pairs": [{**pair, "previous_answer": False}]}]
+        for value in invalid:
+            with self.subTest(value=str(value)[:80]), self.assertRaises(ValueError):
+                self.service.learn({**self.learning(dry_run=False), **value} if isinstance(value, dict) else value)
+        directory, _ = self.service.company_scope(self.learning())
+        self.assertFalse(answer_memory.memory_path(directory).exists())
+        pairs = [{"label": "x" * 300, "answer": "a" * 2000}]
+        self.assertEqual(self.service.learn(self.learning(pairs))["results"][0]["status"], "new")
+        pairs = [{"label": f"Project {index}", "answer": ANSWER} for index in range(80)]
+        self.assertEqual(len(self.service.learn(self.learning(pairs))["results"]), 80)
+
+    def test_http_learn_auth_origin_host_size_and_methods(self):
+        port = self.start()
+        body = self.learning()
+        preflight = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        self.addCleanup(preflight.close)
+        preflight.request("OPTIONS", "/assist/learn", headers={"Origin": ORIGIN,
+                          "Access-Control-Request-Method": "POST"})
+        response = preflight.getresponse()
+        self.assertEqual(response.status, 200)
+        self.assertEqual(response.getheader("Access-Control-Allow-Origin"), ORIGIN)
+        response.read()
+        directory, _ = self.service.company_scope(body)
+        self.assertFalse(answer_memory.memory_path(directory).exists())
+        for token in (None, "incorrect"):
+            self.assertEqual(self.request(port, "/assist/learn", body, token=token)[0], 401)
+        for origin in (None, "https://example.com", "chrome-extension://bad"):
+            self.assertEqual(self.request(port, "/assist/learn", body, origin=origin)[0], 403)
+        for headers, status, method in [({"Host": "forged.example"}, 403, "POST"),
+                                       ({"Content-Length": str(assist_api.MAX_BODY + 1)}, 413, "POST"),
+                                       ({"Transfer-Encoding": "chunked"}, 413, "POST"), ({}, 405, "GET")]:
+            connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+            self.addCleanup(connection.close)
+            connection.request(method, "/assist/learn", json.dumps(body), headers={
+                "Origin": ORIGIN, "X-Assist-Token": TOKEN, **headers})
+            response = connection.getresponse()
+            self.assertEqual(response.status, status)
+            response.read()
+        status, result = self.request(port, "/assist/learn", body)
+        self.assertEqual((status, result["results"][0]["status"]), (200, "new"))
+        body["dry_run"] = False
+        body["pairs"][0]["previous_answer"] = None
+        self.assertEqual(self.request(port, "/assist/learn", body)[1]["results"][0]["stored"], True)
+        self.assertEqual(self.request(port, "/assist/learn", self.learning([{"label": "x" * 301, "answer": ANSWER}]))[0], 400)
+        self.draft.assert_not_called()
+
     def start(self):
         server = make_server(None, 0, assist=self.service)
         thread = threading.Thread(target=server.serve_forever, daemon=True)

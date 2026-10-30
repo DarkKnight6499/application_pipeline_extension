@@ -4,6 +4,10 @@
   const FIELD_SELECTOR = 'input:not([type]),input[type="text"],input[type="email"],input[type="tel"],input[type="url"],input[type="search"],textarea,select,input[type="radio"],input[type="checkbox"],[role="combobox"]';
   const GROUP_SELECTOR = 'fieldset,[role="radiogroup"],[role="group"],[data-automation-id="formField"],.form-field,.field';
   const FORBIDDEN = /\b(password|passcode|captcha|verification code|ssn|social security|signature|sign|signed|initials|attest\w*|certify|declaration|I (confirm|affirm|declare)|truthful|accurate and complete|true and (correct|accurate))\b/i;
+  const LEARN_BLOCKED = /\b(?:(?:work|employment)\s+(?:authori[sz]ation|eligibility)|(?:authori[sz]\w*|eligib\w*|right|permit\w*|permission|allow\w*|legally)\b.{0,60}\b(?:work|employment)|visa|sponsor\w*|immigration|citizen\w*|nationality|work permit|opt|cpt|h[ -]?1b|disab\w*|accommodation\w*|veteran\w*|military|armed forces|national guard|reservist\w*|reserves|active duty|service member|uniformed services|gender|sex|male|female|non[ -]?binary|transgender|race|racial|ethnic\w*|hispanic|latino|black|white|asian|indigenous|native american|pacific islander|sexual orientation|lgbtq\w*|pronouns?|self[ -]?(?:id\w*|identification|disclosure)|demographic\w*|religio\w*|marital status|national origin|eeo|decline to (?:identify|answer|disclose))\b/i;
+  const MAX_LEARN_PAIRS = 80;
+  const MAX_LEARN_LABEL = 300;
+  const MAX_LEARN_ANSWER = 2000;
   const ACTION = /^(?:next|continue|submit|apply)(?:\b|$)/i;
   const DEBOUNCE_MS = 180;
   const SETTLE_MS = 180;
@@ -12,10 +16,11 @@
   const TEXT_TYPES = ['text', 'tel', 'number'];
   const SEGMENT = /\b(?:month|day|year|mm|dd|yyyy)\b/i;
   const STYLE = ':host{all:initial!important;position:absolute!important;z-index:2147483647!important;font:12px Arial,sans-serif!important}button{font:inherit;border:1px solid #777;border-radius:4px;background:#fff;color:#222;padding:2px 6px;cursor:pointer}button:disabled{opacity:.6;cursor:wait}span{font:inherit;color:#333;margin-left:4px}a{font:inherit;color:#165bb4;cursor:pointer;margin-left:4px;text-decoration:underline}';
-  const DOCK_STYLE = ':host{all:initial!important;position:fixed!important;right:0!important;top:40%!important;z-index:2147483647!important;font:12px Arial,sans-serif!important}button{font:inherit;border:1px solid #777;border-right:0;border-radius:6px 0 0 6px;background:#fff;color:#222;padding:8px 6px;cursor:pointer}button:disabled{opacity:.6;cursor:wait}div{background:#fff;border:1px solid #777;border-right:0;padding:4px 6px;max-width:240px;color:#333}';
+  const DOCK_STYLE = ':host{all:initial!important;position:fixed!important;right:0!important;top:40%!important;z-index:2147483647!important;font:12px Arial,sans-serif!important;max-height:58vh;overflow:auto}button{display:block;font:inherit;border:1px solid #777;border-right:0;border-radius:6px 0 0 6px;background:#fff;color:#222;padding:8px 6px;cursor:pointer}button:disabled{opacity:.6;cursor:wait}div{background:#fff;border:1px solid #777;border-right:0;padding:4px 6px;max-width:320px;color:#333;white-space:pre-wrap;overflow-wrap:anywhere}';
   if (globalThis.PortalAssistLoaded) return;
   globalThis.PortalAssistLoaded = true;
   const controls = new Map();
+  const fieldStates = new WeakMap();
   let pending = false;
   let timer;
   let focused = null;
@@ -132,6 +137,37 @@
     return !!element.value?.trim();
   }
 
+  function currentAnswer(element) {
+    if (['password', 'file'].includes(element.type)) return '';
+    if (element.type === 'radio') {
+      const checked = members(element).find(node => node.checked);
+      return checked ? ownLabel(checked) : '';
+    }
+    if (element.type === 'checkbox') return element.indeterminate ? '' : element.checked ? 'Yes' : 'No';
+    if (element.tagName === 'SELECT') return [...element.selectedOptions].filter(option =>
+      option.value !== '' && !PLACEHOLDER.test(option.text)).map(option => option.text).join('; ');
+    const parts = groupOf(element);
+    if (parts.length > 1) return parts.every(node => node.value.trim()) ? parts.map(node => node.value.trim()).join('/') : '';
+    const value = String('value' in element ? element.value : text(element)).trim();
+    return element.getAttribute('role') === 'combobox' && PLACEHOLDER.test(value) ? '' : value;
+  }
+
+  function learnRows() {
+    const rows = [];
+    for (const [element] of controls) {
+      const label = labelFor(element);
+      const answer = currentAnswer(element);
+      const state = fieldStates.get(element);
+      const options = choices(element).map(option => option.text);
+      if (!visible(element) || element.disabled || element.readOnly || !state || !label || !answer
+        || FORBIDDEN.test(label) || LEARN_BLOCKED.test([label, ...options].join(' '))
+        || label.length > MAX_LEARN_LABEL || answer.length > MAX_LEARN_ANSWER
+        || !(state.filled === answer || (state.user === answer && answer !== state.initial))) continue;
+      rows.push({element, label, answer, options, type: element.type || element.tagName.toLowerCase()});
+    }
+    return rows;
+  }
+
   function nativeSet(element, property, value) {
     const prototype = element.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype
       : element.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
@@ -237,7 +273,8 @@
       if (!draft || pending || automation() || !unchanged(element, written) || labelFor(element) !== draft.label) return;
       save.hidden = true;
       try {
-        await request('portal-assist-accept', {label: draft.label, answer: draft.answer});
+        await request('portal-assist-accept', {label: draft.label, answer: draft.answer,
+          host: location.hostname, url: location.href, company_hint: companyHint()});
         badge.textContent = 'stored';
       } catch (error) { badge.textContent = 'save failed'; badge.title = error.message; save.hidden = false; }
     };
@@ -266,6 +303,8 @@
         if (!written) return 'no match';
         await wait(SETTLE_MS);
         if (!unchanged(element, written)) return 'not retained';
+        const state = fieldStates.get(element);
+        if (state) state.filled = currentAnswer(element);
         draft = result.status === 'draft' ? {label, answer: result.answer} : null;
         save.hidden = !draft;
         return result.status;
@@ -297,7 +336,82 @@
     const summary = document.createElement('div');
     summary.hidden = true;
     shadow.append(style, button, summary);
+    const learn = document.createElement('button');
+    learn.type = 'button';
+    learn.textContent = 'Learn page';
+    learn.title = 'Review current answers before saving them for this company.';
+    const review = document.createElement('div');
+    review.hidden = true;
+    shadow.append(learn, review);
     (document.body || document.documentElement).append(host);
+    learn.addEventListener('click', async event => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (pending || automation()) return;
+      scan();
+      review.replaceChildren();
+      review.hidden = false;
+      const rows = learnRows();
+      if (!rows.length || rows.length > MAX_LEARN_PAIRS) {
+        review.textContent = rows.length ? 'More than 80 answers. Review a smaller page.' : 'No touched answers to learn.';
+        return;
+      }
+      const url = location.href;
+      const company = companyHint();
+      const context = {host: location.hostname, url, company_hint: company};
+      const pairs = rows.map(({label, answer, options, type}) => ({label, answer, options, type}));
+      pending = true;
+      learn.disabled = true;
+      try {
+        const result = await request('portal-assist-learn', {...context, pairs, dry_run: true});
+        if (automation() || location.href !== url || companyHint() !== company) return;
+        if (!Array.isArray(result.results) || result.results.length !== rows.length) throw new Error('Invalid learning review');
+        const selected = [];
+        result.results.forEach((item, index) => {
+          const row = rows[index];
+          if (item.label !== row.label) throw new Error('Learning question changed');
+          if (item.status === 'skipped') return;
+          if (!['new', 'same', 'changed'].includes(item.status) || item.answer !== row.answer) throw new Error('Invalid learning answer');
+          const line = document.createElement('div');
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.checked = true;
+          const label = document.createElement('label');
+          label.append(checkbox, document.createTextNode(`${row.label}\n${row.answer}\nCompany: ${result.scope}${item.status === 'changed' ? '\nchanged' : ''}`));
+          line.append(label);
+          review.append(line);
+          selected.push({row, checkbox, pair: {...pairs[index], previous_answer: item.previous_answer}});
+        });
+        if (!selected.length) { review.textContent = 'No eligible answers to learn.'; return; }
+        const confirm = document.createElement('button');
+        confirm.type = 'button';
+        confirm.textContent = 'Confirm';
+        review.append(confirm);
+        confirm.addEventListener('click', async event => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (pending || automation()) return;
+          const ticked = selected.filter(item => item.checkbox.checked);
+          const current = learnRows();
+          if (location.href !== url || companyHint() !== company || ticked.some(({row}) =>
+            !current.some(item => item.element === row.element && item.label === row.label && item.answer === row.answer
+              && JSON.stringify(item.options) === JSON.stringify(row.options)))) {
+            review.textContent = 'Page answers changed. Click Learn page again.';
+            return;
+          }
+          if (!ticked.length) { review.textContent = 'No answers selected.'; return; }
+          pending = true;
+          confirm.disabled = true;
+          try {
+            const saved = await request('portal-assist-learn', {...context, dry_run: false, pairs: ticked.map(item => item.pair)});
+            const count = saved.results.filter(item => item.stored).length;
+            review.textContent = `Stored ${count} answers.${count < ticked.length ? ' KB changed. Click Learn page again.' : ''}`;
+          } catch (error) { review.textContent = `Learn failed: ${error.message}`; }
+          finally { pending = false; confirm.disabled = false; }
+        });
+      } catch (error) { review.textContent = `Learn failed: ${error.message}`; }
+      finally { pending = false; learn.disabled = false; }
+    });
     button.addEventListener('click', async event => {
       event.preventDefault();
       event.stopPropagation();
@@ -343,6 +457,7 @@
     if (automation()) return;
     const radioSeen = new Set();
     for (const element of document.querySelectorAll(FIELD_SELECTOR)) {
+      if (!fieldStates.has(element)) fieldStates.set(element, {initial: currentAnswer(element)});
       if (!visible(element) || element.disabled || element.readOnly || element.closest('[data-portal-panel]')) continue;
       if (element.parentElement?.closest('[role="combobox"]')) continue;
       const parts = groupOf(element);
@@ -370,5 +485,14 @@
     focused = [...controls.keys()].find(element => groupOf(element).includes(event.target) || element.contains?.(event.target)) || null;
     scan();
   });
+  for (const type of ['input', 'change']) document.addEventListener?.(type, event => {
+    if (!event.isTrusted || automation()) return;
+    for (const [element] of controls) {
+      if (groupOf(element).includes(event.target) || members(element).includes(event.target)) {
+        const state = fieldStates.get(element);
+        if (state) { state.user = currentAnswer(element); state.filled = null; }
+      }
+    }
+  }, true);
   scan();
 })();

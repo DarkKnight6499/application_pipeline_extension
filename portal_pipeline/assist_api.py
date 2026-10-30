@@ -1,4 +1,5 @@
 """Author: Yazad Madan. Local per-field answers, reviewed storage, and bounded drafts."""
+import hashlib
 import importlib.util
 import json
 import re
@@ -25,6 +26,11 @@ LOG_FILENAME = "assist_questions.jsonl"
 MAX_BODY = 64 * 1024
 REJECT_DRAIN_TIMEOUT = 1
 MAX_LABEL = 2000
+MAX_LEARN_PAIRS = 80
+MAX_LEARN_LABEL = 300
+MAX_LEARN_ANSWER = 2000
+LEARN_PAIRS = "pairs"
+PREVIOUS_ANSWER = "previous_answer"
 MAX_OPTIONS = 500
 DRAFT_TIMEOUT = 90
 CLAUDE_COMMAND = "claude"
@@ -102,7 +108,22 @@ class AssistService:
                 if not re.fullmatch(r"[A-Za-z0-9_-]{40,100}", self.token):
                     raise ValueError("Invalid assist token file. Restore it locally before starting.")
 
-    def company_answer(self, body):
+    def company_scope(self, body):
+        host = body.get(HOST_COLUMN, "").strip().lower()
+        url = urlsplit(body.get(URL_COLUMN, ""))
+        if not host or url.scheme != "https" or url.hostname != host:
+            raise ValueError("Company learning requires the current HTTPS page host.")
+        company = body.get(COMPANY_HINT_COLUMN, "").strip()
+        identity = host + "|" + normalized(company)
+        directory = self.data / COMPANY_KB_DIRECTORY / hashlib.sha256(identity.encode("utf-8")).hexdigest()
+        return directory, company or host
+
+    def company_answer(self, body, include_local=True):
+        if include_local and body.get(HOST_COLUMN) and body.get(URL_COLUMN):
+            directory, _ = self.company_scope(body)
+            value = answer_memory.lookup(answer_memory.load_memory(directory), body[QUESTION_COLUMN])
+            if value:
+                return value
         company = body.get(COMPANY_HINT_COLUMN, "").strip()
         directory = self.reference / COMPANY_KB_DIRECTORY
         slug = re.sub(r"[^a-z0-9]+", "_", company.lower()).strip("_")
@@ -262,11 +283,74 @@ class AssistService:
         if (not isinstance(answer, str) or not answer.strip() or len(answer) > answer_memory.MAX_ANSWER
                 or NEVER_FILL.search(label) or answer_memory.is_protected(body)):
             raise ValueError("Answer is empty, too long, or protected.")
-        def save(memory):
-            return intent_layer.learn(memory, label, answer, source="assist-reviewed") or answer_memory.remember(
-                memory, label, answer, source="assist-reviewed")
-        answer_memory.update_memory(save, self.data)
+        scoped = bool(body.get(HOST_COLUMN))
+        directory = self.company_scope(body)[0] if scoped else self.data
+        self.update_reviewed(lambda memory: self.save_reviewed(memory, label, answer, scoped), directory, scoped)
         return {"status": "stored"}
+
+    @staticmethod
+    def save_reviewed(memory, label, answer, scoped):
+        memory["author"] = "Yazad Madan"
+        return (not scoped and intent_layer.learn(memory, label, answer, source="assist-reviewed")) or answer_memory.remember(
+            memory, label, answer, source="assist-reviewed")
+
+    @staticmethod
+    def update_reviewed(update, directory, scoped=True):
+        if not scoped:
+            return answer_memory.update_memory(update, directory)
+        with answer_memory.memory_lock(directory):
+            memory = answer_memory.load_memory(directory)
+            if update(memory):
+                atomic_json(answer_memory.memory_path(directory), memory)
+
+    def learn(self, body):
+        if not isinstance(body, dict):
+            raise ValueError("Request must be a JSON object.")
+        self.validate({**body, QUESTION_COLUMN: "Learn page"})
+        directory, company = self.company_scope(body)
+        pairs = body.get(LEARN_PAIRS)
+        dry_run = body.get("dry_run", False)
+        if not isinstance(dry_run, bool) or not isinstance(pairs, list) or len(pairs) > MAX_LEARN_PAIRS:
+            raise ValueError("Learning requires at most 80 pairs and a boolean dry_run.")
+        seen = set()
+        for pair in pairs:
+            self.validate(pair)
+            label, answer = pair[QUESTION_COLUMN], pair.get(ANSWER_COLUMN)
+            previous = pair.get(PREVIOUS_ANSWER)
+            key = answer_memory.normalize_label(label)
+            if (len(label) > MAX_LEARN_LABEL or not isinstance(answer, str) or len(answer) > MAX_LEARN_ANSWER
+                    or not key or key in seen or (previous is not None and
+                    (not isinstance(previous, str) or len(previous) > MAX_LEARN_ANSWER))):
+                raise ValueError("Invalid or duplicate learning pair.")
+            seen.add(key)
+        results = []
+
+        def review(memory):
+            wrote = False
+            for pair in pairs:
+                label, answer = pair[QUESTION_COLUMN], pair[ANSWER_COLUMN].strip()
+                context = label + " " + " ".join(pair.get(OPTIONS_COLUMN, []))
+                if (not answer or NEVER_FILL.search(label) or answer_memory.is_protected(pair)
+                        or any(pattern.search(context) for pattern in BLOCKED_DRAFT)):
+                    results.append({QUESTION_COLUMN: label, "status": "skipped", "stored": False})
+                    continue
+                previous = answer_memory.lookup(memory, label) or self.company_answer(
+                    {**body, QUESTION_COLUMN: label}, include_local=False)
+                status = "new" if previous is None else "same" if previous == answer else "changed"
+                # Recheck the reviewed value under the same lock as the write.
+                store = not dry_run and PREVIOUS_ANSWER in pair and pair[PREVIOUS_ANSWER] == previous
+                if store:
+                    wrote = self.save_reviewed(memory, label, answer, True) or wrote
+                results.append({QUESTION_COLUMN: label, ANSWER_COLUMN: answer, "status": status,
+                                PREVIOUS_ANSWER: previous, "scope": company, "stored": store})
+            return wrote
+
+        with self.lock, answer_memory.memory_lock(directory):
+            if dry_run:
+                review(answer_memory.load_memory(directory))
+            else:
+                self.update_reviewed(review, directory)
+        return {"results": results, "scope": company, "dry_run": dry_run}
 
 
 def handle(handler, service):
@@ -312,10 +396,11 @@ def handle(handler, service):
             return True
         handler.connection.settimeout(10)
         body = json.loads(handler.rfile.read(size))
-        if path not in {"/assist/answer", "/assist/accept"}:
+        if path not in {"/assist/answer", "/assist/accept", "/assist/learn"}:
             handler.send(404, {"error": "Not found."})
         else:
-            result = service.answer(body) if path == "/assist/answer" else service.accept(body)
+            result = {"/assist/answer": service.answer, "/assist/accept": service.accept,
+                      "/assist/learn": service.learn}[path](body)
             handler.send(200, result, extra={"Access-Control-Allow-Origin": handler.headers["Origin"], "Vary": "Origin"})
     except (ValueError, TypeError, UnicodeError):
         handler.send(400, {"error": "Invalid assist request."})

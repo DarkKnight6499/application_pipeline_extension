@@ -38,6 +38,7 @@ class AssistElement {
   constructor(tag, shadows) {
     this.tagName = tag.toUpperCase(); this.listeners = {}; this.hidden = false;
     this.attributes = {}; this.isConnected = true; this.shadows = shadows; this.style = {};
+    this.children = [];
   }
   attachShadow(options) {
     assert.equal(options.mode, 'closed');
@@ -46,6 +47,8 @@ class AssistElement {
     return root;
   }
   setAttribute(key, value) { this.attributes[key] = value; }
+  append(...children) { this.children.push(...children); }
+  replaceChildren(...children) { this.children = children; this.textContent = ''; }
   addEventListener(type, listener) { this.listeners[type] = listener; }
   remove() { this.isConnected = false; }
 }
@@ -55,17 +58,23 @@ async function contentChecks() {
   const marker = '  scan();\n})();';
   assert.equal(source.split(marker).length, 2);
   const instrumented = source.replace(marker,
-    '  globalThis.testAssist = {match, nativeSet, nonempty, fill, labelFor, members, safeClick, scan, groupOf};\n})();');
+    '  globalThis.testAssist = {match, nativeSet, nonempty, fill, labelFor, members, safeClick, scan, groupOf, learnRows, currentAnswer};\n})();');
   const shadows = [];
   const requests = [];
+  const listeners = {};
   const document = {documentElement: {}, body: {append(host) { host.isConnected = true; }}, querySelectorAll: () => [], querySelector: () => null,
+    addEventListener(type, listener) { listeners[type] = listener; }, createTextNode: value => ({textContent: value}),
     getElementById: () => null, createElement: tag => new AssistElement(tag, shadows)};
   let storedResponse = {status: 'stored', answer: 'Example answer', candidates: ['Example answer']};
   let delayResponse = false;
   let pendingResponse;
+  let learnStatus = 'new';
   const runtime = {sendMessage(message, callback) {
     requests.push(message);
     if (delayResponse) pendingResponse = callback;
+    else if (message.type === 'portal-assist-learn') callback({ok: true, value: {scope: 'Example Corp',
+      results: message.body.pairs.map(pair => ({...pair, status: learnStatus,
+        previous_answer: learnStatus === 'changed' ? 'Older answer' : null, stored: !message.body.dry_run}))}});
     else callback({ok: true, value: storedResponse});
   }};
   const context = vm.createContext({document, location: new URL(APPLICATION_URL), setTimeout, clearTimeout,
@@ -103,12 +112,14 @@ async function contentChecks() {
   await api.fill(select, {candidates: ['example OPTION']}, () => true);
   assert.equal(select.value, 'opaque-value');
   assert.equal(api.nonempty(select), true);
+  assert.equal(api.currentAnswer(select), 'Example option');
 
   const checkbox = new Input('checkbox');
   await api.fill(checkbox, {candidates: ['Yes']}, () => true);
   assert.equal(checkbox.checked, true);
   await api.fill(checkbox, {candidates: ['No']}, () => true);
   assert.equal(checkbox.checked, false);
+  assert.equal(api.currentAnswer(checkbox), 'No');
 
   const yes = new Input('radio'); const no = new Input('radio'); const other = new Input('radio');
   yes.labels = [{innerText: 'Yes'}]; no.labels = [{innerText: 'No'}]; other.labels = [{innerText: 'Yes'}];
@@ -120,6 +131,7 @@ async function contentChecks() {
   await api.fill(yes, {candidates: ['NO']}, () => true);
   assert.equal(no.checked, true); assert.equal(other.checked, false);
   assert.equal(api.nonempty(yes), true);
+  assert.equal(api.currentAnswer(yes), 'No');
 
   const combo = new Input(); combo.attributes.role = 'combobox'; combo.attributes['aria-controls'] = 'example-list';
   const option = new Input(); option.innerText = 'Example choice'; option.click = () => { combo.value = option.innerText; };
@@ -202,7 +214,124 @@ async function contentChecks() {
   city.group = zip.group = pair;
   assert.equal(api.groupOf(city).length, 1);
 
+  // Learning requires a trusted edit or retained Fill, never a site-only write.
+  keep.isConnected = empty.isConnected = false;
+  const untouched = new Input(); untouched.labels = [{innerText: 'Prefilled project'}]; untouched.value = 'Site prefill';
+  const scripted = new Input(); scripted.labels = [{innerText: 'Site project'}];
+  const edited = new Input(); edited.labels = [{innerText: 'Preferred project'}];
+  const filled = new Input(); filled.labels = [{innerText: 'Project experience'}];
+  const hidden = new Input(); hidden.labels = [{innerText: 'Hidden project'}];
+  const blank = new Input(); blank.labels = [{innerText: 'Empty project'}];
+  const long = new Input(); long.labels = [{innerText: 'Length project'}];
+  const blocked = ['Password', 'SSN', 'Signature', 'I attest this is true', 'Need sponsorship?', 'Authorized to work?',
+    'Eligible for employment?', 'Veteran status', 'Disability', 'Gender', 'Race or ethnicity', 'Nationality', 'Pronouns'];
+  const protectedFields = blocked.map(label => { const node = new Input(); node.labels = [{innerText: label}]; return node; });
+  const password = new Input('password'); password.labels = [{innerText: 'Secret project'}];
+  const file = new Input('file'); file.labels = [{innerText: 'Project file'}];
+  const generic = new Select([{text: 'Select one', value: '', parentElement: {}},
+    {text: 'Female', value: 'choice', parentElement: {}}]);
+  generic.labels = [{innerText: 'Please select one'}];
+  const learnFields = [untouched, scripted, edited, filled, hidden, blank, long, password, file, generic, ...protectedFields];
+  let navigationClicks = 0;
+  const navigation = ['Next', 'Continue', 'Submit'].map(innerText => ({innerText, click() { navigationClicks += 1; }}));
+  document.querySelector = selector => selector.includes('companyName') ? null : navigation[0];
+  document.querySelectorAll = selector => selector.includes('input[type="text"]') ? learnFields : navigation;
+  api.scan();
+  const trust = node => listeners.input({target: node, isTrusted: true});
+  scripted.value = 'Site update'; listeners.input({target: scripted, isTrusted: false});
+  edited.value = 'Human project'; trust(edited);
+  hidden.value = 'Hidden answer'; trust(hidden); hidden.getClientRects = () => [];
+  long.value = 'x'.repeat(2001); trust(long);
+  password.value = file.value = 'Never store'; trust(password); trust(file);
+  generic.value = 'choice'; trust(generic);
+  for (const node of protectedFields) { node.value = 'Never learn'; trust(node); }
+  assert.deepEqual(Array.from(api.learnRows(), row => row.label), ['Preferred project']);
+
+  const [, , , learn, review] = shadows[0].children;
+  assert.equal(learn.textContent, 'Learn page');
+  assert.equal(learn.type, 'button');
+  learnStatus = 'changed';
+  await learn.listeners.click(event(false));
+  assert.equal(requests.at(-1).body.dry_run, true);
+  assert.equal(requests.at(-1).body.pairs[0].answer, 'Human project');
+  const [reviewLine, confirm] = review.children;
+  assert.equal(confirm.type, 'button');
+  const reviewLabel = reviewLine.children[0];
+  assert.equal(reviewLabel.children[0].checked, true);
+  assert.match(reviewLabel.children[1].textContent, /Company: Example Corp\nchanged/);
+  reviewLabel.children[0].checked = false;
+  const beforeUntick = requests.length;
+  await confirm.listeners.click(event(false));
+  assert.equal(requests.length, beforeUntick);
+  await learn.listeners.click(event(false));
+  await review.children.at(-1).listeners.click(event(false));
+  assert.equal(requests.at(-1).body.dry_run, false);
+  assert.equal(requests.at(-1).body.pairs[0].previous_answer, 'Older answer');
+  assert.match(review.textContent, /Stored 1 answers/);
+
+  untouched.value = 'Edited prefill'; trust(untouched);
+  await learn.listeners.click(event(false));
+  assert.equal(review.children.length, 3);
+  review.children[0].children[0].children[0].checked = false;
+  await review.children.at(-1).listeners.click(event(false));
+  assert.equal(requests.at(-1).body.pairs.length, 1);
+  assert.equal(requests.at(-1).body.pairs[0].label, 'Preferred project');
+  assert.equal(untouched.value, 'Edited prefill');
+  untouched.isConnected = false;
+
+  await learn.listeners.click(event(false));
+  const beforeChanged = requests.length;
+  edited.value = 'Edited after review'; trust(edited);
+  await review.children.at(-1).listeners.click(event(false));
+  assert.equal(requests.length, beforeChanged);
+  assert.match(review.textContent, /Page answers changed/);
+  edited.value = 'Human project'; trust(edited);
+  await learn.listeners.click(event(false));
+  const beforeAutomation = requests.length;
   context.PortalAutomationFilling = true;
+  await review.children.at(-1).listeners.click(event(false));
+  assert.equal(requests.length, beforeAutomation);
+  context.PortalAutomationFilling = false;
+  delayResponse = true;
+  const learning = learn.listeners.click(event(false));
+  context.PortalAutomationFilling = true;
+  pendingResponse({ok: true, value: {scope: 'Example Corp', results: []}});
+  await learning;
+  assert.equal(review.children.length, 0);
+  context.PortalAutomationFilling = false;
+  delayResponse = false;
+  edited.value = 'Site rewrite';
+  assert.equal(api.learnRows().length, 0);
+
+  // A Fill answer remains eligible even when it equals the first-scan value.
+  const fillSame = new Input(); fillSame.labels = [{innerText: 'Retained project'}]; fillSame.value = 'Example answer';
+  learnFields.forEach(node => { node.isConnected = false; });
+  document.querySelectorAll = () => [fillSame];
+  api.scan();
+  const sameButton = shadows.at(-1).children[1];
+  await sameButton.listeners.click(event(true));
+  assert.deepEqual(Array.from(api.learnRows(), row => row.answer), ['Example answer']);
+  fillSame.value = 'User revision'; listeners.change({target: fillSame, isTrusted: true});
+  assert.deepEqual(Array.from(api.learnRows(), row => row.answer), ['User revision']);
+  fillSame.value = 'Example answer'; trust(fillSame);
+  assert.equal(api.learnRows().length, 0);
+
+  const many = Array.from({length: 81}, (_, index) => {
+    const node = new Input(); node.labels = [{innerText: `Project ${index}`}]; return node;
+  });
+  fillSame.isConnected = false;
+  document.querySelectorAll = () => many;
+  api.scan();
+  many.forEach(node => { node.value = 'Example project'; trust(node); });
+  const beforeLimit = requests.length;
+  await learn.listeners.click(event(false));
+  assert.equal(requests.length, beforeLimit);
+  assert.match(review.textContent, /More than 80/);
+  assert.equal(navigationClicks, 0);
+
+  context.PortalAutomationFilling = true;
+  await learn.listeners.click(event(false));
+  assert.equal(requests.length, beforeLimit);
   document.querySelectorAll = () => { throw Error('Must stay passive during automation'); };
   api.scan();
 }
@@ -233,10 +362,22 @@ async function workerChecks() {
   assert.equal(calls.length, 1);
   assert.equal((await send({type: 'portal-assist-accept', body: {label: 'Example question', answer: 'Example answer'}}, sender)).ok, true);
   assert.equal(calls[1].url, 'http://127.0.0.1:8766/assist/accept');
+  const learn = {type: 'portal-assist-learn', body: {pairs: [{label: 'Example project', answer: 'Example answer'}],
+    dry_run: true, host: 'forged.example', url: 'https://forged.example'}};
+  assert.equal((await send(learn, sender)).ok, true);
+  assert.equal(calls[2].url, 'http://127.0.0.1:8766/assist/learn');
+  const learned = JSON.parse(calls[2].options.body);
+  assert.equal(learned.host, 'example.myworkdayjobs.com'); assert.equal(learned.url, APPLICATION_URL);
+  assert.equal(learned.dry_run, true);
+  for (const invalid of [{...sender, id: 'other-extension'}, {...sender, tab: null},
+    {...sender, url: 'https://unrelated.example/apply'}, {...sender, url: 'http://example.myworkdayjobs.com/apply'}]) {
+    assert.equal((await send(learn, invalid)).ok, false);
+  }
+  assert.equal(calls.length, 3);
 }
 
 (async () => {
   await contentChecks();
   await workerChecks();
-  process.stdout.write('Assist content and worker checks passed\n');
+  process.stdout.write('Assist content and worker checks passed (2 suites)\n');
 })().catch(error => { process.stderr.write(error.stack + '\n'); process.exitCode = 1; });
