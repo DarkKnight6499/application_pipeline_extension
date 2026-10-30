@@ -9,12 +9,17 @@
   const SETTLE_MS = 180;
   const POPUP_TIMEOUT_MS = 1800;
   const PLACEHOLDER = /^(?:select(?:\s+(?:one|an? option))?|choose(?:\s+.*)?|please select(?:\s+.*)?|[-*\s]*)$/i;
-  const STYLE = ':host{all:initial!important;display:inline-block!important;margin:0 0 0 6px!important;vertical-align:middle!important;font:12px Arial,sans-serif!important}button{font:inherit;border:1px solid #777;border-radius:4px;background:#fff;color:#222;padding:2px 6px;cursor:pointer}button:disabled{opacity:.6;cursor:wait}span{font:inherit;color:#333;margin-left:4px}a{font:inherit;color:#165bb4;cursor:pointer;margin-left:4px;text-decoration:underline}';
+  const TEXT_TYPES = ['text', 'tel', 'number'];
+  const SEGMENT = /\b(?:month|day|year|mm|dd|yyyy)\b/i;
+  const STYLE = ':host{all:initial!important;position:absolute!important;z-index:2147483647!important;font:12px Arial,sans-serif!important}button{font:inherit;border:1px solid #777;border-radius:4px;background:#fff;color:#222;padding:2px 6px;cursor:pointer}button:disabled{opacity:.6;cursor:wait}span{font:inherit;color:#333;margin-left:4px}a{font:inherit;color:#165bb4;cursor:pointer;margin-left:4px;text-decoration:underline}';
+  const DOCK_STYLE = ':host{all:initial!important;position:fixed!important;right:0!important;top:40%!important;z-index:2147483647!important;font:12px Arial,sans-serif!important}button{font:inherit;border:1px solid #777;border-right:0;border-radius:6px 0 0 6px;background:#fff;color:#222;padding:8px 6px;cursor:pointer}button:disabled{opacity:.6;cursor:wait}div{background:#fff;border:1px solid #777;border-right:0;padding:4px 6px;max-width:240px;color:#333}';
   if (globalThis.PortalAssistLoaded) return;
   globalThis.PortalAssistLoaded = true;
   const controls = new Map();
   let pending = false;
   let timer;
+  let focused = null;
+  let dock = null;
   const text = element => element?.innerText?.replace(/\s+/g, ' ').trim() || '';
   const normalize = value => String(value ?? '').replace(/\s+/g, ' ').trim().toLocaleLowerCase();
   const visible = element => !!element?.isConnected && !element.closest('[hidden],[inert],[aria-hidden="true"]')
@@ -47,7 +52,7 @@
     const own = ownLabel(element);
     const group = element.type === 'checkbox' ? groupLabel(element) : '';
     if (own && group && normalize(own) !== normalize(group)) return `${group}: ${own}`;
-    if (own) return own;
+    if (own && !SEGMENT.test(own)) return own;
     const container = element.closest('[data-automation-id="formField"],.form-field,.field');
     return text(container?.querySelector('label,[data-automation-id="formLabel"]')) || groupLabel(element);
   }
@@ -57,6 +62,29 @@
     const scope = element.closest(GROUP_SELECTOR) || element.form || document;
     return [...scope.querySelectorAll('input[type="radio"]')].filter(candidate =>
       candidate.form === element.form && (element.name ? candidate.name === element.name : candidate === element));
+  }
+
+  const descriptor = node => [ariaLabel(node), node.placeholder, node.name, node.id].join(' ');
+
+  // Split date or similar segments (month/day/year inputs) are one field, not three.
+  function groupOf(element) {
+    const textInput = node => node.tagName === 'INPUT' && TEXT_TYPES.includes(node.type) && node.getAttribute('role') !== 'combobox';
+    if (!textInput(element)) return [element];
+    const container = element.closest(GROUP_SELECTOR);
+    if (!container) return [element];
+    const parts = [...container.querySelectorAll(FIELD_SELECTOR)].filter(node => textInput(node) && visible(node) && !node.disabled && !node.readOnly);
+    return parts.length > 1 && parts.includes(element) && parts.every(node => SEGMENT.test(descriptor(node))) ? parts : [element];
+  }
+
+  function fillGroup(parts, result) {
+    const numbers = result.answer.match(/\d+/g) || [];
+    if (numbers.length !== parts.length || parts.length > 3) return null;
+    const key = node => /month|\bmm\b/i.test(descriptor(node)) ? 0 : /day|\bdd\b/i.test(descriptor(node)) ? 1 : /year|yyyy/i.test(descriptor(node)) ? 2 : -1;
+    const keys = parts.map(key);
+    const byKey = keys.every(index => index >= 0) && new Set(keys).size === parts.length;
+    const values = parts.map((node, position) => numbers[byKey ? keys[position] : position]);
+    parts.forEach((node, position) => nativeSet(node, 'value', values[position]));
+    return {kind: 'group', parts, values};
   }
 
   function popup(element) {
@@ -164,6 +192,8 @@
       return {kind: element.type === 'radio' ? 'radio' : element.type === 'checkbox' ? 'checkbox' : 'select',
         node: option.node, value: element.tagName === 'SELECT' ? option.node.value : element.type === 'radio' || option.checked};
     }
+    const parts = groupOf(element);
+    if (parts.length > 1) return fillGroup(parts, result);
     if (element.maxLength >= 0 && result.answer.length > element.maxLength) throw new Error('Answer too long');
     nativeSet(element, 'value', result.answer);
     return {kind: 'text', value: result.answer};
@@ -171,6 +201,7 @@
 
   function unchanged(element, written) {
     if (!element.isConnected || !written) return false;
+    if (written.kind === 'group') return written.parts.every((node, index) => node.value === written.values[index]);
     if (written.kind === 'radio' || written.kind === 'checkbox') return written.node.checked === written.value;
     if (written.kind === 'combobox') return normalize('value' in element ? element.value : text(element)) === normalize(written.value);
     return element.value === written.value;
@@ -194,8 +225,9 @@
     save.hidden = true;
     shadow.append(style, button, badge, save);
     const anchor = element.type === 'radio' ? element.closest(GROUP_SELECTOR) || element : element;
-    anchor.insertAdjacentElement('afterend', host);
-    const entry = {host, button, badge};
+    (document.body || document.documentElement).append(host);
+    host.hidden = true;
+    const entry = {host, button, badge, anchor, run: null};
     controls.set(element, entry);
     let draft = null;
     let written = null;
@@ -211,17 +243,15 @@
     };
     save.addEventListener('click', saveDraft);
     save.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') saveDraft(event); });
-    button.addEventListener('click', async event => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (pending || automation()) { badge.textContent = 'busy'; return; }
+    const attempt = async overwrite => {
+      if (pending || automation()) return 'busy';
+      const parts = groupOf(element);
       const label = labelFor(element);
-      const overwrite = event.shiftKey;
-      if (!overwrite && nonempty(element)) { badge.textContent = 'has value'; return; }
-      if (!label || FORBIDDEN.test(label) || element.disabled || element.readOnly) return;
+      if (!overwrite && parts.some(nonempty)) return 'has value';
+      if (!label || FORBIDDEN.test(label) || element.disabled || element.readOnly) return 'manual';
       const url = location.href;
       const mayWrite = () => !automation() && element.isConnected && visible(element) && !element.disabled && !element.readOnly
-        && labelFor(element) === label && location.href === url && (overwrite || !nonempty(element));
+        && labelFor(element) === label && location.href === url && (overwrite || !parts.some(nonempty));
       pending = true;
       button.disabled = true;
       badge.textContent = 'looking up';
@@ -230,32 +260,93 @@
         const result = await request('portal-assist-answer', {label, options: choices(element).map(option => option.text),
           type: element.getAttribute('role') === 'combobox' ? 'combobox' : element.type || element.tagName.toLowerCase(),
           host: location.hostname, url, company_hint: companyHint()});
-        if (!mayWrite()) { badge.textContent = 'field changed'; return; }
-        if (!['stored', 'draft'].includes(result.status) || typeof result.answer !== 'string' || !Array.isArray(result.candidates)) {
-          badge.textContent = 'no answer'; return;
-        }
+        if (!mayWrite()) return 'field changed';
+        if (!['stored', 'draft'].includes(result.status) || typeof result.answer !== 'string' || !Array.isArray(result.candidates)) return 'no answer';
         written = await fill(element, result, mayWrite);
-        if (!written) { badge.textContent = 'no match'; return; }
+        if (!written) return 'no match';
         await wait(SETTLE_MS);
-        if (!unchanged(element, written)) { badge.textContent = 'not retained'; return; }
-        badge.textContent = result.status;
+        if (!unchanged(element, written)) return 'not retained';
         draft = result.status === 'draft' ? {label, answer: result.answer} : null;
         save.hidden = !draft;
-      } catch (error) { badge.textContent = 'unavailable'; badge.title = error.message; }
+        return result.status;
+      } catch (error) { badge.title = error.message; return 'unavailable'; }
       finally { pending = false; button.disabled = false; }
+    };
+    entry.run = async overwrite => {
+      const status = await attempt(overwrite);
+      badge.textContent = status;
+      return status;
+    };
+    button.addEventListener('click', async event => {
+      event.preventDefault();
+      event.stopPropagation();
+      await entry.run(event.shiftKey);
     });
+  }
+
+  // One page-level button fills only empty fields; it never overwrites and never clicks Next or Submit.
+  function makeDock() {
+    const host = document.createElement('div');
+    const shadow = host.attachShadow({mode: 'closed'});
+    const style = document.createElement('style');
+    style.textContent = DOCK_STYLE;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Fill page';
+    button.title = 'Fill every empty field on this page. Fields that already have a value are left alone.';
+    const summary = document.createElement('div');
+    summary.hidden = true;
+    shadow.append(style, button, summary);
+    (document.body || document.documentElement).append(host);
+    button.addEventListener('click', async event => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (pending || automation()) return;
+      const order = ([a], [b]) => typeof a.compareDocumentPosition === 'function' ? (a.compareDocumentPosition(b) & 4 ? -1 : 1) : 0;
+      const rows = [...controls].filter(([element]) => element.isConnected && visible(element)).sort(order);
+      let filled = 0;
+      let left = 0;
+      const misses = [];
+      button.disabled = true;
+      for (const [element, entry] of rows) {
+        const status = await entry.run(false);
+        if (status === 'stored' || status === 'draft') filled += 1;
+        else if (status === 'has value') left += 1;
+        else misses.push(`${labelFor(element).slice(0, 60)}: ${status}`);
+      }
+      button.disabled = false;
+      summary.textContent = `filled ${filled}, left alone ${left} (already filled)${misses.length ? '; not filled: ' + misses.join('; ') : ''}`;
+      summary.hidden = false;
+    });
+    return {host, button, summary};
+  }
+
+  // The per-field Fill appears beside the focused field only, outside its right edge.
+  function place() {
+    for (const [element, entry] of controls) {
+      if (entry.host.hidden || typeof entry.anchor.getBoundingClientRect !== 'function') continue;
+      const rect = entry.anchor.getBoundingClientRect();
+      const left = rect.right + (globalThis.scrollX || 0) + 8;
+      const top = rect.top + (globalThis.scrollY || 0) + Math.max(0, (rect.height - 24) / 2);
+      if (entry.host.style) { entry.host.style.left = `${left}px`; entry.host.style.top = `${top}px`; }
+    }
   }
 
   function scan() {
     for (const [element, entry] of controls) {
       if (!element.isConnected || !entry.host.isConnected) { entry.host.remove(); controls.delete(element); }
-      else entry.host.hidden = !visible(element);
+      else entry.host.hidden = !(focused === element && visible(element));
     }
+    if (!dock) dock = makeDock();
+    dock.host.hidden = controls.size === 0 || automation();
+    place();
     if (automation()) return;
     const radioSeen = new Set();
     for (const element of document.querySelectorAll(FIELD_SELECTOR)) {
       if (!visible(element) || element.disabled || element.readOnly || element.closest('[data-portal-panel]')) continue;
       if (element.parentElement?.closest('[role="combobox"]')) continue;
+      const parts = groupOf(element);
+      if (parts[0] !== element) continue;
       if (element.type === 'radio') {
         const group = members(element);
         if (group.some(node => radioSeen.has(node))) continue;
@@ -268,11 +359,16 @@
   }
   const observer = new MutationObserver(records => {
     if (!records.some(record => record.target.nodeType === Node.ELEMENT_NODE
-      && ![...controls.values()].some(entry => entry.host === record.target))) return;
+      && record.target !== dock?.host && ![...controls.values()].some(entry => entry.host === record.target))) return;
     clearTimeout(timer);
     timer = setTimeout(scan, DEBOUNCE_MS);
   });
   observer.observe(document.documentElement, {childList: true, subtree: true, attributes: true,
     attributeFilter: ['hidden', 'style', 'class', 'disabled', 'readonly', 'aria-hidden', 'aria-labelledby', 'aria-label']});
+  document.addEventListener?.('focusin', event => {
+    if (event.target === dock?.host || [...controls.values()].some(entry => entry.host === event.target)) return;
+    focused = [...controls.keys()].find(element => groupOf(element).includes(event.target) || element.contains?.(event.target)) || null;
+    scan();
+  });
   scan();
 })();

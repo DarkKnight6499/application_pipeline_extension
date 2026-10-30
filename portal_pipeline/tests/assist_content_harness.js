@@ -37,7 +37,7 @@ class Select extends Input {
 class AssistElement {
   constructor(tag, shadows) {
     this.tagName = tag.toUpperCase(); this.listeners = {}; this.hidden = false;
-    this.attributes = {}; this.isConnected = true; this.shadows = shadows;
+    this.attributes = {}; this.isConnected = true; this.shadows = shadows; this.style = {};
   }
   attachShadow(options) {
     assert.equal(options.mode, 'closed');
@@ -55,10 +55,10 @@ async function contentChecks() {
   const marker = '  scan();\n})();';
   assert.equal(source.split(marker).length, 2);
   const instrumented = source.replace(marker,
-    '  globalThis.testAssist = {match, nativeSet, nonempty, fill, labelFor, members, safeClick, scan};\n})();');
+    '  globalThis.testAssist = {match, nativeSet, nonempty, fill, labelFor, members, safeClick, scan, groupOf};\n})();');
   const shadows = [];
   const requests = [];
-  const document = {documentElement: {}, querySelectorAll: () => [], querySelector: () => null,
+  const document = {documentElement: {}, body: {append(host) { host.isConnected = true; }}, querySelectorAll: () => [], querySelector: () => null,
     getElementById: () => null, createElement: tag => new AssistElement(tag, shadows)};
   let storedResponse = {status: 'stored', answer: 'Example answer', candidates: ['Example answer']};
   let delayResponse = false;
@@ -134,8 +134,8 @@ async function contentChecks() {
   const field = new Input(); field.labels = [{innerText: 'Example question'}];
   document.querySelectorAll = () => [field];
   api.scan(); api.scan();
-  assert.equal(shadows.length, 1);
-  const [, button, badge, save] = shadows[0].children;
+  assert.equal(shadows.length, 2);
+  const [, button, badge, save] = shadows[1].children;
   assert.equal(button.type, 'button');
   const event = shiftKey => ({shiftKey, preventDefault() {}, stopPropagation() {}});
   field.value = 'Keep existing';
@@ -166,7 +166,42 @@ async function contentChecks() {
   const replacement = new Input(); replacement.labels = [{innerText: 'Example question'}];
   document.querySelectorAll = () => [replacement];
   api.scan(); api.scan();
-  assert.equal(shadows.length, 2);
+  assert.equal(shadows.length, 3);
+
+  // Page button: fills empty fields only and reports what it left alone.
+  replacement.isConnected = false;
+  const keep = new Input(); keep.labels = [{innerText: 'Kept question'}]; keep.value = 'Typed by hand';
+  const empty = new Input(); empty.labels = [{innerText: 'Open question'}];
+  storedResponse = {status: 'stored', answer: 'Example answer', candidates: ['Example answer']};
+  document.querySelectorAll = () => [keep, empty];
+  api.scan();
+  const [, dockButton, dockSummary] = shadows[0].children;
+  const requestsBefore = requests.length;
+  await dockButton.listeners.click(event(false));
+  assert.equal(keep.value, 'Typed by hand'); assert.equal(empty.value, 'Example answer');
+  assert.equal(requests.length, requestsBefore + 1);
+  assert.match(dockSummary.textContent, /filled 1, left alone 1/);
+  assert.equal(dockSummary.hidden, false);
+
+  // Month, day and year inputs form one field and are filled together.
+  const month = new Input(); const day = new Input(); const year = new Input();
+  month.attributes['aria-label'] = 'Month'; day.attributes['aria-label'] = 'Day'; year.attributes['aria-label'] = 'Year';
+  const dateGroup = {querySelector: () => ({innerText: 'When would you be available to start?'}),
+    querySelectorAll: () => [month, day, year], getAttribute: () => null};
+  month.group = day.group = year.group = dateGroup;
+  assert.equal(api.groupOf(day).length, 3);
+  assert.equal(api.labelFor(day), 'When would you be available to start?');
+  await api.fill(month, {answer: '12/01/2026', candidates: []}, () => true);
+  assert.deepEqual([month.value, day.value, year.value], ['12', '01', '2026']);
+  assert.equal(api.nonempty(year), true);
+  day.value = ''; year.value = '';
+  assert.equal(await api.fill(month, {answer: 'Immediately', candidates: []}, () => true), null);
+  assert.deepEqual([day.value, year.value], ['', '']);
+  const city = new Input(); const zip = new Input(); city.attributes['aria-label'] = 'City'; zip.attributes['aria-label'] = 'Zip';
+  const pair = {querySelector: () => null, querySelectorAll: () => [city, zip], getAttribute: () => null};
+  city.group = zip.group = pair;
+  assert.equal(api.groupOf(city).length, 1);
+
   context.PortalAutomationFilling = true;
   document.querySelectorAll = () => { throw Error('Must stay passive during automation'); };
   api.scan();

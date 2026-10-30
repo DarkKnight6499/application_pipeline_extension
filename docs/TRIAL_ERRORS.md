@@ -256,3 +256,9 @@ Author: Yazad Madan.
 - Focused assist API, manifest, and Node-only control checks cover resolution, blocked labels and options, queue preservation, authentication, readback, duplicate buttons, stale fields, explicit overwrite, draft acceptance, popup ownership, native setters, and worker isolation. Broader pytest execution reports 546 passed, 613 skipped, one failure, and two collection errors. The remaining failure and both collection errors require missing Playwright. Full-suite green status is unverified.
 - Primary source contracts were read without copying personal values: company_kb exposes find_answer; profile name is header.name, with education, certifications, and experience company fields separately allowlisted. The official Claude CLI reference confirms built-in tool restrictions and a separate MCP deny flag. Windows npm shims are bypassed through Node to avoid shell interpretation.
 - No Git, Edge, employer page, or real Claude draft call was used. Normal-profile injection, real React/Workday behavior, CLI login, and remote persistence remain unverified. Drafts remain local proposals until explicitly saved; signatures, attestations, and final actions remain manual.
+
+## October 30, 2026: one Fill per page
+
+- A segmented date field (month, day, year inputs) got three Fill buttons that overlapped the digits. Segment inputs inside one form group are now one field, filled together from an MM/DD/YYYY answer; an answer without the matching number of parts is left unfilled.
+- Per-field Fill moved outside the field's right edge and shows only for the focused field. A docked "Fill page" button fills every empty field in page order, never overwrites, never clicks Next or Submit, and reports filled, left alone and not filled.
+- Verified only with the browser-free harness. The real Workday date widget, focus placement and live fills are unverified.
