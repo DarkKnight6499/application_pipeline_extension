@@ -29,10 +29,11 @@ QUIET_SECONDS = 5  # Simplify keeps filling in the same profile; read only after
 QUIET_MAX_SECONDS = 90
 SNAPSHOT_JS = "() => [...document.querySelectorAll('input,textarea,button[aria-haspopup=listbox]')].map(e => (e.value || e.innerText || '') + (e.checked ? '1' : '')).join('|')"
 # Self-ID answers come from the local intent store (answer memory), never from this public file.
-ACK_LABEL = re.compile(r"acknowledg|consent to the terms|have read and", re.I)
+ACK_LABEL = re.compile(r"acknowledg|consent to the terms|give your consent|have read and", re.I)
 ACK_OPTION = re.compile(r"^(i acknowledge|yes)", re.I)
 # Per-company consents Yazad approved to auto-tick (2026-10-29).
 CONSENT_BY_COMPANY = {"keybank": re.compile(r"arbitration agreement", re.I)}
+SUBMIT_LABEL = re.compile(r"submit|send application", re.I)
 SKIP_LABEL = re.compile(r"signature|password", re.I)
 SALARY_LABEL = re.compile(r"minimum pay|desired (pay|salary)|salary expectation|expected salary", re.I)
 
@@ -186,7 +187,11 @@ def main(argv):
             if page.locator(INVALID).count():
                 print("STOP: invalid fields remain (text field or unreadable control). Check manually.")
                 return 2
-            page.locator(NEXT_SELECTOR).first.click()
+            next_button = page.locator(NEXT_SELECTOR).first
+            if not title.strip() or SUBMIT_LABEL.search(next_button.inner_text(timeout=5000)):
+                print("STOP: no readable step title or the button is Submit. Never clicking it.")
+                return 2
+            next_button.click()
             page.wait_for_timeout(ADVANCE_WAIT_MS)
             if " ".join(page.locator(STEP).all_inner_texts()).replace("\n", " ") == title:
                 print("STOP: step did not advance.")

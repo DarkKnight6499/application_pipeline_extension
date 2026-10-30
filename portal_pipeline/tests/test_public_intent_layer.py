@@ -30,6 +30,9 @@ CASES = [
     ("Do you currently participate in an outside activity (i.e. part time job, serving on a board)", "outside_activity"),
     ("Are you willing to travel?*", "willing_travel"),
     ("Are you a California resident?*", "california_resident"),
+    ("Please indicate the type of sponsorship that you will need (e.g., H-1B visa or other nonimmigrant sponsorship)", "sponsorship_type_text"),
+    ("Please indicate what type of visa you are currently on, if applicable (e.g., F-1 visa).", "current_visa_type"),
+    ("What amount of time are you willing to travel?*", "willing_travel"),
 ]
 
 

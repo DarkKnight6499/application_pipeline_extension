@@ -29,6 +29,7 @@ INTENT_PATTERNS = [
     ("public_office", r"public office|government entity|government official|elected official"),
     ("under_investigation", r"under investigation"),
     ("age_18", r"at least 18|18 years of age|legal working age|over the age of 18"),
+    ("current_visa_type", r"what type of visa you are currently on|type of visa .* currently"),
     ("willing_travel", r"willing to travel"),
     ("willing_relocate", r"willing to relocate|open to relocation"),
     ("california_resident", r"california resident"),
@@ -52,6 +53,8 @@ COMPILED = [(name, re.compile(pattern, re.I)) for name, pattern in INTENT_PATTER
 def classify(label):
     """Intent id for a question label, or None. Sponsorship splits by whether OPT, STEM OPT or CPT is named."""
     text = re.sub(r"\s+", " ", str(label)).strip()
+    if re.search(r"type of sponsorship", text, re.I):
+        return "sponsorship_type_text"
     if SPONSOR_WORDS.search(text) and re.search(r"require|need|assistance|will you", text, re.I):
         return "sponsorship_opt_listed" if OPT_WORDS.search(text) else "sponsorship_h1b_only"
     for name, pattern in COMPILED:
