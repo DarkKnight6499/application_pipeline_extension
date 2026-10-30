@@ -3,6 +3,7 @@ import argparse
 import contextlib
 import hashlib
 import json
+import re
 import sys
 import unicodedata
 from pathlib import Path
@@ -21,7 +22,9 @@ STATE_FILENAME = "questions_processed.json"
 CONFLICTS_FILENAME = "conflicts.json"
 SCHEMA_VERSION = 1
 AUTHOR = "Yazad Madan"
-SECTIONS = ("AGREE", "CONFLICT", "SINGLE", "SENSITIVE")
+SECTIONS = ("AGREE", "CONFLICT", "SINGLE", "REPEATED", "SENSITIVE")
+INDEXED_LABEL = re.compile(r"\d+\s*:")  # "Work Experience 3: ..." rows belong to a repeating section
+PAGE_ID = "page_id"
 LABEL, ANSWER, COMPANY, HOST = "label", "answer", "company", "host"
 LABELS, ANSWERS, ROWS = "labels", "answers", "_rows"
 KEY, STATUS, RESOLVED = "key", "status", "resolved"
@@ -120,6 +123,16 @@ def stored_entries(service, group):
     return sorted(entries, key=lambda entry: (entry[SCOPE], entry.get(LABEL, ""), entry[ANSWER]))
 
 
+def repeated(group):
+    # One page showing a label twice with different answers is a repeating section (jobs, schools), not a conflict.
+    seen = {}
+    for row in group[ROWS]:
+        key = (row.get(PAGE_ID), normalized_answer(row[ANSWER]))
+        if seen.setdefault((row.get(PAGE_ID), row[LABEL]), key[1]) != key[1]:
+            return True
+    return any(INDEXED_LABEL.search(label) for label in group[LABELS])
+
+
 def build_report(service, rows, state):
     groups = []
     for row in sorted(rows, key=lambda row: (answer_memory.normalize_label(row[LABEL]), row[TS], row[COMPANY], row[ANSWER])):
@@ -156,7 +169,7 @@ def build_report(service, rows, state):
         group[SENSITIVE] = any(row.get(SENSITIVE, False) or page_questions.sensitive(row) for row in group[ROWS])
         stored = {normalized_answer(entry[ANSWER]) for entry in group[STORED]}
         conflicts = len(answers) > 1 or bool(stored - set(answers))
-        group[STATUS] = "SENSITIVE" if group[SENSITIVE] else "CONFLICT" if conflicts else "AGREE" if len(companies) >= 2 else "SINGLE"
+        group[STATUS] = "SENSITIVE" if group[SENSITIVE] else "REPEATED" if repeated(group) else "CONFLICT" if conflicts else "AGREE" if len(companies) >= 2 else "SINGLE"
         resolution = state[RESOLUTIONS].get(group[KEY], {})
         global_answers = [normalized_answer(entry[ANSWER]) for entry in group[STORED] if entry[SCOPE] == "global"]
         group[RESOLVED] = bool(not group[SENSITIVE] and resolution.get("sightings") == sightings_digest(group)
@@ -165,7 +178,7 @@ def build_report(service, rows, state):
     for group in groups:
         intents = {intent_layer.classify(label) for label in group[LABELS]} - {None}
         values = {normalized_answer(answer[ANSWER]) for answer in group[ANSWERS]}
-        if not group[SENSITIVE] and any(
+        if group[STATUS] not in ("SENSITIVE", "REPEATED") and any(
                 intents & ({intent_layer.classify(label) for label in other[LABELS]} - {None})
                 and values != {normalized_answer(answer[ANSWER]) for answer in other[ANSWERS]}
                 for other in groups if other is not group and not other[SENSITIVE]):
@@ -281,8 +294,8 @@ def _promote(service):
             if group[RESOLVED]:
                 summary["unchanged"] += 1
                 continue
-            if status in ("CONFLICT", "SENSITIVE"):
-                summary[status.lower()] += 1
+            if status in ("CONFLICT", "SENSITIVE", "REPEATED"):
+                summary[status.lower()] = summary.get(status.lower(), 0) + 1
                 continue
             if state[PROCESSED].get(group[KEY]) == promotion_digest(group):
                 summary["unchanged"] += 1
