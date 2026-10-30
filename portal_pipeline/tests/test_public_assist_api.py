@@ -164,11 +164,13 @@ class AssistTests(unittest.TestCase):
         self.assertEqual(arguments[:2], [str(self.root / "node.exe"), str(entry)])
         self.assertFalse(self.draft.call_args.kwargs["shell"])
 
-    def test_stored_sensitive_answer_is_allowed_but_signature_is_not(self):
-        self.service.accept(dict(label="Gender?", answer="Example reviewed choice"))
-        self.assertEqual(self.service.answer(self.payload("Gender?"))["status"], "stored")
-        with self.assertRaises(ValueError):
-            self.service.accept(dict(label="Signature", answer=ANSWER))
+    def test_stored_sensitive_answer_and_signature_remain_manual(self):
+        answer_memory.update_memory(lambda memory: answer_memory.remember(
+            memory, "Gender?", "Example reviewed choice"), self.service.data)
+        self.assertEqual(self.service.answer(self.payload("Gender?"))["status"], "none")
+        for label in ("Gender?", "Signature"):
+            with self.assertRaises(ValueError):
+                self.service.accept(dict(label=label, answer=ANSWER))
         self.draft.assert_not_called()
 
     def test_repeated_miss_has_one_queue_entry(self):
@@ -208,7 +210,7 @@ class AssistTests(unittest.TestCase):
         self.assertEqual(stored["author"], "Yazad Madan")
         self.assertEqual(self.service.answer(self.payload())["answer"], ANSWER)
         self.assertEqual(self.service.answer(self.payload())["source"], "company_kb")
-        self.service.accept({**self.payload(), "answer": "Reviewed replacement"})
+        self.service.accept({**self.payload(), "answer": "Reviewed replacement", "previous_answer": ANSWER})
         self.assertEqual(self.service.learn(body)["results"][0]["previous_answer"], "Reviewed replacement")
         self.assertEqual(answer_memory.load_memory(self.service.data)["answers"], {})
         self.draft.assert_not_called()
@@ -223,7 +225,7 @@ class AssistTests(unittest.TestCase):
         self.assertEqual(self.service.learn({**changed, "dry_run": False})["results"][0]["stored"], False)
         self.service.learn(self.learning([], dry_run=False))
         self.assertEqual(self.service.company_answer(self.payload()), ANSWER)
-        self.service.accept({**self.payload(), "answer": "Concurrent review"})
+        self.service.accept({**self.payload(), "answer": "Concurrent review", "previous_answer": ANSWER})
         stale = self.service.learn({**changed, "dry_run": False, "pairs": [
             {**changed["pairs"][0], "previous_answer": review["previous_answer"]}]})
         self.assertFalse(stale["results"][0]["stored"])

@@ -413,8 +413,20 @@
           const label = document.createElement('label');
           label.append(checkbox, document.createTextNode(`${row.label}\n${row.answer}\nCompany: ${result.scope}${item.status === 'changed' ? '\nchanged' : ''}`));
           line.append(label);
+          let aliasCheckbox;
+          if (typeof item.similar_to === 'string' && ['company', 'global'].includes(item.similar_scope)) {
+            const similar = document.createElement('div');
+            similar.textContent = `similar to: ${item.similar_to}${item.similar_scope === 'global' ? ' (global)' : ''}`;
+            aliasCheckbox = document.createElement('input');
+            aliasCheckbox.type = 'checkbox';
+            aliasCheckbox.checked = false;
+            const aliasLabel = document.createElement('label');
+            aliasLabel.append(aliasCheckbox, document.createTextNode('also use this answer for the similar question wording'));
+            line.append(similar, aliasLabel);
+          }
           review.append(line);
-          selected.push({row, checkbox, pair: {...pairs[index], previous_answer: item.previous_answer}});
+          selected.push({row, checkbox, aliasCheckbox, pair: {...pairs[index], previous_answer: item.previous_answer,
+            ...(aliasCheckbox ? {similar_to: item.similar_to, similar_scope: item.similar_scope} : {})}});
         });
         if (!selected.length) { review.textContent = 'No eligible answers to learn.'; return; }
         const confirm = document.createElement('button');
@@ -437,7 +449,8 @@
           pending = true;
           confirm.disabled = true;
           try {
-            const saved = await request('portal-assist-learn', {...context, dry_run: false, pairs: ticked.map(item => item.pair)});
+            const saved = await request('portal-assist-learn', {...context, dry_run: false,
+              pairs: ticked.map(item => ({...item.pair, use_alias: item.aliasCheckbox?.checked === true}))});
             const count = saved.results.filter(item => item.stored).length;
             review.textContent = `Stored ${count} answers.${count < ticked.length ? ' KB changed. Click Learn page again.' : ''}`;
           } catch (error) { review.textContent = `Learn failed: ${error.message}`; }
