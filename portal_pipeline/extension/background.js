@@ -6,7 +6,7 @@ const ASSIST_TIMEOUT_MS = 100000;
 const applicationRestrictions = new Set();
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
-    if (["portal-assist-answer", "portal-assist-accept", "portal-assist-learn", "portal-assist-miss", "portal-assist-correction", "portal-assist-dump"].includes(message.type)) {
+    if (["portal-assist-answer", "portal-assist-accept", "portal-assist-learn", "portal-assist-miss", "portal-assist-correction", "portal-assist-dump", "portal-assist-history"].includes(message.type)) {
       if (!sender.tab || sender.id !== chrome.runtime.id || typeof sender.url !== "string")
         throw new Error("Assist requires an extension content script.");
       const target = new URL(sender.url);

@@ -200,6 +200,16 @@
     });
   }
 
+  // When nothing saves, say why: how many controls exist, are visible, have a label, and whether this is an iframe.
+  function saveDiagnosis(rows) {
+    const all = [...document.querySelectorAll(CAPTURE_SELECTOR)];
+    const shown = all.filter(visible);
+    const named = rows.filter(row => row.label).length;
+    const bare = shown.filter(element => !labelFor(element) && !ownLabel(element))[0];
+    return `[${window === window.top ? 'top page' : 'iframe'}: ${all.length} controls, ${shown.length} visible, ${named} labelled${bare ? `, unlabelled e.g. ${bare.tagName.toLowerCase()}#${bare.id || bare.name || '?'}` : ''}]
+`;
+  }
+
   function learnRows(capture = false) {
     const rows = [];
     for (const element of capture ? captureElements() : controls.keys()) {
@@ -321,6 +331,45 @@
     return {job_title: snippet.slice(0, MAX_JOB_TITLE), page_snippet: snippet};
   }
 
+  // Workday history rows share an id prefix like education-2--; the row index is the prefix's page order.
+  const HISTORY_ROW = /^(education|certifications?)-\d+--/;
+  const HISTORY_SECTIONS = {Education: 'education', Certifications: 'certification'};
+  function rowContext(element) {
+    const found = HISTORY_ROW.exec(element.id || '');
+    if (!found) return {};
+    const prefixes = [...new Set([...document.querySelectorAll(`[id^="${found[1]}-"]`)].map(node => HISTORY_ROW.exec(node.id)?.[0]).filter(Boolean))];
+    return {row_group: found[1].replace(/s$/, ''), row_index: prefixes.indexOf(found[0])};
+  }
+
+  function rowCount(group) {
+    return new Set([...document.querySelectorAll(`[id^="${group}-"],[id^="${group}s-"]`)].map(node => HISTORY_ROW.exec(node.id)?.[0]).filter(Boolean)).size;
+  }
+
+  // Click the section's Add button once per missing profile record; never touches Next or Submit.
+  async function addHistoryRows() {
+    const headings = [...document.querySelectorAll('h1,h2,h3,h4')];
+    if (!Object.keys(HISTORY_SECTIONS).some(text => headings.some(node => node.textContent.trim() === text))) return;
+    const counts = await request('portal-assist-history', {label: 'history'});
+    for (const [text, group] of Object.entries(HISTORY_SECTIONS)) {
+      const heading = headings.find(node => node.textContent.trim() === text);
+      if (!heading) continue;
+      for (let guard = 0; guard < 6 && rowCount(group) < (counts[group] || 0); guard += 1) {
+        let button = null;
+        for (let node = heading.parentElement, depth = 0; node && depth < 8 && !button; node = node.parentElement, depth += 1) {
+          const own = [...node.querySelectorAll('button[data-automation-id="add-button"]')];
+          if (own.length === 1) button = own[0];
+          else if (own.length > 1) break;
+        }
+        if (!button) break;
+        const before = rowCount(group);
+        safeClick(button);
+        for (let waited = 0; waited < 3000 && rowCount(group) === before; waited += 100) await wait(100);
+        if (rowCount(group) === before) break;
+        await wait(SETTLE_MS);
+      }
+    }
+  }
+
   async function fill(element, result, mayWrite) {
     if (!mayWrite()) return null;
     if (element.getAttribute('role') === 'combobox' && element.tagName !== 'SELECT') {
@@ -412,7 +461,7 @@
       try {
         const result = await request('portal-assist-answer', {label, options: choices(element).map(option => option.text),
           type: element.getAttribute('role') === 'combobox' ? 'combobox' : element.type || element.tagName.toLowerCase(),
-          host: location.hostname, url, company_hint: companyHint(), ...essayContext()});
+          host: location.hostname, url, company_hint: companyHint(), ...essayContext(), ...rowContext(element)});
         if (!mayWrite()) return 'field changed';
         if (result.status === 'blank') return 'left blank';  // optional field Yazad leaves empty on purpose
         if (!['stored', 'draft'].includes(result.status) || typeof result.answer !== 'string' || !Array.isArray(result.candidates)) {
@@ -523,7 +572,7 @@
         const result = await request('portal-assist-dump', {pairs, company_hint: companyHint()});
         if (!['saved', 'excluded_by_type', 'duplicate', 'flagged_sensitive'].every(key => Number.isSafeInteger(result?.[key]) && result[key] >= 0))
           throw new Error('Invalid save counts');
-        savedSummary.textContent = `saved ${result.saved}, skipped ${result.excluded_by_type} blocked by type (password/file inputs are not answers), duplicate ${result.duplicate}, sensitive ${result.flagged_sensitive}`;
+        savedSummary.textContent = `${result.saved ? '' : saveDiagnosis(rows)}saved ${result.saved}, skipped ${result.excluded_by_type} blocked by type (password/file inputs are not answers), duplicate ${result.duplicate}, sensitive ${result.flagged_sensitive}`;
         captured = true;
       } catch (error) { savedSummary.textContent = error.message === RELOADED ? RELOADED : 'Save failed. Check the local helper and request size (64 KB).'; }
       finally { pending = false; savePage.disabled = false; }
@@ -633,6 +682,7 @@
       let blank = 0;
       const misses = [];
       button.disabled = true;
+      if (/myworkday/.test(location.hostname)) { try { await addHistoryRows(); } catch (_) { /* rows stay as they are */ } }
       // Sites re-render fields after an earlier answer (country, device type), so the next field is looked up fresh each time.
       for (let guard = 0; guard < MAX_PAGE_FIELDS; guard += 1) {
         scan();

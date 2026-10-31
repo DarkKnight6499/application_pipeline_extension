@@ -66,6 +66,7 @@ JOBS_COLUMN, VARIANTS_COLUMN, JOB_URLS_COLUMN, JOB_COUNT_COLUMN = "jobs", "varia
 COMPANY_COLUMN, PORTALS_COLUMN, HOST_COLUMN = "company", "portals", "host"
 PROFILE_HEADER, PROFILE_NAME = "header", "name"
 EDUCATION_COLUMN, CERTIFICATIONS_COLUMN, EXPERIENCE_COLUMN = "education", "certifications", "experience"
+HISTORY_GROUPS = {"education": "education", "certification": "certifications"}
 EDUCATION_FIELDS = ("school", "degree", "date")
 CERTIFICATION_FIELDS = ("cert", "issuer", "date")
 EMPLOYER_COLUMN = "company"
@@ -155,7 +156,7 @@ class AssistService:
     def salary_answer(self, body):
         """Lower band of the best-matching To Apply row, matched by company and role words on the page."""
         label = body.get(QUESTION_COLUMN, "")
-        if not SALARY_LABEL.search(label) or SALARY_EXCLUDE.search(label) or answer_memory.is_protected(body) or not TRACKER_PATH.exists():
+        if body.get(TYPE_COLUMN) == "textarea" or len(label) > 100 or not SALARY_LABEL.search(label) or SALARY_EXCLUDE.search(label) or answer_memory.is_protected(body) or not TRACKER_PATH.exists():
             return ""
         words = lambda text: set(re.findall(r"[a-z0-9]{3,}", str(text).lower()))
         page = words(" ".join(str(body.get(key, "")) for key in (essay_tracks.TITLE_KEY, essay_tracks.SNIPPET_KEY, HOST_COLUMN, COMPANY_HINT_COLUMN)))
@@ -320,8 +321,48 @@ class AssistService:
                 not isinstance(option, str) or len(option) > MAX_LABEL for option in options):
             raise ValueError("Options must be a bounded list of strings.")
 
+    def history(self, body):
+        """Row counts and values for Workday Education and Certifications sections."""
+        facts = json.loads(self.profile_path.read_text(encoding="utf-8")) if self.profile_path.is_file() else {}
+        return {group: len(facts.get(column, [])) for group, column in HISTORY_GROUPS.items()}
+
+    def history_answer(self, body):
+        if not isinstance(body, dict) or not isinstance(body.get(QUESTION_COLUMN), str):
+            return None
+        group, index = body.get("row_group"), body.get("row_index")
+        if group not in HISTORY_GROUPS or not isinstance(index, int) or index < 0 or not self.profile_path.is_file():
+            return None
+        rows = json.loads(self.profile_path.read_text(encoding="utf-8")).get(HISTORY_GROUPS[group], [])
+        if index >= len(rows):
+            return None
+        row, label = rows[index], normalized(body[QUESTION_COLUMN])
+        years = re.findall(r"(?:19|20)\d{2}", row.get("date", ""))
+        year = years[-1] if years else None
+        value = None
+        if group == "education":
+            degree = row.get("degree", "")
+            if "school" in label or "university" in label:
+                value = row.get("school", "").title()
+            elif "field of study" in label:
+                parts = degree.split(",", 1)
+                field = re.sub(r"^(?:master|bachelor)s? of\s+", "", parts[1] if len(parts) > 1 and parts[1].strip() and "distinction" not in parts[1].lower() and "class" not in parts[1].lower() else parts[0], flags=re.I)
+                value = re.sub(r"\s*\(.*\)", "", field).strip()
+            elif "degree" in label:
+                value = degree
+            elif ("last" in label or "graduat" in label or "to" in label.split()) and year:
+                value = year
+        elif group == "certification" and "number" not in label and "date" not in label and "certif" in label:
+            value = row.get("cert", "").replace("®", "").strip()
+        if not value:
+            return None
+        candidates = [value]
+        if group == "education" and "degree" in label and "field" not in label:
+            kind = "Master" if degree.lower().startswith("master") else "Bachelor" if degree.lower().startswith("bachelor") else ""
+            candidates += [f"{kind}'s Degree", f"{kind}s Degree", f"{kind}'s", kind] if kind else []
+        return {"status": "stored", "source": "history", "answer": value, "candidates": candidates}
+
     def answer(self, body):
-        return dropdown_mappings.response(self, body, self._answer(body))
+        return dropdown_mappings.response(self, body, self.history_answer(body) or self._answer(body))
 
     def _answer(self, body):
         self.validate(body)
@@ -549,12 +590,13 @@ def handle(handler, service):
             return True
         handler.connection.settimeout(10)
         body = json.loads(handler.rfile.read(size))
-        if path not in {"/assist/answer", "/assist/accept", "/assist/learn", "/assist/miss", "/assist/correction", "/assist/dump"}:
+        if path not in {"/assist/answer", "/assist/accept", "/assist/learn", "/assist/miss", "/assist/correction", "/assist/dump", "/assist/history"}:
             handler.send(404, {"error": "Not found."})
         else:
             result = {"/assist/answer": service.answer, "/assist/accept": service.accept,
                       "/assist/learn": service.learn, "/assist/miss": service.miss,
-                      "/assist/correction": service.correction, "/assist/dump": service.dump}[path](body)
+                      "/assist/correction": service.correction, "/assist/dump": service.dump,
+                      "/assist/history": service.history}[path](body)
             handler.send(200, result, extra={"Access-Control-Allow-Origin": handler.headers["Origin"], "Vary": "Origin"})
     except (ValueError, TypeError, UnicodeError):
         handler.send(400, {"error": "Invalid assist request."})
