@@ -2,7 +2,10 @@
 (() => {
   // Config
   const FIELD_SELECTOR = 'input:not([type]),input[type="text"],input[type="email"],input[type="tel"],input[type="url"],input[type="search"],textarea,select,input[type="radio"],input[type="checkbox"],[role="combobox"]';
-  const CAPTURE_SELECTOR = 'input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),textarea,select,[role="combobox"]';
+  const CAPTURE_SELECTOR = 'input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),textarea,select,[role="combobox"],[role="radiogroup"]';
+  // Oracle-style pills: a radiogroup of buttons with role=radio and aria-checked, no native inputs.
+  const PILL_OPTION = '[role="radio"]:not(input)';
+  const pillGroup = element => element?.getAttribute?.('role') === 'radiogroup' && !!element.querySelector(PILL_OPTION);
   const GROUP_SELECTOR = 'fieldset,[role="radiogroup"],[role="group"],[data-automation-id="formField"],.form-field,.field';
   const FORBIDDEN = /\b(password|passcode|captcha|verification code|ssn|social security|signature|sign|signed|initials|attest\w*|certify|declaration|I (confirm|affirm|declare)|truthful|accurate and complete|true and (correct|accurate))\b/i;
   const LEARN_BLOCKED = /\b(?:(?:work|employment)\s+(?:authori[sz]ation|eligibility)|(?:authori[sz]\w*|eligib\w*|right|permit\w*|permission|allow\w*|legally)\b.{0,60}\b(?:work|employment)|visa|sponsor\w*|immigration|citizen\w*|nationality|work permit|opt|cpt|h[ -]?1b|disab\w*|accommodation\w*|veteran\w*|military|armed forces|national guard|reservist\w*|reserves|active duty|service member|uniformed services|gender|sex|male|female|non[ -]?binary|transgender|race|racial|ethnic\w*|hispanic|latino|black|white|asian|indigenous|native american|pacific islander|sexual orientation|lgbtq\w*|pronouns?|self[ -]?(?:id\w*|identification|disclosure)|demographic\w*|religio\w*|marital status|national origin|eeo|decline to (?:identify|answer|disclose))\b/i;
@@ -117,6 +120,8 @@
       && !option.parentElement.disabled && option.value !== '' && !PLACEHOLDER.test(option.text)).map(option => ({node: option, text: option.text}));
     if (element.type === 'radio') return members(element).filter(node => visible(node) && !node.disabled)
       .map(node => ({node, text: ownLabel(node)})).filter(option => option.text);
+    if (pillGroup(element)) return [...element.querySelectorAll(PILL_OPTION)].filter(node => visible(node))
+      .map(node => ({node, text: text(node)})).filter(option => option.text);
     if (element.type === 'checkbox') return [{node: element, text: 'Yes', checked: true}, {node: element, text: 'No', checked: false}];
     if (element.getAttribute('role') === 'combobox') return [...(popup(element)?.querySelectorAll('[role="option"]') || [])]
       .filter(node => visible(node) && node.getAttribute('aria-disabled') !== 'true').map(node => ({node, text: text(node)}));
@@ -166,6 +171,7 @@
   }
 
   function currentAnswer(element, capture = false) {
+    if (pillGroup(element)) return text(element.querySelector(`${PILL_OPTION}[aria-checked="true"]`));
     if (['password', 'file'].includes(element.type)) return '';
     if (element.type === 'radio') {
       const checked = members(element).find(node => node.checked);
@@ -186,6 +192,7 @@
     const seen = new Set();
     return [...document.querySelectorAll(CAPTURE_SELECTOR)].filter(element => {
       if (!visible(element) || element.closest('[data-portal-panel]') || element.parentElement?.closest('[role="combobox"]')) return false;
+      if (element.getAttribute('role') === 'radiogroup' && !pillGroup(element)) return false;
       const parts = element.type === 'radio' ? members(element) : groupOf(element, true);
       if (parts.some(node => seen.has(node))) return false;
       parts.forEach(node => seen.add(node));
@@ -215,7 +222,7 @@
       const source = corrected ? 'corrected' : state.filled === answer ? 'filled' : typed ? 'typed' : 'prefilled';
       rows.push({element, label, answer, options, corrected, source,
         manual: state.filled !== answer && (typed || corrected),
-        type: element.getAttribute('role') === 'combobox' ? 'combobox' : element.type || element.tagName.toLowerCase()});
+        type: element.getAttribute('role') === 'combobox' ? 'combobox' : pillGroup(element) ? 'radio' : element.type || element.tagName.toLowerCase()});
     }
     return rows.sort((a, b) => Number(b.corrected) - Number(a.corrected));
   }
