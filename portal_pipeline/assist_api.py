@@ -410,7 +410,9 @@ class AssistService:
                     results.append(mapping)
                     continue
                 previous = question_alias.previous_answer(self, {**body, QUESTION_COLUMN: label}, memory)
-                status = "new" if previous is None else "same" if previous == answer else "changed"
+                # Formatting alone (case, spaces, punctuation: "(862) 452-0144" vs "8624520144") is not a changed answer.
+                same = previous is not None and re.sub(r"[^a-z0-9]", "", previous.lower()) == re.sub(r"[^a-z0-9]", "", answer.lower())
+                status = "new" if previous is None else "same" if previous == answer or same else "changed"
                 # Recheck the reviewed value under the same lock as the write.
                 store = not dry_run and PREVIOUS_ANSWER in pair and pair[PREVIOUS_ANSWER] == previous
                 alias, handled = question_alias.review(self, body, memory, pair, dry_run, store, previous)
