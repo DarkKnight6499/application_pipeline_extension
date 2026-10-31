@@ -33,6 +33,8 @@ LOG_FILENAME = "assist_questions.jsonl"
 MAX_BODY = 64 * 1024
 REJECT_DRAIN_TIMEOUT = 1
 MAX_LABEL = 2000
+STORED_ONLY_INTENTS = {"work_authorized_us", "sponsorship_h1b_only", "sponsorship_opt_listed", "sponsorship_type_text",
+                       "gender", "ethnicity", "hispanic_latino", "veteran_status", "protected_veteran", "disability", "lgbtq"}
 MAX_LEARN_PAIRS = 80
 MAX_LEARN_LABEL = 300
 MAX_LEARN_ANSWER = 2000
@@ -271,6 +273,12 @@ class AssistService:
             handle.write(json.dumps({QUESTION_COLUMN: label}, ensure_ascii=True) + "\n")
         context = label + " " + " ".join(body.get(OPTIONS_COLUMN, []))
         blocked = any(pattern.search(context) for pattern in BLOCKED_DRAFT) or question_alias.blocked(body) or dropdown_mappings.blocked(body)
+        # Eligibility and self-ID answers Yazad already gave are reused as stored (never drafted by a model).
+        intent = intent_layer.classify(label)
+        if (intent in STORED_ONLY_INTENTS and not NEVER_FILL.search(label) and not answer_memory.is_protected(body)):
+            value = intent_layer.lookup(answer_memory.load_memory(self.data), label)
+            if value:
+                return {"status": "stored", "source": "intent", "answer": value, "candidates": intent_layer.expand(value)}
         if corrections.blocked(body):
             self.queue_question(body, True)
             return {"status": "none", "source": "manual", "answer": "", "candidates": []}
