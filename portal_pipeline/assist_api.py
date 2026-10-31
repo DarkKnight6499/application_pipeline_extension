@@ -33,6 +33,16 @@ LOG_FILENAME = "assist_questions.jsonl"
 MAX_BODY = 64 * 1024
 REJECT_DRAIN_TIMEOUT = 1
 MAX_LABEL = 2000
+# Desired-pay questions are answered with the lower band of the matching To Apply tracker row (user rule 2026-10-29).
+TRACKER_PATH = Path(r"D:\Code\Resume\Applications.xlsx")
+TRACKER_COMPANY, TRACKER_ROLE, TRACKER_STATUS, TRACKER_SALARY_MIN, TRACKER_LINK = "Company", "Role Title", "Status", "Salary Min", "Link"
+QUEUE_PATH = Path(r"D:\Code\job-scrap\data\queue.json")  # posted bands for rows saved without a Salary Min
+TO_APPLY = "To Apply"
+SALARY_LABEL = re.compile(r"(?:desired|expected|minimum|target)\s+(?:annual\s+|base\s+)?(?:salary|pay|compensation)|salary (?:expectations?|requirements?)", re.I)
+SALARY_EXCLUDE = re.compile(r"hour|rate|history|current|previous|prior|last", re.I)
+COMPANY_STOPWORDS = {"bank", "group", "financial", "services", "company", "trust", "national", "ratings", "corp"}
+# Optional fields Yazad leaves empty on purpose; Fill reports them as blank, not as misses.
+BLANK_LABEL = re.compile(r"^(?:middle name|home phone(?: number)?|address line 2|if (?:other|yes|employee referral)\b)", re.I)
 STORED_ONLY_INTENTS = {"work_authorized_us", "sponsorship_h1b_only", "sponsorship_opt_listed", "sponsorship_type_text",
                        "gender", "ethnicity", "hispanic_latino", "veteran_status", "protected_veteran", "disability", "lgbtq"}
 MAX_LEARN_PAIRS = 80
@@ -126,6 +136,53 @@ class AssistService:
         identity = host + "|" + normalized(company)
         directory = self.data / COMPANY_KB_DIRECTORY / hashlib.sha256(identity.encode("utf-8")).hexdigest()
         return directory, company or host
+
+    @staticmethod
+    def queue_salary_low(link):
+        """Lower end of the posted band for a link, from the job-scrap queue, or None."""
+        if not link or not QUEUE_PATH.exists():
+            return None
+        try:
+            entries = json.loads(QUEUE_PATH.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        for entry in entries if isinstance(entries, list) else []:
+            if str(entry.get("link", "")).strip().lower() == str(link).strip().lower():
+                found = re.search(r"([0-9][0-9,]{3,})", str(entry.get("salary", "")))
+                return int(found.group(1).replace(",", "")) if found else None
+        return None
+
+    def salary_answer(self, body):
+        """Lower band of the best-matching To Apply row, matched by company and role words on the page."""
+        label = body.get(QUESTION_COLUMN, "")
+        if not SALARY_LABEL.search(label) or SALARY_EXCLUDE.search(label) or answer_memory.is_protected(body) or not TRACKER_PATH.exists():
+            return ""
+        words = lambda text: set(re.findall(r"[a-z0-9]{3,}", str(text).lower()))
+        page = words(" ".join(str(body.get(key, "")) for key in (essay_tracks.TITLE_KEY, essay_tracks.SNIPPET_KEY, HOST_COLUMN, COMPANY_HINT_COLUMN)))
+        title = words(body.get(essay_tracks.TITLE_KEY, ""))
+        from openpyxl import load_workbook
+        workbook = load_workbook(TRACKER_PATH, read_only=True, data_only=True)
+        try:
+            rows = workbook.active.iter_rows(values_only=True)
+            col = {name: index for index, name in enumerate(next(rows))}
+            scored = []
+            for row in rows:
+                if row[col[TRACKER_STATUS]] != TO_APPLY:
+                    continue
+                company = {word for word in words(row[col[TRACKER_COMPANY]]) if word not in COMPANY_STOPWORDS and len(word) >= 4}
+                if not company & page:
+                    continue
+                low = row[col[TRACKER_SALARY_MIN]]
+                if not low:
+                    low = self.queue_salary_low(row[col[TRACKER_LINK]])
+                scored.append((len(words(row[col[TRACKER_ROLE]]) & title), low))
+        finally:
+            workbook.close()
+        if not scored:
+            return ""
+        best = max(score for score, _ in scored)
+        lows = {answer_memory.salary_expectation(low) for score, low in scored if score == best}
+        return str(lows.pop()) if len(lows) == 1 else ""
 
     def company_answer(self, body, include_local=True):
         if include_local and body.get(HOST_COLUMN) and body.get(URL_COLUMN):
@@ -279,6 +336,13 @@ class AssistService:
             value = intent_layer.lookup(answer_memory.load_memory(self.data), label)
             if value:
                 return {"status": "stored", "source": "intent", "answer": value, "candidates": intent_layer.expand(value)}
+        salary = self.salary_answer(body)
+        if salary:
+            return {"status": "stored", "source": "salary_band", "answer": salary, "candidates": [salary]}
+        if (BLANK_LABEL.search(label.strip()) and not answer_memory.is_protected(body)
+                and not (self.company_answer(body) or intent_layer.lookup(answer_memory.load_memory(self.data), label)
+                         or answer_memory.lookup(answer_memory.load_memory(self.data), label))):
+            return {"status": "blank", "source": "blank", "answer": "", "candidates": []}
         if corrections.blocked(body):
             self.queue_question(body, True)
             return {"status": "none", "source": "manual", "answer": "", "candidates": []}

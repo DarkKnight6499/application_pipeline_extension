@@ -152,6 +152,8 @@ def expand(answer):
                 candidates.extend(YES_WORDS)
             elif text.upper() == NO:
                 candidates.extend(NO_WORDS)
+            elif text.upper() == "USD":
+                candidates.extend([text, "US Dollar", "US Dollars", "United States Dollar", "United States Dollars", "Dollar", "USD - US Dollar", "U.S. Dollar"])
             elif text:
                 candidates.append(text)
     return candidates

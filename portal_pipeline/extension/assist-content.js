@@ -414,6 +414,7 @@
           type: element.getAttribute('role') === 'combobox' ? 'combobox' : element.type || element.tagName.toLowerCase(),
           host: location.hostname, url, company_hint: companyHint(), ...essayContext()});
         if (!mayWrite()) return 'field changed';
+        if (result.status === 'blank') return 'left blank';  // optional field Yazad leaves empty on purpose
         if (!['stored', 'draft'].includes(result.status) || typeof result.answer !== 'string' || !Array.isArray(result.candidates)) {
           reportMiss(element, label);
           return 'no answer';
@@ -629,6 +630,7 @@
       const attempted = new Set();
       let filled = 0;
       let left = 0;
+      let blank = 0;
       const misses = [];
       button.disabled = true;
       // Sites re-render fields after an earlier answer (country, device type), so the next field is looked up fresh each time.
@@ -649,10 +651,11 @@
         }
         if (status === 'stored' || status === 'draft') filled += 1;
         else if (status === 'has value') left += 1;
+        else if (status === 'left blank') blank += 1;
         else misses.push(`${label.slice(0, 60)}: ${status}`);
       }
       button.disabled = false;
-      summary.textContent = [`filled ${filled}, left alone ${left} (already filled)`,
+      summary.textContent = [`filled ${filled}, left alone ${left} (already filled)${blank ? `, left blank ${blank} (optional)` : ""}`,
         ...(misses.length ? ['not filled:', ...misses.map(line => `- ${line}`)] : [])].join('\n');
       summary.hidden = false;
     });
