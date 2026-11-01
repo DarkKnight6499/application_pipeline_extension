@@ -3,13 +3,15 @@
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const DATE_ID = /--(startDate|endDate)-dateSection(Month|Year)-input$/;
   const EDUCATION_ID = /--(firstYearAttended|lastYearAttended)-dateSectionYear-input$/;
+  // Self-ID signature date: month, day and year spinbuttons under any other id prefix.
+  const SIGNED_ID = /dateSection(Month|Day|Year)-input$/;
 
   const matches = element => element?.tagName === "INPUT" && element.getAttribute("role") === "spinbutton"
-    && (DATE_ID.test(element.id) || EDUCATION_ID.test(element.id));
+    && (DATE_ID.test(element.id) || EDUCATION_ID.test(element.id) || SIGNED_ID.test(element.id));
 
   function part(element) {
     if (!matches(element)) throw new Error("Not a Workday date field.");
-    return element.id.endsWith("-dateSectionMonth-input") ? "month" : "year";
+    return element.id.endsWith("-dateSectionMonth-input") ? "month" : element.id.endsWith("-dateSectionDay-input") ? "day" : "year";
   }
 
   function read(element) {
@@ -27,6 +29,10 @@
     if (datePart === "month" && wanted.length === 1 && /^[1-9]$/.test(wanted)) wanted = "0" + wanted;
     if (datePart === "month" && (wanted.length !== 2 || !/^(0[1-9]|1[0-2])$/.test(wanted))) {
       throw new Error("Provide a month from 01 to 12.");
+    }
+    if (datePart === "day" && wanted.length === 1 && /^[1-9]$/.test(wanted)) wanted = "0" + wanted;
+    if (datePart === "day" && (wanted.length !== 2 || !/^(0[1-9]|[12]\d|3[01])$/.test(wanted))) {
+      throw new Error("Provide a day from 01 to 31.");
     }
     if (datePart === "year" && (wanted.length !== 4 || !/^\d{4}$/.test(wanted))) {
       throw new Error("Provide a year with exactly four digits.");
@@ -48,7 +54,7 @@
     await sleep(150);
     guard();
     const actual = step(() => read(element));
-    if (datePart === "month" ? Number(actual) !== Number(wanted) : actual !== wanted) {
+    if (datePart !== "year" ? Number(actual) !== Number(wanted) : actual !== wanted) {
       throw new Error("The date field did not keep the value. Enter it manually.");
     }
     return wanted;

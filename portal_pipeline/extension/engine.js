@@ -47,6 +47,19 @@
   const DATE_PART_ID = /^(?:workExperience|education)-\d+--(startDate|endDate|firstYearAttended|lastYearAttended)-dateSection(Month|Year)-input$/;
   const DATE_PART_KEY = {startDate: "start", endDate: "end", firstYearAttended: "start", lastYearAttended: "end"};
 
+  // The disability self-ID form (CC-305) signs with a bare "Name" and a "Date"; Yazad authorised filling both (2026-11-01).
+  const SELF_ID_PAGE = /voluntary self.identification of disability/i;
+  const SIGNED_DATE_PART = /dateSection(Month|Day|Year)-input$/;
+  const selfIdPage = () => SELF_ID_PAGE.test(document.body?.innerText || "");
+
+  function signedDateFact(key) {
+    const part = key?.match(/^signed_date_(month|day|year)$/)?.[1];
+    if (!part) return null;
+    const now = new Date();
+    const value = part === "year" ? String(now.getFullYear()) : String(part === "month" ? now.getMonth() + 1 : now.getDate()).padStart(2, "0");
+    return {value, source: "Today's date (self-ID signature date)", truth: null};
+  }
+
   function datePartName(element) {
     const match = element.id.match(DATE_PART_ID);
     return match ? `${DATE_PART_KEY[match[1]]}_${match[2].toLowerCase()}` : null;
@@ -298,7 +311,7 @@
   function proposeCore(field, profile, {element, options = field.options || []} = {}) {
     // A phone-code picker shares the phone label; the number must never be typed into it.
     const phoneCode = field.type === "combobox" && field.key === "phone";
-    const base = phoneCode ? null : storedFact(profile, field, options, element) || (field.key ? datePartFact(profile, field.key, element, options) : null);
+    const base = phoneCode ? null : storedFact(profile, field, options, element) || signedDateFact(field.key) || (field.key ? datePartFact(profile, field.key, element, options) : null);
     // A portal's own option wording, learned once per host, replaces the profile wording (for example a degree).
     const learned = base && base.basis !== "answer_memory" && profile.aliases ? profile.aliases[`${location.hostname.toLowerCase()}|${labelKey(base.value)}`] : null;
     const aliased = typeof learned === "string" && learned.trim() ? {...base, value: learned.trim(), source: `${base.source} (learned portal label)`, basis: "alias"} : base;
@@ -334,6 +347,7 @@
       }
     });
     const surface = visibleControls();
+    const selfIdOnPage = selfIdPage();
     if (register) registeredSurface = surface;
     for (const element of surface) {
       const custom = isCustom(element);
@@ -357,6 +371,10 @@
       const section = record?.group || "contact";
       let blocked = members.some(protectedControl);
       let key = blocked ? null : classify(label, identity, section);
+      if (!blocked && !key && selfIdOnPage) {
+        if (normalize(label) === "name") key = "full_name";
+        else if (element.getAttribute("role") === "spinbutton" && SIGNED_DATE_PART.test(element.id)) key = `signed_date_${element.id.match(SIGNED_DATE_PART)[1].toLowerCase()}`;
+      }
       const datePart = !blocked && !key && record ? datePartName(element) : null;
       if (datePart) key = `${record.group}.${datePart}`;
       const required = requiredFor(element, label);
