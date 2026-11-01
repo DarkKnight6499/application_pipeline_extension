@@ -130,7 +130,7 @@ Missing answers enter the local learning queue. Eligibility, self-ID, signatures
 Drafting uses the logged-in `claude` CLI with built-in and MCP tools disabled and a 90 second timeout ([CLI flags](https://code.claude.com/docs/en/cli-reference)). No API key is required.
 Configure the read-only knowledge and profile paths in `assist_api.py`; Resume files are never written.
 The token stays in the extension worker. Question logs and the learning queue remain under ignored `data/`.
-Signatures, attestations, navigation, and submission remain manual. DOM readback does not prove remote saving.
+Demographic and self-ID answers fill from stored intents, and the CC-305 disability form's Name and Date fill automatically (owner decision 2026-11-01). Other signatures, attestations, navigation, and submission remain manual. DOM readback does not prove remote saving.
 
 ### Save page and sort captured questions
 
