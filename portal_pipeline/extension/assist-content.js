@@ -294,6 +294,9 @@
     if (text(employer)) return text(employer).slice(0, 150);
     const host = location.hostname;
     if (/\.(?:myworkdayjobs|myworkdaysite)\.com$/i.test(host)) return host.split('.')[0];
+    if (/\.fa\.[a-z0-9-]+\.oraclecloud\.com$/i.test(host)) return host.split('.')[0];
+    // SuccessFactors hosts are shared (careerN.successfactors.com); the tenant is the company query parameter.
+    if (/\.successfactors\.(?:com|eu)$/i.test(host)) return (new URLSearchParams(location.search).get('company') || '').slice(0, 150);
     if (host === 'jobs.lever.co' || /greenhouse\.io$/i.test(host)) return location.pathname.split('/').filter(Boolean)[0] || '';
     return '';
   }
