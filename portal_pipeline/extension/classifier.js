@@ -111,6 +111,22 @@
     return PROFILE_INTENTS.has(intent) ? intent : null;
   }
 
+  const STATES = {al: "alabama", ak: "alaska", az: "arizona", ar: "arkansas", ca: "california", co: "colorado", ct: "connecticut", de: "delaware", fl: "florida",
+    ga: "georgia", hi: "hawaii", id: "idaho", il: "illinois", in: "indiana", ia: "iowa", ks: "kansas", ky: "kentucky", la: "louisiana", me: "maine", md: "maryland",
+    ma: "massachusetts", mi: "michigan", mn: "minnesota", ms: "mississippi", mo: "missouri", mt: "montana", ne: "nebraska", nv: "nevada", nh: "new hampshire",
+    nj: "new jersey", nm: "new mexico", ny: "new york", nc: "north carolina", nd: "north dakota", oh: "ohio", ok: "oklahoma", or: "oregon", pa: "pennsylvania",
+    ri: "rhode island", sc: "south carolina", sd: "south dakota", tn: "tennessee", tx: "texas", ut: "utah", vt: "vermont", va: "virginia", wa: "washington",
+    wv: "west virginia", wi: "wisconsin", wy: "wyoming", dc: "district of columbia"};
+  const STATE_NAMES = Object.fromEntries(Object.entries(STATES).map(([code, name]) => [name, code]));
+  const COUNTRY_US = ["united states", "united states of america", "united states of america (+1)", "united states (+1)", "usa", "us", "u.s.", "u.s.a.", "+1", "1"];
+
+  // Ordered alternatives for a state or US country answer; empty for anything else so no other answer is ever loosened.
+  function alternatives(wanted) {
+    if (STATES[wanted]) return [STATES[wanted]];
+    if (STATE_NAMES[wanted]) return [STATE_NAMES[wanted]];
+    return COUNTRY_US.includes(wanted) ? COUNTRY_US.filter(item => item !== wanted) : [];
+  }
+
   const NEGATIONS = ["not", "no", "dont", "do not", "will not", "wont", "never", "unable", "cannot", "cant", "doesnt", "does not"];
 
   // Exact label or value first; otherwise only a Yes or No answer may use the polarity rules; two survivors return null.
@@ -120,6 +136,11 @@
     const usable = (options || []).filter(option => !option.disabled);
     const exact = usable.filter(option => answerKey(option.label) === wanted || answerKey(option.value) === wanted);
     if (exact.length === 1) return exact[0];
+    // Same fact worded differently by site (NJ vs New Jersey): try each alternative in order, first single match wins.
+    for (const alternative of alternatives(wanted)) {
+      const found = usable.filter(option => answerKey(option.label) === alternative || answerKey(option.value) === alternative);
+      if (found.length === 1) return found[0];
+    }
     if (wanted !== "yes" && wanted !== "no") return null;
     const yes = wanted === "yes", opposite = yes ? "no" : "yes";
     const survivors = usable.filter(option => {

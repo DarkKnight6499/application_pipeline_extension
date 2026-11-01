@@ -115,6 +115,15 @@ class PublicClassifierTests(SyntheticBrowserTest):
         self.assertIsNone(self.match(["Nobody", "Yesterday"], "Yes"))
         self.assertIsNone(self.match(["Nobody", "Yesterday"], "No"))
 
+    def test_match_option_state_and_country_alternatives(self):
+        self.blank()
+        self.assertEqual(self.match(["NJ", "NY"], "New Jersey"), "NJ")
+        self.assertEqual(self.match(["New Jersey", "New York"], "NJ"), "New Jersey")
+        self.assertEqual(self.match(["United States of America (+1)", "Canada (+1)"], "United States"), "United States of America (+1)")
+        self.assertEqual(self.match(["+44", "+1"], "United States"), "+1")
+        self.assertIsNone(self.match(["Newark", "Trenton"], "New Jersey"))
+        self.assertIsNone(self.match(["Other", "Remote"], "Texas"))
+
     def test_match_option_skips_disabled(self):
         self.blank()
         result = self.call("PortalClassifier.matchOption([{label: 'Yes', value: 'y', disabled: true}, {label: 'No', value: 'n'}], 'Yes')")
