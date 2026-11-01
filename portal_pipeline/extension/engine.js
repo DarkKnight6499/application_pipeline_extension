@@ -52,6 +52,8 @@
   const SIGNED_DATE_PART = /dateSection(Month|Day|Year)-input$/;
   const selfIdPage = () => SELF_ID_PAGE.test(document.body?.innerText || "");
 
+  const attestationFact = key => key === "attestation_accept" ? {value: "Yes", source: "Standing rule: accept attestations and terms (owner 2026-11-01)", truth: null} : null;
+
   function signedDateFact(key) {
     const part = key?.match(/^signed_date_(month|day|year)$/)?.[1];
     if (!part) return null;
@@ -242,8 +244,9 @@
     const text = `${labelFor(element)} ${element.name || ""} ${element.id || ""} ${element.getAttribute("data-automation-id") || ""} ${element.closest("fieldset")?.querySelector("legend")?.textContent || ""}`;
     const attestationContext = `${text} ${protectionHeading(element)}`;
     const demographic = (!!element.closest(demographicContainers) || demographicTerms.test(text)) && !hasStoredAnswer(element);
+    // Attestations, terms, consent and signatures are filled on purpose (owner decision 2026-11-01); only secrets stay protected.
     return element.type === "password" || honeypotTerms.test(text) || (protectedTerms.test(text) && !consentRecorded(element))
-      || (!!globalThis.PortalClassifier?.hasAttestationText(attestationContext) && !consentRecorded(element)) || demographic || !!globalThis.PortalGreenhouse?.protectedField(element);
+      || demographic || !!globalThis.PortalGreenhouse?.protectedField(element);
   }
 
   function radioMembers(element) {
@@ -311,7 +314,7 @@
   function proposeCore(field, profile, {element, options = field.options || []} = {}) {
     // A phone-code picker shares the phone label; the number must never be typed into it.
     const phoneCode = field.type === "combobox" && field.key === "phone";
-    const base = phoneCode ? null : storedFact(profile, field, options, element) || signedDateFact(field.key) || (field.key ? datePartFact(profile, field.key, element, options) : null);
+    const base = phoneCode ? null : storedFact(profile, field, options, element) || signedDateFact(field.key) || attestationFact(field.key) || (field.key ? datePartFact(profile, field.key, element, options) : null);
     // A portal's own option wording, learned once per host, replaces the profile wording (for example a degree).
     const learned = base && base.basis !== "answer_memory" && profile.aliases ? profile.aliases[`${location.hostname.toLowerCase()}|${labelKey(base.value)}`] : null;
     const aliased = typeof learned === "string" && learned.trim() ? {...base, value: learned.trim(), source: `${base.source} (learned portal label)`, basis: "alias"} : base;
@@ -378,7 +381,9 @@
       const datePart = !blocked && !key && record ? datePartName(element) : null;
       if (datePart) key = `${record.group}.${datePart}`;
       const required = requiredFor(element, label);
-      if (!blocked && type === "checkbox" && PortalClassifier.isAttestationCheckbox({type, label, key, required, checked: element.checked}) && !consentRecorded(element)) { blocked = true; key = null; }
+      if (!blocked && type === "checkbox" && !key && PortalClassifier.hasAttestationText(label)) key = "attestation_accept";
+      else if (!blocked && type === "checkbox" && PortalClassifier.isAttestationCheckbox({type, label, key, required, checked: element.checked}) && !consentRecorded(element)) { blocked = true; key = null; }
+      if (!blocked && !key && type === "text" && /^[*\s]*(?:typed |electronic |e-?)?signature/i.test(label)) key = "full_name";
       if (key?.includes(".")) {
         const [group, name] = key.split(".");
         key = Number.isInteger(record?.index) ? `${group}.${record.index}.${name}` : null;
