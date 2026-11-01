@@ -6,6 +6,8 @@ import sys
 # Config
 SERVICE_PREFIX = "application-pipeline:"
 INDEX_ACCOUNT = "__accounts__"
+DEFAULT_HOST = "__default__"  # shared login tried when a host has no entry of its own
+DEFAULT_ALIAS = "default"
 
 
 def _backend(backend=None):
@@ -16,6 +18,8 @@ def _backend(backend=None):
 
 
 def _service(host):
+    if str(host).strip().lower() == DEFAULT_ALIAS:
+        host = DEFAULT_HOST
     return SERVICE_PREFIX + str(host).strip().lower()
 
 
@@ -29,19 +33,21 @@ def save_login(host, username, password, backend=None):
 
 
 def get_login(host, backend=None):
-    """Returns (username, password) for the host, or None."""
+    """Returns (username, password) for the host, else the shared default login, or None."""
     store = _backend(backend)
-    service = _service(host)
-    username = store.get_password(service, INDEX_ACCOUNT)
-    password = store.get_password(service, username) if username else None
-    return (username, password) if password else None
+    for service in (_service(host), _service(DEFAULT_ALIAS)):
+        username = store.get_password(service, INDEX_ACCOUNT)
+        password = store.get_password(service, username) if username else None
+        if password:
+            return username, password
+    return None
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     add = sub.add_parser("add", help="Store a login; the password is prompted, never passed on the command line.")
-    add.add_argument("host")
+    add.add_argument("host", help='portal host, or "default" for the login tried on every host without its own')
     add.add_argument("username")
     show = sub.add_parser("show", help="Show the stored username for a host (never the password).")
     show.add_argument("host")

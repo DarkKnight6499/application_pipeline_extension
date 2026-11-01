@@ -41,3 +41,21 @@ class CredentialStoreTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_default_login_used_when_host_has_none():
+    class Backend:
+        def __init__(self):
+            self.data = {}
+
+        def set_password(self, service, account, value):
+            self.data[(service, account)] = value
+
+        def get_password(self, service, account):
+            return self.data.get((service, account))
+
+    backend = Backend()
+    store.save_login("default", "shared@example.com", "pw1", backend)
+    store.save_login("own.example.com", "own@example.com", "pw2", backend)
+    assert store.get_login("own.example.com", backend) == ("own@example.com", "pw2")
+    assert store.get_login("other.example.com", backend) == ("shared@example.com", "pw1")
