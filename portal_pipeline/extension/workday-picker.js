@@ -67,6 +67,12 @@
       await waitUntil(() => pillNodes(input).some(node => !before.has(node)), PILL_WAIT_MS);
       // A late result can still land after the search box clears, so look once more before judging.
       if (!pillNodes(input).some(node => !before.has(node))) { await sleep(LATE_RESULT_MS); }
+      // Enter does not select from hierarchical lists (e.g. How did you hear), so click the exactly matching listed option.
+      if (!pillNodes(input).some(node => !before.has(node))) {
+        const option = [...input.ownerDocument.querySelectorAll('[data-automation-id="promptOption"], [role=option]')]
+          .find(node => !node.closest(PILL) && normalize(node.getAttribute("data-automation-label") || node.textContent) === normalize(candidate));
+        if (option) { guard(); option.click(); await waitUntil(() => pillNodes(input).some(node => !before.has(node)), PILL_WAIT_MS); }
+      }
       guard();
       const added = pillNodes(input).filter(node => !before.has(node));
       if (added.length === 1 && normalize(pillLabel(added[0])) === normalize(candidate)) {
