@@ -35,7 +35,7 @@ INTENT_PATTERNS = [
     ("identity_verification", r"\bsubmit verification of both your identity and authorization to work\b"),
     ("related_to_employee", r"\bimmediate family members\b.*\b(?:work|employ)"),
     ("work_authorized_us", r"\blegally eligible to work in (?:the country in which this job is located|the job.s location)"),
-    ("salary_expectation", r"^(?:what are your |please (?:provide|indicate) your )?(?:salary expectations|expected salary|desired salary)\s*[?*]*$"),
+    ("salary_expectation", r"^[*\s]*(?:what are your |please (?:provide|indicate) your )?(?:salary expectations|expected salary|desired salary)\s*[?*]*$"),
     ("job_board_source", r"^if internet job board, please specify\s*[:?*]*$"),
     ("current_student", r"\b(?:are you|currently enrolled as) (?:currently )?a (?:full.time |part.time )?student\s*[?*]*$|\bcurrently enrolled (?:in|at) (?:a |an )?(?:college|university|school)\b"),
     ("available_start_date", r"^(?:available date|available start date|earliest start date)\s*[?*]*$|\b(?:what is your|please (?:provide|indicate) your) (?:available |earliest )?start date\b|\bwhen (?:can|could|are) you (?:available to )?(?:start|begin)\b"),
@@ -95,6 +95,11 @@ INTENT_PATTERNS = [
     ("other_opportunities", r"additional opportunities|other (opportunities|positions|roles)|future opportunities"),
     ("drug_screen", r"drug.free|drug (screen|test)"),
     ("background_check", r"background check|fingerprint|diploma or ged"),
+    ("race_selected", r"select the races you identify with.*:\s*asian\b"),
+    ("race_not_selected", r"select the races you identify with.*:\s*(?:black|white|native|american indian|alaska|two or more|hispanic)"),
+    ("current_title", r"^(?:current|present) (?:job )?title\s*[?*:]*$"),
+    ("current_employer", r"^(?:current|present) (?:employer|company)\s*[?*:]*$"),
+    ("preferred_name_flag", r"\bi have a preferred name\b"),
     ("hispanic_latino", r"hispanic or latino"),
     ("veteran_status", r"veteran"),
     ("ethnicity", r"ethnicity|\brace\b"),
@@ -108,7 +113,8 @@ COMPILED = [(name, re.compile(pattern, re.I)) for name, pattern in INTENT_PATTER
 
 def classify(label):
     """Intent id for a question label, or None. Sponsorship splits by whether OPT, STEM OPT or CPT is named."""
-    text = re.sub(r"\s+", " ", str(label)).strip()
+    # SuccessFactors prefixes required labels with "* ".
+    text = re.sub(r"^[*\s]+", "", re.sub(r"\s+", " ", str(label)).strip())
     if re.search(r"type of sponsorship", text, re.I):
         return "sponsorship_type_text"
     if SPONSOR_WORDS.search(text) and re.search(r"require|need|assistance|will you", text, re.I):

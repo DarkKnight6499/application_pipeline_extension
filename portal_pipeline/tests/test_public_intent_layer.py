@@ -5,6 +5,13 @@ import answer_memory
 import intent_layer
 
 CASES = [
+    ("* Email", "email"),
+    ("Select the races you identify with.: Asian", "race_selected"),
+    ("Select the races you identify with.: White", "race_not_selected"),
+    ("Current Title", "current_title"),
+    ("Present Employer", "current_employer"),
+    ("Legal Name: I have a preferred name", "preferred_name_flag"),
+    ("* Salary Expectations", "salary_expectation"),
     ("Have you been previously employed by Regions or any of its divisions, subsidiaries, or affiliates?*", "prev_worked_here"),
     ("Have you previously worked at BBH as a permanent, temporary, intern, co-op, fixed term employee or contingent worker? If you are a current employee, please apply through the Internal Workday Career site.", "prev_worked_here"),
     ("Have you ever worked at Key (as an employee, intern, or contractor) either directly or as part of an acquisition?*", "prev_worked_here"),

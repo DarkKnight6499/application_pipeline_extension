@@ -44,7 +44,9 @@ COMPANY_STOPWORDS = {"bank", "group", "financial", "services", "company", "trust
 # Optional fields Yazad leaves empty on purpose; Fill reports them as blank, not as misses.
 BLANK_LABEL = re.compile(r"^(?:middle name|home phone(?: number)?|address line 2|if (?:other|yes|employee referral)\b)", re.I)
 STORED_ONLY_INTENTS = {"work_authorized_us", "sponsorship_h1b_only", "sponsorship_opt_listed", "sponsorship_type_text",
-                       "gender", "ethnicity", "hispanic_latino", "veteran_status", "protected_veteran", "disability", "lgbtq"}
+                       "gender", "ethnicity", "hispanic_latino", "veteran_status", "protected_veteran", "disability", "lgbtq",
+                       "military_status", "military_spouse", "race_selected", "race_not_selected", "current_title", "current_employer",
+                       "preferred_name_flag", "job_board_source"}
 MAX_LEARN_PAIRS = 80
 MAX_LEARN_LABEL = 300
 MAX_LEARN_ANSWER = 2000
