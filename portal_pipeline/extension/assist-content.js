@@ -1,9 +1,11 @@
 /* Author: Yazad Madan. User-selected per-field assist in the extension's isolated world. */
 (() => {
   // Config
-  const FIELD_SELECTOR = 'input:not([type]),input[type="text"],input[type="email"],input[type="tel"],input[type="url"],input[type="search"],textarea,select,input[type="radio"],input[type="checkbox"],[role="combobox"]';
+  const FIELD_SELECTOR = 'input:not([type]),input[type="text"],input[type="email"],input[type="tel"],input[type="url"],input[type="search"],textarea,select,input[type="radio"],input[type="checkbox"],[role="combobox"],button[aria-haspopup="listbox"]';
   const CAPTURE_SELECTOR = 'input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),textarea,select,[role="combobox"],[role="radiogroup"]';
   // Oracle-style pills: a radiogroup of buttons with role=radio and aria-checked, no native inputs.
+  // Workday-style custom dropdown: a button that opens a listbox; its chosen option shows as the button text.
+  const menuButton = element => element?.tagName === 'BUTTON' && element.getAttribute('aria-haspopup') === 'listbox';
   const PILL_OPTION = '[role="radio"]:not(input)';
   const pillGroup = element => element?.getAttribute?.('role') === 'radiogroup' && !!element.querySelector(PILL_OPTION);
   const GROUP_SELECTOR = 'fieldset,[role="radiogroup"],[role="group"],[data-automation-id="formField"],.form-field,.field';
@@ -54,6 +56,12 @@
   }
 
   function ownLabel(element) {
+    if (menuButton(element)) {  // Workday names the button 'Select One Required'; the question is its label or the field container's label
+      const linked = [...(element.labels || [])].map(text).filter(Boolean).join(' ');
+      if (linked) return linked;
+      const named = ariaLabel(element);
+      return /^select one( required)?$/i.test(named) ? '' : named;
+    }
     return ariaLabel(element) || [...(element.labels || [])].map(text).filter(Boolean).join(' ');
   }
 
@@ -73,7 +81,7 @@
     const group = element.type === 'checkbox' ? groupLabel(element) : '';
     if (own && group && normalize(own) !== normalize(group)) return `${group}: ${own}`;
     if (own && !SEGMENT.test(own)) return own;
-    const container = element.closest('[data-automation-id="formField"],.form-field,.field');
+    const container = element.closest('[data-automation-id="formField"],[data-automation-id^="formField-"],.form-field,.field');
     return text(container?.querySelector('label,[data-automation-id="formLabel"]')) || groupLabel(element);
   }
 
@@ -112,7 +120,10 @@
     const ids = `${element.getAttribute('aria-controls') || ''} ${element.getAttribute('aria-owns') || ''}`.trim().split(/\s+/);
     const lists = ids.map(id => document.getElementById(id)).filter(node =>
       visible(node) && (node.getAttribute('role') === 'listbox' || node.querySelector('[role="option"]')));
-    return lists.length === 1 ? lists[0] : null;
+    if (lists.length === 1) return lists[0];
+    if (!menuButton(element)) return null;
+    const open = [...document.querySelectorAll('[role="listbox"]')].filter(node => visible(node) && node.querySelector('[role="option"]'));
+    return open.length === 1 ? open[0] : null;
   }
 
   function choices(element) {
@@ -123,7 +134,7 @@
     if (pillGroup(element)) return [...element.querySelectorAll(PILL_OPTION)].filter(node => visible(node))
       .map(node => ({node, text: text(node)})).filter(option => option.text);
     if (element.type === 'checkbox') return [{node: element, text: 'Yes', checked: true}, {node: element, text: 'No', checked: false}];
-    if (element.getAttribute('role') === 'combobox') return [...(popup(element)?.querySelectorAll('[role="option"]') || [])]
+    if (element.getAttribute('role') === 'combobox' || menuButton(element)) return [...(popup(element)?.querySelectorAll('[role="option"]') || [])]
       .filter(node => visible(node) && node.getAttribute('aria-disabled') !== 'true').map(node => ({node, text: text(node)}));
     return [];
   }
@@ -180,6 +191,7 @@
     if (element.type === 'checkbox') return element.indeterminate ? '' : element.checked ? 'Yes' : 'No';
     if (element.tagName === 'SELECT') return [...element.selectedOptions].filter(option =>
       option.value !== '' && !PLACEHOLDER.test(option.text)).map(option => option.text).join('; ');
+    if (element.tagName === 'BUTTON') { const shown = text(element); return PLACEHOLDER.test(shown) ? '' : shown; }  // Workday custom dropdown shows its choice as button text
     const chosen = pills(element);
     if (chosen.length) return chosen.join('; ');
     const parts = groupOf(element, capture);
@@ -232,7 +244,7 @@
       const source = corrected ? 'corrected' : state.filled === answer ? 'filled' : typed ? 'typed' : 'prefilled';
       rows.push({element, label, answer, options, corrected, source,
         manual: state.filled !== answer && (typed || corrected),
-        type: element.getAttribute('role') === 'combobox' ? 'combobox' : pillGroup(element) ? 'radio' : element.type || element.tagName.toLowerCase()});
+        type: element.getAttribute('role') === 'combobox' || menuButton(element) ? 'combobox' : pillGroup(element) ? 'radio' : element.type || element.tagName.toLowerCase()});
     }
     return rows.sort((a, b) => Number(b.corrected) - Number(a.corrected));
   }
@@ -318,7 +330,7 @@
     try {
       const dropdown = element.tagName === 'SELECT' || element.getAttribute('role') === 'combobox';
       void request('portal-assist-miss', {label: label.replace(/\s+/g, ' ').trim().slice(0, MISS_LABEL_LIMIT),
-        type: element.getAttribute('role') === 'combobox' ? 'combobox' : element.type || element.tagName.toLowerCase(),
+        type: element.getAttribute('role') === 'combobox' || menuButton(element) ? 'combobox' : element.type || element.tagName.toLowerCase(),
         host: location.hostname, company_hint: companyHint(),
         options: dropdown ? choices(element).slice(0, MISS_OPTION_LIMIT).map(option => option.text.slice(0, MISS_OPTION_TEXT_LIMIT)) : []})
         .catch(() => {});
@@ -375,7 +387,7 @@
 
   async function fill(element, result, mayWrite) {
     if (!mayWrite()) return null;
-    if (element.getAttribute('role') === 'combobox' && element.tagName !== 'SELECT') {
+    if ((element.getAttribute('role') === 'combobox' || menuButton(element)) && element.tagName !== 'SELECT') {
       if (!popup(element)) safeClick(element);
       const deadline = Date.now() + POPUP_TIMEOUT_MS;
       while (!match(choices(element), result.candidates, result.mapped_options) && Date.now() < deadline) {
@@ -407,7 +419,7 @@
     if (!element.isConnected || !written) return false;
     if (written.kind === 'group') return written.parts.every((node, index) => node.value === written.values[index]);
     if (written.kind === 'radio' || written.kind === 'checkbox') return written.node.checked === written.value;
-    if (written.kind === 'combobox') return normalize('value' in element ? element.value : text(element)) === normalize(written.value);
+    if (written.kind === 'combobox') return normalize('value' in element && !menuButton(element) ? element.value : text(element)) === normalize(written.value);
     return element.value === written.value;
   }
 
@@ -463,7 +475,7 @@
       save.hidden = true;
       try {
         const result = await request('portal-assist-answer', {label, options: choices(element).map(option => option.text),
-          type: element.getAttribute('role') === 'combobox' ? 'combobox' : element.type || element.tagName.toLowerCase(),
+          type: element.getAttribute('role') === 'combobox' || menuButton(element) ? 'combobox' : element.type || element.tagName.toLowerCase(),
           host: location.hostname, url, company_hint: companyHint(), ...essayContext(), ...rowContext(element)});
         if (!mayWrite()) return 'field changed';
         if (result.status === 'blank') return 'left blank';  // optional field Yazad leaves empty on purpose
@@ -486,7 +498,7 @@
           state.reportedUser = state.filled;
           state.user = state.corrected = null;
           state.correctionPending = false;
-          state.fillContext = {label, type: element.getAttribute('role') === 'combobox' ? 'combobox'
+          state.fillContext = {label, type: element.getAttribute('role') === 'combobox' || menuButton(element) ? 'combobox'
             : element.type || element.tagName.toLowerCase(), host: location.hostname, url,
             company_hint: companyHint(), options: choices(element).map(option => option.text), wrong_value: state.filled};
         }
