@@ -495,6 +495,10 @@ async function plainFormChecks() {
   const ambiguous = plain('span', 'Wrong question');
   ambiguous.parentElement.querySelectorAll = () => [ambiguous, new Input()];
   assert.equal(api.labelFor(ambiguous), '');
+  const withHidden = plain('span', 'Hidden sibling question*'), hiddenBacking = new Input();
+  hiddenBacking.getClientRects = () => [];
+  withHidden.parentElement.querySelectorAll = selector => selector.startsWith('input:') ? [withHidden, hiddenBacking] : [];
+  assert.equal(api.labelFor(withHidden), 'Hidden sibling question*');
   const raw = new Input();
   raw.parentElement = {closest: () => null, matches: selector => selector.includes('div'),
     querySelectorAll: selector => selector.startsWith('input:') ? [raw] : []};
