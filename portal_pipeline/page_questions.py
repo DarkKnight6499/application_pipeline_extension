@@ -37,11 +37,9 @@ def pair_digest(company, label, answer):
 
 
 def sensitive(field):
-    from assist_api import BLOCKED_DRAFT, NEVER_FILL
-    context = " ".join([field.get(LABEL, ""), *field.get(OPTIONS, [])])
+    # Only credentials and secrets are flagged; every other answer is eligible for save and fill (owner 2026-11-01).
     return bool(answer_memory.is_protected(field) or question_alias.blocked(field)
-                or corrections.blocked(field) or dropdown_mappings.blocked(field)
-                or NEVER_FILL.search(context) or any(pattern.search(context) for pattern in BLOCKED_DRAFT))
+                or corrections.blocked(field) or dropdown_mappings.blocked(field))
 
 
 def read(data):

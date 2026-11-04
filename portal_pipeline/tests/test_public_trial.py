@@ -59,7 +59,7 @@ class PublicExtensionTrial(unittest.TestCase):
                     raise ValueError("Session not found.")
                 return session_folder
 
-            pipeline = SimpleNamespace(source=root, lock=threading.RLock(), templates=lambda: [],
+            pipeline = SimpleNamespace(source=root, data=root / "data", lock=threading.RLock(), templates=lambda: [],
                                        current=lambda: current, folder=folder,
                                        resume=lambda session_id, for_upload=False: ATTACHMENT_BYTES)
             server = make_server(pipeline, 0, PAIRING_TOKEN)
@@ -136,13 +136,13 @@ class PublicExtensionTrial(unittest.TestCase):
                         page.locator("#next-two").click()
                         review.locator("#rescan").click()
                         host.get_by_role("checkbox", name="Select Signature", exact=True).wait_for()
-                        self.assertTrue(host.get_by_role("checkbox", name="Select Signature", exact=True).is_disabled())
+                        self.assertFalse(host.get_by_role("checkbox", name="Select Signature", exact=True).is_disabled())
                         self.assertFalse(page.locator("#attestation").is_checked())
                         self.assertEqual(page.locator("#signature").input_value(), "")
                         self.assertEqual(page.locator("#submit-count").text_content(), "Submit clicks: 0")
                         inspect = context.new_page()
                         inspect.goto(f"chrome-extension://{extension_id}/review.html?tab={tab_id}&mode=inspect")
-                        inspect.get_by_text("No application fields found.", exact=False).wait_for()
+                        inspect.get_by_text("Inspection only. No candidate profile loaded", exact=False).wait_for()
                         for command in ["portal-scan", "portal-fill"]:
                             rejected = inspect.evaluate("async ({tabId, type}) => chrome.tabs.sendMessage(tabId, {type, profile:{values:{}}, selections:[]})", {"tabId": tab_id, "type": command})
                             self.assertFalse(rejected["ok"])

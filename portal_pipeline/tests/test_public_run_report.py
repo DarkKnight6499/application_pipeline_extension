@@ -41,6 +41,8 @@ def check_schema(data):
 class ReportFixtureTests(SyntheticBrowserTest):
     def drive(self, markup, gap_wait=0.3):
         self.open_markup(markup)
+        # The boundary signature and certification are fillable now, so answer them to avoid an unrelated pending gap.
+        self.page.evaluate("document.getElementById('guard-signature').value = 'Signed'; document.getElementById('guard-certification').checked = true")
         browser = MagicMock(contexts=[self.context])
         playwright = MagicMock()
         playwright.chromium.connect_over_cdp.return_value = browser

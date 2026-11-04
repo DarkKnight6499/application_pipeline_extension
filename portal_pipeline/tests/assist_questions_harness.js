@@ -69,7 +69,7 @@ async function contentChecks() {
       else {
         const excluded = message.body.pairs.filter(row => ['password', 'file'].includes(row.type)).length;
         callback({ok: true, value: {saved: message.body.pairs.length - excluded, duplicate: 0,
-          excluded_by_type: excluded, flagged_sensitive: 12}});
+          excluded_by_type: excluded, flagged_sensitive: 0}});
       }
     }}}});
   const source = fs.readFileSync(path.join(EXTENSION, 'assist-content.js'), 'utf8').replace(/\r\n/g, '\n');
@@ -160,16 +160,16 @@ async function contentChecks() {
   const learn = dock.shadow.children[3], review = dock.shadow.children[4];
   await learn.listeners.click(EVENT);
   assert.equal(requests.at(-1).body.dry_run, true);
-  assert.equal(requests.at(-1).body.pairs.length, 4);
+  assert.equal(requests.at(-1).body.pairs.length, 5);
   const expected = {'Prefilled project': 'prefilled', 'Typed project': 'typed',
-    'Filled project': 'filled', 'Corrected project': 'corrected'};
+    'Filled project': 'filled', 'Corrected project': 'corrected', 'Gender': 'prefilled'};
   for (const row of requests.at(-1).body.pairs) assert.equal(row.source, expected[row.label]);
   const unchecked = review.children.find(line => line.children?.[0]?.children?.[1]?.textContent?.startsWith('Typed project'));
   unchecked.children[0].children[0].checked = false;
   await review.children.at(-1).listeners.click(EVENT);
   assert.equal(requests.at(-1).type, 'portal-assist-learn');
   assert.equal(requests.at(-1).body.dry_run, false);
-  assert.equal(requests.at(-1).body.pairs.length, 3);
+  assert.equal(requests.at(-1).body.pairs.length, 4);
   for (const row of requests.at(-1).body.pairs) {
     assert.notEqual(row.label, 'Typed project');
     assert.equal(row.source, expected[row.label]);

@@ -64,7 +64,7 @@ function node(label, type, value) {
     getRootNode: () => document, closest: () => null, getClientRects: () => [1],
     matches: selector => selector !== ':disabled' && selector.includes(menu ? 'button[aria-haspopup=listbox]' : 'input')};
 }
-nodes = [node('Gender', 'combobox', 'Private choice'), node('Consent', 'checkbox', true), node('Gender empty', 'combobox', 'Select One')];
+nodes = [node('Bank account', 'combobox', 'Private choice'), node('Social security number', 'checkbox', true), node('Routing number empty', 'combobox', 'Select One')];
 const context = vm.createContext({document, location: {href: 'https://sample.myworkdayjobs.com/apply', hostname: 'sample.myworkdayjobs.com'},
   getComputedStyle: () => ({visibility: 'visible', display: 'block'})});
 for (const filename of ['classifier.js', 'workday-menu.js', 'engine.js'])
@@ -352,7 +352,7 @@ class ManualPresenceTests(unittest.TestCase):
         self.assertNotIn("Private choice", result.stdout)
         event = {}
         driver.record_pending(event, fields)
-        self.assertEqual(event["manual_required"], ["Gender empty"])
+        self.assertEqual(event["manual_required"], ["Routing number empty"])
 
     def test_nonempty_manual_fields_never_reported_pending(self):
         fields = [{"label": "Manual question", "type": "combobox", "required": True, "blocked": True,

@@ -52,9 +52,12 @@
     return scan({values: {}}, {register: false});
   }
 
+  // Signature and attestation fields sit on review pages, so they must not hide a Review heading.
+  const REVIEW_BOUNDARY = /\b(signature|sign|initials|certify|certification|attest|attestation|consent|agree|acknowledge|declare)\b/i;
+
   function detectFinalReview(doc = document, adapter = null) {
     const reasons = candidates(doc).denied.map(item => `control: ${item.label}`);
-    if (/review/i.test(heading()) && !scanFields(adapter).some(field => !field.blocked && !field.disabled)) reasons.push("review heading without editable fields");
+    if (/review/i.test(heading()) && !scanFields(adapter).some(field => !field.blocked && !field.disabled && !REVIEW_BOUNDARY.test(field.label || ""))) reasons.push("review heading without editable fields");
     return {final: reasons.length > 0, reasons};
   }
 

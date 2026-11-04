@@ -6,8 +6,8 @@
   const INLINE_SUCCESS = /successfully\s+(?:uploaded|attached|saved)|(?:upload|attachment)\s+(?:was\s+)?(?:successful|complete(?:d)?)\b/i;
   const INLINE_FAILURE = /\b(?:error|failed|failure|invalid|rejected|unable|required|must)\b/i;
   const VALIDITY_KEYS = ["valid", "valueMissing", "typeMismatch", "patternMismatch", "tooLong", "tooShort", "rangeUnderflow", "rangeOverflow", "stepMismatch", "badInput", "customError"];
-  const protectedTerms = /\b(password|passcode|captcha|one.?time|otp|ssn|social security|credit card|bank account|routing number|signature|attest|certify|certification of|consent|agree|accept terms|privacy policy|declaration)\b/i;
-  const demographicTerms = /\b(gender|race|ethnicity|veteran|disability|sexual orientation)\b/i;
+  const protectedTerms = /\b(password|passcode|captcha|one.?time|otp|ssn|social security|credit card|bank account|routing number)\b/i;
+  const demographicTerms = /(?!)/i;
   const normalize = value => String(value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   const answerKey = value => String(value ?? "").toLowerCase().replace(/\s+/g, " ").trim();
   let controls = new Map();
@@ -383,7 +383,7 @@
       const required = requiredFor(element, label);
       if (!blocked && type === "checkbox" && !key && PortalClassifier.hasAttestationText(label)) key = "attestation_accept";
       else if (!blocked && type === "checkbox" && PortalClassifier.isAttestationCheckbox({type, label, key, required, checked: element.checked}) && !consentRecorded(element)) { blocked = true; key = null; }
-      if (!blocked && !key && type === "text" && /^[*\s]*(?:typed |electronic |e-?)?signature/i.test(label)) key = "full_name";
+      if (!blocked && !key && type === "text" && /^[*\s]*(?:typed |electronic |e-?)?signature\b/i.test(label)) key = "full_name";
       if (key?.includes(".")) {
         const [group, name] = key.split(".");
         key = Number.isInteger(record?.index) ? `${group}.${record.index}.${name}` : null;

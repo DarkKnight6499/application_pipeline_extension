@@ -27,15 +27,15 @@ HELD_MEMORY_LOCKS = ContextVar("held_memory_locks", default=())
 MAX_ANSWER = 2000
 START_MONTH_DAY = (12, 15)  # every application starts 15 December (user rule 2026-10-25)
 DEFAULT_SALARY = 50000  # per year, used when a posting shows no band (user rule 2026-10-25)
-# Demographic self-ID answers are allowed (user decision 2026-10-25); credentials, attestations and signatures never are.
-NEVER_STORE = re.compile(r"\b(password|passcode|captcha|one.?time|otp|verification code|security code|authenticator|ssn|social security|credit card|bank account|routing number|signature|signed|initials|attest|attestation|certify|certification of|consent|agree|accept terms|privacy policy|declaration|username|user name|login|log in)\b", re.I)
+# Only credentials and secrets are protected; self-ID, attestations and signatures are fillable (owner decision 2026-11-01).
+NEVER_STORE = re.compile(r"\b(password|passcode|captcha|one.?time|otp|verification code|security code|authenticator|ssn|social security|credit card|bank account|routing number|username|user name|login|log in)\b", re.I)
 
 
 def is_protected(field):
-    return bool(field.get("protected")) or str(field.get(TYPE_COLUMN, "")).lower() in {"password", "file", "signature"} or bool(NEVER_STORE.search(str(field.get(LABEL_COLUMN, ""))))
+    return bool(field.get("protected")) or str(field.get(TYPE_COLUMN, "")).lower() in {"password", "file"} or bool(NEVER_STORE.search(str(field.get(LABEL_COLUMN, ""))))
 
 
-# Consent and attestation boxes are auto-tickable only after one manual tick on that host (user decision 2026-10-25); signatures never are.
+# Consent and attestation boxes and typed signatures auto-fill (owner decision 2026-11-01).
 CONSENT_TERMS = re.compile(r"\b(agree|consent|accept|terms|privacy|certify|attest|attestation|acknowledge|declare|true and (correct|accurate)|truthful)\b", re.I)
 SIGNATURE_TERMS = re.compile(r"\b(signature|sign|signed|initials)\b", re.I)
 

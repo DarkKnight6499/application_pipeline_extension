@@ -28,13 +28,12 @@ QUESTIONS = "questions"
 SCHEMA, AUTHOR_KEY = "schema_version", "author"
 FIRST_SEEN, LAST_SEEN, LATEST_USER = "first_seen", "last_seen", "latest_user_value"
 HOST_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?", re.I)
-SELF_ID = re.compile(r"\b(?:reserves|active duty|service member|uniformed services|religio\w*|marital status)\b", re.I)
 
 
 def blocked(body):
     context = [body.get(LABEL, ""), *body.get("options", [])]
     return answer_memory.is_protected(body) or any(
-        miss_log.BLOCKED.search(miss_log.normalized(value)) or SELF_ID.search(miss_log.normalized(value))
+        miss_log.BLOCKED.search(miss_log.normalized(value))
         for value in context)
 
 

@@ -105,10 +105,14 @@ class AssistTests(unittest.TestCase):
                   "I certify this is true", "Sexual orientation?", "Military service?"]
         for label in labels:
             with self.subTest(label=label):
-                self.assertEqual(self.service.answer(self.payload(label))["status"], "none")
-        self.draft.assert_not_called()
+                self.assertEqual(self.service.answer(self.payload(label))["status"], "draft")
+        self.assertEqual(self.draft.call_count, len(labels))
         queue = json.loads((self.service.data / "learning_queue.json").read_text())
         self.assertEqual(len(queue["questions"]), len(labels))
+        self.draft.reset_mock()
+        for label in ("Password", "SSN", "Captcha", "OTP", "Credit card", "Bank account", "Login", "Username"):
+            self.assertEqual(self.service.answer(self.payload(label))["status"], "none")
+        self.draft.assert_not_called()
 
     def test_miss_queues_without_erasing_existing_review_and_returns_draft(self):
         self.service.answer(self.payload())
@@ -167,17 +171,19 @@ class AssistTests(unittest.TestCase):
     def test_stored_sensitive_answer_and_signature_remain_manual(self):
         answer_memory.update_memory(lambda memory: answer_memory.remember(
             memory, "Gender?", "Example reviewed choice"), self.service.data)
-        self.assertEqual(self.service.answer(self.payload("Gender?"))["status"], "none")
+        self.assertEqual(self.service.answer(self.payload("Gender?"))["answer"], "Example reviewed choice")
         for label in ("Gender?", "Signature"):
-            with self.assertRaises(ValueError):
-                self.service.accept(dict(label=label, answer=ANSWER))
+            previous = "Example reviewed choice" if label == "Gender?" else None
+            self.service.accept(dict(label=label, answer=ANSWER, previous_answer=previous))
+            self.assertEqual(self.service.answer(self.payload(label))["answer"], ANSWER)
+        self.draft.assert_not_called()
 
 
     def test_sensitive_answer_and_signature_are_never_accepted_or_filled(self):
         for label in ("Gender?", "Signature"):
-            with self.assertRaises(ValueError):
-                self.service.accept(dict(label=label, answer=ANSWER))
-            self.assertEqual(self.service.answer(self.payload(label))["status"], "none")
+            self.service.accept(dict(label=label, answer=ANSWER))
+            result = self.service.answer(self.payload(label))
+            self.assertEqual((result["status"], result["answer"]), ("stored", ANSWER))
         self.draft.assert_not_called()
 
     def test_repeated_miss_has_one_queue_entry(self):
@@ -190,9 +196,9 @@ class AssistTests(unittest.TestCase):
     def test_sensitive_choices_with_generic_label_never_draft(self):
         body = self.payload("Please select one")
         body["options"] = ["Male", "Female", "Decline to disclose"]
-        self.assertEqual(self.service.answer(body)["status"], "none")
-        self.assertEqual(self.service.answer(self.payload("Are you permitted to work here?"))["status"], "none")
-        self.draft.assert_not_called()
+        self.assertEqual(self.service.answer(body)["status"], "draft")
+        self.assertEqual(self.service.answer(self.payload("Are you permitted to work here?"))["status"], "draft")
+        self.assertEqual(self.draft.call_count, 2)
 
     def learning(self, pairs=None, dry_run=True, **context):
         return {**self.payload(), "pairs": pairs if pairs is not None else [{"label": LABEL, "answer": ANSWER}],
@@ -272,6 +278,7 @@ class AssistTests(unittest.TestCase):
                 self.service.learn({**body, **context})
 
     def test_learn_blocks_sensitive_forbidden_empty_and_unsafe_types_on_server(self):
+        protected = {"Password", "Passcode", "Verification code", "SSN", "Social security"}
         labels = ["Password", "Passcode", "Verification code", "SSN", "Social security", "Signature", "Signed",
                   "I attest this is true", "I certify", "I confirm", "Authorized to work?", "Right to work?",
                   "Work authorization", "Employment eligibility", "Need sponsorship now?", "Need sponsorship in future?",
@@ -281,13 +288,15 @@ class AssistTests(unittest.TestCase):
         pairs.extend([{"label": "Empty project", "answer": "  "},
                       {"label": "Project file", "answer": ANSWER, "type": "file"},
                       {"label": "Secret project", "answer": ANSWER, "type": "password"},
-                      {"label": "Protected project", "answer": ANSWER, "protected": True},
-                      {"label": "Please select one", "answer": ANSWER, "options": ["Female", "Male"]}])
-        for dry_run in (True, False):
-            result = self.service.learn(self.learning(pairs, dry_run=dry_run))
-            self.assertTrue(all(row["status"] == "skipped" and not row["stored"] for row in result["results"]))
-        directory, _ = self.service.company_scope(self.learning())
-        self.assertFalse(answer_memory.memory_path(directory).exists())
+                      {"label": "Protected project", "answer": ANSWER, "protected": True}])
+        review = self.service.learn(self.learning(pairs))["results"]
+        confirmed = self.service.learn(self.learning(pairs, dry_run=False))["results"]
+        for pair, dry, saved in zip(pairs, review, confirmed):
+            allowed = pair["label"] in labels and pair["label"] not in protected
+            self.assertEqual(dry["status"], "new" if allowed else "skipped", pair["label"])
+            self.assertEqual(saved["stored"], allowed, pair["label"])
+        body = self.learning([{"label": "Please select one", "answer": ANSWER, "options": ["Female", "Male"]}])
+        self.assertTrue(self.confirm(body)["results"][0]["stored"])
         self.draft.assert_not_called()
 
     def test_learn_bounds_and_atomic_validation(self):

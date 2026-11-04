@@ -158,8 +158,10 @@ class EssayTrackTests(unittest.TestCase):
                      [self.payload(options=["Male", "Female"]), self.payload(type="password"),
                       self.payload(protected=True)]):
             with self.subTest(body=body):
-                self.assertEqual(self.service.answer(body)["status"], "none")
-        self.draft.assert_not_called()
+                self.assertEqual(self.service.answer(body)["status"], "none" if body.get("protected") or body.get("type") == "password" else "draft")
+        self.assertGreater(self.draft.call_count, 0)
+        for label in ("Password", "SSN", "Captcha", "OTP"):
+            self.assertEqual(self.service.answer(self.payload(label=label))["status"], "none")
 
     def test_cli_add_list_replace_remove_and_persistence(self):
         prefix = ["--data", str(self.data)]

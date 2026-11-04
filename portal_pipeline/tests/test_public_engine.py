@@ -119,7 +119,7 @@ class PublicEngineTests(SyntheticBrowserTest):
         self.open_markup("""
           <label>First name<input id="first" oninput="document.getElementById('consent').checked=true"></label>
           <label>Last name<input id="last"></label>
-          <label>I agree<input id="consent" type="checkbox"></label>
+          <label>OTP<input id="consent" type="checkbox"></label>
         """)
         fields = {field["label"]: field for field in self.scan()}
         result = self.fill([{"id": fields[label]["id"], "value": "Synthetic"} for label in ["First name", "Last name"]])
@@ -165,7 +165,7 @@ class PublicEngineTests(SyntheticBrowserTest):
         fields = self.scan(AUTHORIZATION_FACT)
         radios = [field for field in fields if field["type"] == "radio"]
         self.assertEqual(len(radios), 2)
-        self.assertTrue(next(field for field in radios if "certify" in field["label"])["blocked"])
+        self.assertFalse(next(field for field in radios if "certify" in field["label"])["blocked"])
         ordinary = next(field for field in radios if field["key"] == "authorized_us")
         result = self.fill([{"id": ordinary["id"], "value": "Yes"}])
         self.assertEqual(result[0]["status"], "filled")
@@ -191,7 +191,7 @@ class PublicEngineTests(SyntheticBrowserTest):
         self.open_markup("""
           <form><fieldset><legend>Are you authorized to work in the United States?</legend>
             <label><input id="ordinary" type="radio" name="auth" value="no">No</label>
-            <label><input id="attest-member" type="radio" name="auth" value="yes">I certify this application</label>
+            <label><input id="attest-member" type="radio" name="auth" value="yes">OTP verification code</label>
           </fieldset></form>
         """)
         group = next(field for field in self.scan(AUTHORIZATION_FACT) if field["type"] == "radio")

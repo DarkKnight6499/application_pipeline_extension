@@ -23,7 +23,7 @@ class PublicDynamicTests(SyntheticBrowserTest):
         self.open_markup('''<label>First name<input id="first"></label>
           <label id="email-label">Email<input id="email"></label><label>Last name<input id="last"></label>
           <script>document.getElementById('first').oninput=()=>{
-            document.getElementById('email-label').firstChild.textContent='I certify PRIVATE_LABEL';
+            document.getElementById('email-label').firstChild.textContent='Password PRIVATE_LABEL';
             document.getElementById('email').value='PRIVATE_VALUE';};</script>''')
         fields = {field["key"]: field for field in self.scan() if field["key"]}
         results = self.fill([{"id": fields[key]["id"], "value": "Synthetic"} for key in ("first_name", "email", "last_name")])

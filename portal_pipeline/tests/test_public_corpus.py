@@ -14,7 +14,8 @@ PAIRING_TOKEN = "synthetic-test-token"
 CORPUS_FILENAME = "question_corpus.json"
 LABEL = "Do you hold a Synthetic License?"
 LABEL_VARIANT = "  do you hold a synthetic license "
-PROTECTED_LABELS = ["Gender", "Are you a protected veteran?", "Disability status", "Enter your password", "I agree to the privacy policy", "Signature"]
+PROTECTED_LABELS = ["Enter your password", "SSN", "Captcha", "OTP", "Credit card", "Bank account"]
+FILLABLE_LABELS = ["Gender", "Are you a protected veteran?", "Disability status", "I agree to the privacy policy", "Signature"]
 SENTINEL = "SENTINEL-ANSWER-9431"
 
 sys.path.insert(0, str(HERE))
@@ -50,6 +51,8 @@ class PublicCorpusTests(unittest.TestCase):
         self.assertFalse(question_corpus.append_question(data, entry(protected=True)))
         self.assertFalse(question_corpus.append_question(data, entry(type="password")))
         self.assertEqual(data["questions"], {})
+        for label in FILLABLE_LABELS:
+            self.assertTrue(question_corpus.append_question(data, entry(label)))
 
     def test_no_values_stored(self):
         data = question_corpus.empty_corpus()
@@ -97,7 +100,7 @@ class PublicCorpusTests(unittest.TestCase):
                     result = response.status, json.loads(response.read())
                     connection.close()
                     return result
-                self.assertEqual(post({"questions": [entry(), entry("Gender")]}), (200, {"logged": 1, "skipped": 1}))
+                self.assertEqual(post({"questions": [entry(), entry("Password")]}), (200, {"logged": 1, "skipped": 1}))
                 self.assertEqual(post({"questions": "bad"})[0], 400)
                 stored = json.loads((pipeline.data / CORPUS_FILENAME).read_text(encoding="utf-8"))
                 self.assertEqual(len(stored["questions"]), 1)

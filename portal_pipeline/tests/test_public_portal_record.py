@@ -63,11 +63,12 @@ class RecordTests(unittest.TestCase):
 
     def test_protected_values_never_stored(self):
         seeded(self.data)
-        fields = [entry("Password", type="password", final_value=SENTINEL), entry("Gender", final_value=SENTINEL),
-                  entry("Are you a protected veteran?", final_value=SENTINEL), entry("I agree to the privacy policy", final_value=SENTINEL),
+        fields = [entry("Password", type="password", final_value=SENTINEL), entry("Gender", final_value="Synthetic choice"),
+                  entry("Are you a protected veteran?", final_value="No"), entry("I agree to the privacy policy", final_value="Yes"),
                   entry("Flagged", protected=True, final_value=SENTINEL), entry("Kept")]
         record = portal_record.record_page(self.data, APPLICATION_ID, {"page_key": "k", "fields": fields})
-        self.assertEqual([item["label"] for item in record["pages"][0]["fields"]], ["Kept"])
+        self.assertEqual([item["label"] for item in record["pages"][0]["fields"]], ["Gender", "Are you a protected veteran?", "I agree to the privacy policy", "Kept"])
+        self.assertEqual([item["final_value"] for item in record["pages"][0]["fields"]], ["Synthetic choice", "No", "Yes", "v"])
         self.assertNotIn(SENTINEL, (self.data / "records" / f"{APPLICATION_ID}.json").read_text(encoding="utf-8"))
 
     def test_state_never_submitted_without_user_report(self):

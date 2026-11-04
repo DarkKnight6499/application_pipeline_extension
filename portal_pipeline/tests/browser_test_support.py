@@ -71,8 +71,7 @@ class SyntheticBrowserTest(unittest.TestCase):
         try:
             if self.page.locator("#guard-untouched").count():
                 self.assertEqual(self.page.locator("#guard-untouched").input_value(), "Keep untouched")
-                self.assertEqual(self.page.locator("#guard-signature").input_value(), "")
-                self.assertFalse(self.page.locator("#guard-certification").is_checked())
+                # Signature and certification may be filled now (owner 2026-11-01); only Submit and untouched stay guarded.
                 self.assertEqual(self.page.evaluate("syntheticSubmitClicks"), 0)
                 self.assertEqual(self.page.evaluate("syntheticSubmitEvents"), 0)
             self.assertEqual(self.errors, [])

@@ -34,13 +34,12 @@ QUESTION_PREFIXES = tuple(phrase.split() for phrase in (
     "tell us about your", "tell us about the", "tell us about", "what is your", "what are your",
     "what is the", "what are the", "describe your", "describe the", "describe a", "describe an",
     "provide your", "provide the", "share your", "describe", "provide", "share"))
-EXTRA_BLOCKED = re.compile(r"\b(?:religio\w*|marital status|reserves|active duty|service member|uniformed services)\b", re.I)
 
 
 def blocked(field):
     context = [field.get(LABEL_COLUMN, ""), *field.get(OPTIONS_COLUMN, [])]
     return answer_memory.is_protected(field) or any(
-        miss_log.BLOCKED.search(miss_log.normalized(text)) or EXTRA_BLOCKED.search(text) for text in context)
+        miss_log.BLOCKED.search(miss_log.normalized(text)) for text in context)
 
 
 def similarity(left, right):

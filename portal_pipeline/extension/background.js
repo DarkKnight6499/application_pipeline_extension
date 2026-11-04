@@ -6,7 +6,7 @@ const ASSIST_TIMEOUT_MS = 100000;
 const applicationRestrictions = new Set();
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
-    if (["portal-assist-answer", "portal-assist-accept", "portal-assist-learn", "portal-assist-miss", "portal-assist-correction", "portal-assist-dump", "portal-assist-history"].includes(message.type)) {
+    if (["portal-assist-answer", "portal-assist-full-name", "portal-assist-accept", "portal-assist-learn", "portal-assist-miss", "portal-assist-correction", "portal-assist-dump", "portal-assist-history"].includes(message.type)) {
       if (!sender.tab || sender.id !== chrome.runtime.id || typeof sender.url !== "string")
         throw new Error("Assist requires an extension content script.");
       const target = new URL(sender.url);
@@ -17,6 +17,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const route = message.type.slice("portal-assist-".length);
       if (!message.body || typeof message.body !== "object" || Array.isArray(message.body))
         throw new Error("Assist requires a request object.");
+      if (route === "full-name") {
+        const {server, token} = await chrome.storage.local.get(["server", "token"]);
+        if (!/^http:\/\/127\.0\.0\.1:\d{1,5}$/.test(server || "") || !token) throw new Error("Pair the extension in its popup first.");
+        const response = await fetch(server + "/api/profile", {
+          headers: {"X-Portal-Token": token}, signal: AbortSignal.timeout(ASSIST_TIMEOUT_MS)
+        });
+        if (!response.ok) throw new Error("Stored profile lookup failed.");
+        const profile = await response.json();
+        const value = profile?.values?.full_name?.value;
+        const answer = typeof value === "string" ? value.trim() : "";
+        return {status: answer ? "stored" : "none", source: "profile", answer, candidates: answer ? [answer] : []};
+      }
       const miss = route === "miss";
       const body = miss ? {label: message.body?.label, type: message.body?.type, options: message.body?.options,
         company_hint: message.body?.company_hint, host: target.hostname}

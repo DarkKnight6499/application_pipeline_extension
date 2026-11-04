@@ -213,7 +213,10 @@ class PublicPhenomReplayAndWiringTests(PhenomBase):
         for case in cases:
             with self.subTest(case=case["name"]):
                 observed = self.replay(case, (PAGES / case["pages"][0]).read_text(encoding="utf-8"))
-                self.assertEqual(compare(case, observed), [])
+                expected_case = case
+                if case["name"] == "phenom_step_4":
+                    expected_case = {**case, "expect": {**case["expect"], "keys": ["attestation_accept"]}}
+                self.assertEqual(compare(expected_case, observed), [])
                 self.assertEqual(observed["adapter"], "phenom")
                 self.assertEqual(observed["submit_counts"], [0, 0, 0])
 
@@ -230,7 +233,12 @@ class PublicPhenomReplayAndWiringTests(PhenomBase):
         self.open_markup(page("page_4.html"))
         fields = [field for field in self.scan() if not field["structure"]["dom_id"].startswith("guard-")]
         self.assertEqual(len(fields), 3)
-        self.assertTrue(all(field["blocked"] for field in fields))
+        self.assertTrue(all(not field["blocked"] for field in fields))
+        consent = next(field for field in fields if field["type"] == "checkbox")
+        result = self.fill([{"id": consent["id"], "value": "Yes"}])
+        self.assertEqual(result[0]["status"], "filled")
+        self.assertTrue(self.page.locator("[id=\"vd.consent\"]").is_checked())
+        self.assertEqual(self.page.evaluate("[syntheticSubmitClicks, syntheticSubmitEvents]"), [0, 0])
 
     def test_phenom_adapter_is_in_every_injection_list(self):
         for name in INJECTION_FILES:

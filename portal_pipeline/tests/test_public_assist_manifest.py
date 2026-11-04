@@ -19,7 +19,7 @@ class AssistManifestTests(unittest.TestCase):
         self.assertEqual(manifest["host_permissions"], ["http://127.0.0.1/*"])
         scripts = manifest["content_scripts"]
         self.assertEqual(len(scripts), 1)
-        self.assertEqual(scripts[0]["js"], ["assist-content.js"])
+        self.assertEqual(scripts[0]["js"], ["classifier.js", "assist-content.js"])
         matches = scripts[0]["matches"]
         self.assertNotIn("<all_urls>", json.dumps(manifest))
         self.assertEqual({urlsplit(pattern).netloc for pattern in matches}, EXPECTED_HOSTS)

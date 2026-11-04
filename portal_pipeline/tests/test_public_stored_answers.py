@@ -38,8 +38,10 @@ class StoredAnswerTests(SyntheticBrowserTest):
 
     def test_attestation_checkbox_is_never_proposed_from_memory(self):
         field = self.scan()["certify"]
-        self.assertTrue(field["blocked"])
-        self.assertEqual(field["proposal"], "")
+        self.assertFalse(field["blocked"])
+        self.assertEqual(field["proposal"], "Yes")
+        self.assertEqual(self.fill([{"id": field["id"], "value": field["proposal"]}])[0]["status"], "filled")
+        self.assertTrue(self.page.locator("#certify").is_checked())
 
     def test_stored_answer_beats_profile_value(self):
         fields = self.scan({"preferred nickname": "No"}, {"preferred_name": {"value": "Yes", "source": "x"}})
@@ -77,15 +79,18 @@ class DemographicAndGridTests(SyntheticBrowserTest):
 
     def test_demographic_field_stays_manual_without_a_stored_answer(self):
         fields = self.scan({})
-        self.assertTrue(fields["gender"]["blocked"])
+        self.assertFalse(fields["gender"]["blocked"])
+        self.assertEqual((fields["gender"]["proposal"], fields["gender"]["status"]), ("", "pending"))
 
     def test_demographic_field_with_exact_stored_answer_is_proposed(self):
         fields = self.scan({"gender": "Male"})
         self.assertEqual((fields["gender"]["blocked"], fields["gender"]["proposal"]), (False, "Male"))
-        self.assertTrue(fields["eth"]["blocked"])
+        self.assertFalse(fields["eth"]["blocked"])
+        self.assertEqual(fields["eth"]["proposal"], "")
 
     def test_attestation_stays_blocked_even_with_stored_answer(self):
-        self.assertTrue(self.scan({"i certify and consent to the above": "Yes"})["consent"]["blocked"])
+        field = self.scan({"i certify and consent to the above": "Yes"})["consent"]
+        self.assertEqual((field["blocked"], field["proposal"]), (False, "Yes"))
 
     def test_checkbox_inside_readonly_grid_is_available(self):
         self.assertFalse(self.scan({})["grid-box"]["disabled"])
@@ -109,12 +114,16 @@ class ConsentTests(SyntheticBrowserTest):
         self.assertTrue(self.page.locator("#consent").is_checked())
 
     def test_other_attestations_stay_manual(self):
-        self.assertTrue(self.scan(["yes i have read and consent to the above"])["other"]["blocked"])
+        field = self.scan(["yes i have read and consent to the above"])["other"]
+        self.assertFalse(field["blocked"])
+        self.assertEqual(self.fill([{"id": field["id"], "value": "Yes"}])[0]["status"], "filled")
+        self.assertTrue(self.page.locator("#other").is_checked())
 
     def test_consent_for_another_host_is_ignored(self):
         self.open_markup(self.PAGE)
         fields = {f["structure"]["dom_id"]: f for f in self.page.evaluate("profile => PortalEngine.scan(profile)", {"values": {}, "answers": {}, "consents": ["other.example|yes i have read and consent to the above"]})}
-        self.assertTrue(fields["consent"]["blocked"] and fields["other"]["blocked"])
+        self.assertFalse(fields["consent"]["blocked"] or fields["other"]["blocked"])
+        self.assertEqual(fields["consent"]["proposal"], "Yes")
 
 
 class ValueAliasTests(SyntheticBrowserTest):
@@ -153,13 +162,16 @@ class ReviewFixTests(SyntheticBrowserTest):
         page = '<label><input type="checkbox" id="g"> Gender: Male</label>'
         fields = self.scan(page, {"gender male": "No"})
         result = self.fill([{"id": fields["g"]["id"], "value": "Yes"}])[0]
-        self.assertEqual(result["status"], "failed")
-        self.assertFalse(self.page.locator("#g").is_checked())
+        self.assertEqual(result["status"], "filled")
+        self.assertTrue(self.page.locator("#g").is_checked())
 
     def test_recorded_consent_never_unlocks_a_signature_control(self):
         host = "safety-fixture.myworkdayjobs.com"
         page = '<label><input type="checkbox" id="signature"> I agree</label>'
-        self.assertTrue(self.scan(page, consents=[f"{host}|i agree"])["signature"]["blocked"])
+        field = self.scan(page, consents=[f"{host}|i agree"])["signature"]
+        self.assertFalse(field["blocked"])
+        self.assertEqual(self.fill([{"id": field["id"], "value": "Yes"}])[0]["status"], "filled")
+        self.assertTrue(self.page.locator("#signature").is_checked())
 
 
 class HistoryRowMemoryTests(SyntheticBrowserTest):

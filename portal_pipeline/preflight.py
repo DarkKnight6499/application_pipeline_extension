@@ -189,9 +189,12 @@ SENSITIVE = re.compile(
     r"|social security|\bssn\b|driver'?s?\s+licen[sc]e|criminal|convicted|felony|arrest)")
 
 
+SSN_ONLY = re.compile(r"social security|\bssn\b")  # the only field still forced manual (owner 2026-11-01)
+
+
 def sensitive_gate(fields):
     return [item("sensitive", "warn", SENSITIVE_MESSAGE, _text(entry), False, field_id=entry.get("id"), force_manual=True)
-            for entry in fields or [] if SENSITIVE.search(_norm_label(entry))]
+            for entry in fields or [] if SSN_ONLY.search(_norm_label(entry))]
 
 
 def run_preflight(source, session, fields, *, reference=None):

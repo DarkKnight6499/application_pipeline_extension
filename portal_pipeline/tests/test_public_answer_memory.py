@@ -25,9 +25,15 @@ class AnswerMemoryTests(unittest.TestCase):
 
     def test_protected_questions_are_refused(self):
         data = self.fresh()
-        for label in ("I certify this is true", "Password", "I agree to the privacy policy", "Signature"):
+        for label in ("Password", "SSN", "Captcha", "OTP", "Credit card", "Bank account", "Login", "Username"):
             self.assertFalse(memory.remember(data, label, "x"), label)
         self.assertEqual(data["answers"], {})
+        for kind in ("password", "file"):
+            self.assertTrue(memory.is_protected({"type": kind, "label": "Example field"}))
+        self.assertFalse(memory.is_protected({"type": "signature", "label": "Example field"}))
+        for label in ("I certify this is true", "I agree to the privacy policy", "Signature"):
+            self.assertTrue(memory.remember(data, label, "x"), label)
+            self.assertEqual(memory.lookup(data, label), "x")
 
     def test_demographic_self_id_answers_are_stored(self):
         data = self.fresh()
@@ -44,7 +50,7 @@ class AnswerMemoryTests(unittest.TestCase):
         data = self.fresh()
         memory.remember(data, "Notice period", "2 weeks")
         fields = [{"label": "Notice period"}, {"label": "Why us?"}, {"label": "why us"}, {"label": "I agree to the terms"}, {"label": ""}]
-        self.assertEqual(memory.gaps(data, fields), ["Why us?"])
+        self.assertEqual(memory.gaps(data, fields), ["Why us?", "I agree to the terms"])
 
     def test_consent_is_remembered_per_host_and_exact_label(self):
         data = self.fresh()

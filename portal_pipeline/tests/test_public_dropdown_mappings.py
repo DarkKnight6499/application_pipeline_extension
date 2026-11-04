@@ -155,10 +155,7 @@ class DropdownTests(unittest.TestCase):
         self.assertEqual(self.service.learn(body)["results"][0]["status"], "skipped")
 
     def test_blocked_labels_options_and_legacy_answers_never_map_learn_or_fill(self):
-        for label in ("Need sponsorship now?", "Need sponsorship in future?", "Authorized to work?",
-                      "Work authorization", "Veteran", "Disability", "Gender", "Race or ethnicity",
-                      "Religious affiliation", "Marital status", "Active duty", "Uniformed services",
-                      "Password", "Signature", "I attest this is true", "SSN", "S.S.N."):
+        for label in ("Password", "SSN", "S.S.N.", "Captcha", "OTP", "Credit card", "Bank account"):
             with self.subTest(label=label):
                 with self.assertRaises(ValueError):
                     self.service.accept({"label": label, "answer": ANSWER})
@@ -171,23 +168,34 @@ class DropdownTests(unittest.TestCase):
                 body = self.learning()
                 body["pairs"][0]["label"] = label
                 self.assertEqual(self.service.learn(body)["results"][0]["status"], "skipped")
+        for label in ("Need sponsorship now?", "Need sponsorship in future?", "Authorized to work?",
+                      "Work authorization", "Veteran", "Disability", "Gender", "Race or ethnicity",
+                      "Religious affiliation", "Marital status", "Active duty", "Uniformed services",
+                      "Signature", "I attest this is true"):
+            with self.subTest(label=label):
+                self.service.accept({"label": label, "answer": ANSWER})
+                mappings.update(self.service.data, "workday", label, ANSWER, OPTION)
+                result = self.service.answer({**self.body(), "label": label})
+                self.assertEqual((result["status"], result["answer"], result["mapped_options"]), ("stored", ANSWER, [OPTION]))
         self.seed()
         body = self.learning()
         body["pairs"][0]["options"].append("Decline to disclose")
-        self.assertEqual(self.service.learn(body)["results"][0]["status"], "skipped")
-        self.assertFalse((self.service.data / mappings.FILENAME).exists())
+        self.assertEqual(self.service.learn(body)["results"][0]["status"], "dropdown")
         self.draft.assert_not_called()
 
     def test_store_rejects_empty_oversized_and_protected_options(self):
         for label, answer, option in (("", ANSWER, OPTION), (LABEL, "", OPTION), (LABEL, ANSWER, ""),
                                       (LABEL, ANSWER, False), ("Q" * 301, ANSWER, OPTION),
                                       (LABEL, "x" * 2001, OPTION), (LABEL, ANSWER, "x" * 2001),
-                                      (LABEL, ANSWER, "Female"), (LABEL, "Veteran", OPTION)):
+                                      (LABEL, ANSWER, "OTP"), (LABEL, "SSN", OPTION)):
             with self.assertRaises(ValueError):
                 mappings.update(self.service.data, "workday", label, answer, option)
         with self.assertRaises(ValueError):
             mappings.update(self.service.data, "unknown", LABEL, ANSWER, OPTION)
         self.assertFalse((self.service.data / mappings.FILENAME).exists())
+        mappings.update(self.service.data, "workday", LABEL, ANSWER, "Female")
+        mappings.update(self.service.data, "workday", LABEL, "Veteran", OPTION)
+        self.assertEqual(len(mappings.load(self.service.data)[mappings.ROWS]), 2)
 
     def test_accept_requires_current_previous_answer_for_replacement(self):
         self.seed()
@@ -247,7 +255,7 @@ class DropdownTests(unittest.TestCase):
     def test_extension_mapping_harness(self):
         result = subprocess.run([NODE, str(HARNESS)], capture_output=True, text=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("Assist dropdown checks passed", result.stdout)
+        self.assertIn("Assist dropdown and State adapter checks passed", result.stdout)
 
 
 if __name__ == "__main__":

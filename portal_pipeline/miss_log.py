@@ -27,19 +27,8 @@ EVENT_COLUMN, AUTHOR_COLUMN, SCHEMA_COLUMN = "event", "author", "schema_version"
 RESOLVED_COLUMN = "resolved_at"
 PROTECTED_COLUMN = "protected"
 SELECT_TYPES = {"select", "select-one", "select-multiple", "combobox"}
-BLOCKED_TYPES = {"password", "signature", "file"}
-BLOCKED = re.compile(
-    r"\b(?:password\w*|passcode\w*|captcha|s ?s ?n|social security|verification code|one time|otp|"
-    r"signature\w*|sign|signed|signing|initials|attest\w*|certify|certifies|certified|certification of|consent|agree\w*|declaration|"
-    r"i (?:confirm|affirm|declare)|truthful|accurate and complete|true and (?:correct|accurate)|"
-    r"sponsor\w*|visa\w*|immigration|citizen\w*|nationality|work permit|opt|cpt|h 1b|"
-    r"(?:work|employment) (?:authori[sz]\w*|eligib\w*)|"
-    r"(?:authori[sz]\w*|eligib\w*|right|permit\w*|permission|allow\w*|legally).{0,60}(?:work|employment)|"
-    r"veteran\w*|disab\w*|accommodation\w*|military|armed forces|national guard|reservist\w*|"
-    r"gender\w*|sex|male|female|non ?binary|transgender|race|racial|ethnic\w*|hispanic|latino|"
-    r"black|white|asian|indigenous|native american|pacific islander|sexual orientation|lgbtq\w*|"
-    r"pronouns?|self ?(?:id\w*|identification|disclosure)|demographic\w*|eeo|national origin|"
-    r"decline to (?:identify|answer|disclose))\b", re.I)
+BLOCKED_TYPES = {"password", "file"}
+BLOCKED = re.compile(r"\b(?:password\w*|passcode\w*|captcha|s ?s ?n|social security|verification code|one time|otp)\b", re.I)  # credentials only; every other answer is fillable
 
 
 def normalized(value):

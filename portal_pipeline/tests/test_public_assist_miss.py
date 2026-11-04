@@ -72,21 +72,22 @@ class MissTests(unittest.TestCase):
                   "Authorized to work?", "Right to work?", "Eligible for employment?",
                   "Legally permitted to work?", "Veteran status?", "Disability?", "Gender?",
                   "Race/ethnicity?", "Self-ID", "SelfIdentification", "Sexual orientation?", "Visa status?"]
+        protected = {"Password", "SSN", "S.S.N.", "Social Security Number"}
         for label in labels:
             with self.subTest(label=label):
-                body = self.payload()
-                body["label"] = label
-                self.assertFalse(miss_log.record(self.data, body))
-        for kind in ("password", "signature", "file"):
-            body = self.payload()
-            body["type"] = kind
-            self.assertFalse(miss_log.record(self.data, body))
+                self.assertEqual(miss_log.record(self.data, dict(self.payload(), label=label)), label not in protected)
+        for kind in ("password", "file"):
+            self.assertFalse(miss_log.record(self.data, dict(self.payload(), type=kind)))
+        self.assertTrue(miss_log.record(self.data, dict(self.payload(), type="signature")))
         for body in (dict(self.payload(), label="Q" * 310 + " signature"),
                      dict(self.payload(), options=["Example"] * 40 + ["Veteran status"]),
                      dict(self.payload(), options=["O" * 130 + " disability"])):
+            self.assertTrue(miss_log.record(self.data, body))
+        for body in (dict(self.payload(), label="Q" * 310 + " password"),
+                     dict(self.payload(), options=["Example"] * 40 + ["OTP"]),
+                     dict(self.payload(), options=["O" * 130 + " captcha"])):
             self.assertFalse(miss_log.record(self.data, body))
-        self.assertEqual(miss_log.report(self.data), [])
-        self.assertFalse((self.data / miss_log.LOG_FILENAME).exists())
+        self.assertTrue((self.data / miss_log.LOG_FILENAME).exists())
 
     def test_concurrent_counts_and_restart(self):
         with ThreadPoolExecutor(max_workers=8) as pool:
@@ -147,7 +148,7 @@ class MissTests(unittest.TestCase):
     def test_manual_answer_misses_are_filtered_and_keep_non_sensitive_questions(self):
         self.assertEqual(self.service.answer(dict(self.payload(), label="Future sponsorship?"))["status"], "none")
         self.assertEqual(self.service.answer(dict(self.payload(), label="Expected salary?"))["status"], "none")
-        self.assertEqual([row["label"] for row in miss_log.report(self.data)], ["Expected salary?"])
+        self.assertEqual([row["label"] for row in miss_log.report(self.data)], ["Expected salary?", "Future sponsorship?"])
 
     def test_corrupt_log_does_not_break_answer_outcome(self):
         (self.data / miss_log.LOG_FILENAME).write_text('{"event": "miss"}\n', encoding="utf-8")
@@ -198,7 +199,7 @@ class MissTests(unittest.TestCase):
         self.assertEqual(self.request(port, method="GET")[0], 405)
         self.assertFalse((self.data / miss_log.LOG_FILENAME).exists())
         self.assertEqual(self.request(port)[0:2], (200, {"status": "logged"}))
-        self.assertEqual(self.request(port, dict(self.payload(), label="Sponsorship?"))[1], {"status": "skipped"})
+        self.assertEqual(self.request(port, dict(self.payload(), label="Sponsorship?"))[1], {"status": "logged"})
         self.assertEqual(self.request(port, ["invalid"])[0], 400)
         self.assertEqual(self.request(port)[2], ORIGIN)
         self.assertEqual(miss_log.report(self.data)[0]["count"], 2)

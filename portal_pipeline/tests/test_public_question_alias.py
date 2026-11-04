@@ -205,9 +205,7 @@ class QuestionAliasTests(unittest.TestCase):
         self.assertEqual(self.lookup()["answer"], "Separate answer")
 
     def test_server_blocks_sensitive_stored_answers_options_and_aliases(self):
-        labels = ["Authorized to work?", "Need sponsorship?", "Veteran status", "Disability status",
-                  "Gender", "Race or ethnicity", "Password", "Signature", "I attest this is true", "SSN"]
-        for label in labels:
+        for label in ("Password", "SSN", "Captcha", "OTP", "Credit card", "Bank account"):
             with self.subTest(label=label):
                 self.seed(question=label)
                 self.assertEqual(self.lookup(label)["status"], "none")
@@ -215,9 +213,18 @@ class QuestionAliasTests(unittest.TestCase):
                 self.assertFalse(question_alias.similarity(label, "Please " + label))
                 with self.assertRaises(ValueError):
                     self.service.accept({**self.body, "label": label, "answer": ANSWER})
+        for label in ("Authorized to work?", "Need sponsorship?", "Veteran status", "Disability status",
+                      "Gender", "Race or ethnicity", "Signature", "I attest this is true"):
+            with self.subTest(label=label):
+                self.seed(question=label)
+                self.assertEqual(self.lookup(label)["answer"], ANSWER)
+                self.assertEqual(self.review(label=label)["status"], "same")
+                self.assertEqual(question_alias.similarity(label, label), 1)
+                self.assertFalse(question_alias.blocked({"label": label}))
         self.seed()
         self.assertTrue(self.confirm(use_alias=True)["stored"])
-        self.assertEqual(self.lookup(options=["Female", "Male"])["status"], "none")
+        self.assertEqual(self.lookup(options=["Female", "Male"])["answer"], ANSWER)
+        self.assertEqual(self.lookup(options=["OTP"])["status"], "none")
         self.draft.assert_not_called()
 
     def test_alias_controls_validated_before_any_write(self):

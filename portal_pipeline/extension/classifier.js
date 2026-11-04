@@ -68,7 +68,7 @@
     full_name: ["full name", "legal name"], email: ["email", "email address", "e mail"],
     phone: ["phone", "phone number", "mobile phone", "telephone"],
     linkedin: ["linkedin", "linkedin profile", "linkedin url"], github: ["github", "github url", "github profile"],
-    city: ["city", "city of residence"], location: ["current location", "location of residence"],
+    city: ["city", "city of residence"], state: ["state"], location: ["current location", "location of residence"],
     authorized_us: ["are you authorized to work in the us", "are you legally authorized to work in the united states", "are you authorized to work in the united states"],
     sponsorship_now: ["do you require sponsorship now", "do you currently require sponsorship", "do you require visa sponsorship now"],
     sponsorship_future: ["will you require sponsorship in the future", "will you require visa sponsorship in the future", "do you require sponsorship in the future"],

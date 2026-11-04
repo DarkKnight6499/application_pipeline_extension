@@ -81,22 +81,24 @@ class PageQuestionsTests(unittest.TestCase):
                   "Authorized to work?", "Right to work?", "Employment eligibility", "Veteran status",
                   "Disability", "Gender", "Race or ethnicity", "Nationality", "Pronouns", "Visa status",
                   "Religious affiliation", "Marital status", "Active duty", "Expected salary", "Criminal history"]
-        pairs = [self.pair(label=label) for label in labels]
+        protected = {"Password", "SSN", "S.S.N.", "Social Security Number"}
+        pairs = [self.pair(label=label) for label in labels if label not in protected]
         pairs += [self.pair(label="Generic choice", options=["Male", "Female"]),
-                  self.pair(label="Protected project", protected=True), self.pair(label="Draw here", type="signature")]
+                  self.pair(label="Draw here", type="signature")]
         for company in (COMPANY, "Other Corp"):
             result = self.service.dump(self.body(pairs, company_hint=company))
-            self.assertEqual((result["saved"], result["flagged_sensitive"]), (len(pairs), len(pairs)))
-        groups = questions_sort.report(self.service)
-        self.assertEqual(sum(map(len, groups.values())), len(pairs))
-        self.assertEqual(len(groups["SENSITIVE"]), len(pairs))
+            self.assertEqual((result["saved"], result["flagged_sensitive"]), (len(pairs), 0))
+        self.assertTrue(all(not row["sensitive"] for row in page_questions.read(self.data)))
         questions_sort.promote(self.service)
-        self.assertFalse(list(self.data.rglob("answer_memory.json")))
-        for label in labels:
-            with self.subTest(label=label), self.assertRaises(ValueError):
-                questions_sort.resolve(self.service, label, ANSWER)
-        for label in ("Gender", "SSN", "Signature", "Need sponsorship now?", "Authorized to work?"):
-            self.assertEqual(self.service.answer({**self.body(), "label": label})["status"], "none")
+        for label in ("Gender", "Signature", "Need sponsorship now?", "Authorized to work?", "Draw here"):
+            self.assertEqual(self.service.answer({**self.body(), "label": label})["answer"], ANSWER)
+        for label in sorted(protected):
+            with self.subTest(label=label):
+                result = self.capture(label=label)
+                self.assertEqual(result["flagged_sensitive"], 1)
+                with self.assertRaises(ValueError):
+                    questions_sort.resolve(self.service, label, ANSWER)
+                self.assertEqual(self.service.answer({**self.body(), "label": label})["status"], "none")
         self.draft.assert_not_called()
 
     def test_profile_answers_saved_and_promoted(self):
@@ -122,13 +124,13 @@ class PageQuestionsTests(unittest.TestCase):
         row = page_questions.read(self.data)[0]
         self.assertEqual((len(row["label"]), len(row["answer"]), len(row["company"])), (300, 2000, 150))
         self.assertEqual((len(row["options"]), len(row["options"][0])), (40, 120))
-        self.assertTrue(row["sensitive"])
+        self.assertFalse(row["sensitive"])
         self.assertTrue(row["truncated"])
         self.assertEqual(row["truncated_fields"], ["answer", "company", "label", "options"])
         self.service.dump(self.body([self.pair(label="Generic choice", options=["Example"] * 40 + ["Gender"]),
                                     self.pair(label="Other choice", options=["O" * 130 + " disability"])]))
-        self.assertTrue(all(row["sensitive"] for row in page_questions.read(self.data)))
-        self.assertEqual(len(questions_sort.report(self.service)["SENSITIVE"]), 3)
+        self.assertTrue(all(not row["sensitive"] for row in page_questions.read(self.data)))
+        self.assertEqual(len(questions_sort.report(self.service)["SENSITIVE"]), 0)
         result = self.service.dump(self.body([self.pair(label=f"Project {index}") for index in range(80)]))
         self.assertEqual(result["saved"], 80)
 
@@ -258,7 +260,7 @@ class PageQuestionsTests(unittest.TestCase):
                       "Need sponsorship now?", "Need sponsorship in future?"):
             self.capture(label=label)
         report = questions_sort.report(self.service)
-        self.assertEqual((len(report["AGREE"]), len(report["SINGLE"]), len(report["SENSITIVE"])), (1, 3, 2))
+        self.assertEqual((len(report["AGREE"]), len(report["SINGLE"]), len(report["SENSITIVE"])), (1, 5, 0))
 
     def test_intent_storage_collision_is_conflict(self):
         self.capture(label="Are you willing to travel?", answer="Yes")
@@ -403,7 +405,7 @@ class PageQuestionsTests(unittest.TestCase):
         self.assertNotIn(ANSWER, json.dumps(result))
         self.assertEqual(request()[1]["duplicate"], 1)
         status, result = request(self.body([self.pair(label="Q" * 310 + " signature", answer="A" * 2100)]))
-        self.assertEqual((status, result["saved"], result["flagged_sensitive"]), (200, 1, 1))
+        self.assertEqual((status, result["saved"], result["flagged_sensitive"]), (200, 1, 0))
         with ThreadPoolExecutor(max_workers=8) as pool:
             responses = list(pool.map(lambda index: request(self.body([self.pair(label=f"HTTP project {index}")])), range(8)))
         self.assertTrue(all(status == 200 and result["saved"] == 1 for status, result in responses))

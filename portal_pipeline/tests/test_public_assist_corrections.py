@@ -91,27 +91,25 @@ class CorrectionTests(unittest.TestCase):
                   "Eligible for employment?", "Right to work?", "Veteran status", "Disability", "Gender",
                   "Race or ethnicity", "Self-ID", "Visa status", "Active duty", "Uniformed services",
                   "Religious affiliation", "Marital status", "Criminal history", "Expected salary"]
+        protected = {"Password", "SSN", "S.S.N."}
         for label in labels:
             with self.subTest(label=label):
                 body = self.payload(label=label)
-                self.assertEqual(self.service.correction(body)["status"], "skipped")
-        bodies = [self.payload(type=kind) for kind in ("password", "signature", "file")]
-        bodies += [self.payload(options=["Male", "Female"]), self.payload(protected=True)]
-        for body in bodies:
+                self.assertEqual(self.service.correction(body)["status"], "skipped" if label in protected else "recorded")
+                if label in protected:
+                    self.assertEqual(self.service.answer(body)["status"], "none")
+                    with self.assertRaises(ValueError):
+                        self.service.accept({**body, "answer": USER})
+                else:
+                    self.service.accept({**body, "answer": USER})
+                    self.assertEqual(self.service.answer(body)["answer"], USER)
+        for body in [self.payload(type=kind) for kind in ("password", "file")] + [self.payload(protected=True)]:
             self.assertEqual(self.service.correction(body)["status"], "skipped")
+        for body in (self.payload(type="signature"), self.payload(options=["Male", "Female"])):
+            self.assertEqual(self.service.correction(body)["status"], "recorded")
         learned = self.service.learn({**self.payload(), "dry_run": False, "pairs": [
-            {"label": label, "answer": USER, "previous_answer": None} for label in labels]})
-        self.assertTrue(all(row["status"] == "skipped" for row in learned["results"]))
-        self.assertFalse((self.data / corrections.FILENAME).exists())
-        for label in labels:
-            if label in ("Criminal history", "Expected salary"):
-                continue
-            body = self.payload(label=label)
-            directory = self.service.company_scope(body)[0]
-            answer_memory.update_memory(lambda memory: answer_memory.remember(memory, label, WRONG), directory)
-            self.assertEqual(self.service.answer(body)["status"], "none", label)
-            with self.assertRaises(ValueError):
-                self.service.accept({**body, "answer": USER})
+            {"label": label, "answer": USER, "previous_answer": USER if label not in protected else None} for label in labels]})
+        self.assertEqual([row["stored"] for row in learned["results"]], [label not in protected for label in labels])
         self.draft.assert_not_called()
 
     def test_bounds_empty_unchanged_and_atomic_validation(self):

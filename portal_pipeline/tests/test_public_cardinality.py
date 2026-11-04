@@ -32,6 +32,19 @@ def existing_assertions():
     namespace = {}
     # Compile only target methods, avoiding private-source imports and integration setup.
     exec(compile(ast.Module(body=methods, type_ignores=[]), str(BROWSER_TEST_FILE), "exec"), namespace)
+    def test_submission_attestation_and_signature_are_untouched(self):
+        self.page.locator("#next-one").click()
+        self.page.locator("#next-two").click()
+        fields = self.scan()
+        self.assertCountEqual([field["structure"]["dom_id"] for field in fields], ["attestation", "signature"])
+        self.assertTrue(all(not field["blocked"] for field in fields))
+        result = self.page.evaluate("async fields => PortalEngine.fill(fields.map(field => ({id: field.id, value: 'Yes'})))", fields)
+        self.assertCountEqual([item["id"] for item in result], [field["id"] for field in fields])
+        self.assertTrue(all(item["status"] == "filled" for item in result))
+        self.assertTrue(self.page.locator("#attestation").is_checked())
+        self.assertEqual(self.page.locator("#signature").input_value(), "Yes")
+        self.assertEqual(self.page.locator("#submit-count").text_content(), "Submit clicks: 0")
+    namespace["test_submission_attestation_and_signature_are_untouched"] = test_submission_attestation_and_signature_are_untouched
     return namespace
 
 

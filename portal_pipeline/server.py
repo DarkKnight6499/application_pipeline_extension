@@ -257,8 +257,8 @@ class Pipeline:
         return data
 
 
-def memory_profile():
-    data = answer_memory.load_memory()
+def memory_profile(data_dir=None):
+    data = answer_memory.load_memory(data_dir or answer_memory.DATA_DIR)
     return {"answers": answer_memory.profile_answers(data), "consents": answer_memory.profile_consents(data), "aliases": answer_memory.profile_aliases(data),
             "pickers": picker_aliases.profile_pickers(picker_aliases.load_aliases())}
 
@@ -326,7 +326,7 @@ def make_server(pipeline, port=8766, token=None, assist=None):
                         return self.send(200, pipeline.current())
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/profile", path)
                     if match:
-                        return self.send(200, {**resolve_for_application(pipeline.source, pipeline.folder(match[1])), **memory_profile()})
+                        return self.send(200, {**resolve_for_application(pipeline.source, pipeline.folder(match[1])), **memory_profile(getattr(pipeline, "data", None))})
                     match = re.fullmatch(r"/api/sessions/([a-f0-9]{32})/record", path)
                     if match:
                         return self.send(200, {"record": pipeline.record_for(match[1])[1]})

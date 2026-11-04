@@ -60,7 +60,7 @@
   }
 
   async function choose(element, answer, guard = () => {}) {
-    const wanted = normalize(answer);
+    let wanted = normalize(answer);
     if (!wanted) throw new Error("Provide an answer before selecting this menu.");
     const startIdentity = identity(element), startValue = read(element);
     const assertSame = () => {
@@ -78,6 +78,11 @@
       popup = element.getAttribute("aria-expanded") === "true" ? popupFor(element) : null;
     } while ((!popup || !optionNodes(popup).length) && performance.now() < deadline);
     if (!popup || !optionNodes(popup).length) { await close(element); throw new Error("The menu popup did not open. Choose this answer manually."); }
+    if (globalThis.PortalClassifier?.classify(question(element), '', 'contact') === 'state') {
+      const options = optionNodes(popup).map(node => ({label: optionLabel(node), value: optionLabel(node), disabled: node.getAttribute('aria-disabled') === 'true'}));
+      const matched = PortalClassifier.matchOption(options, answer);
+      if (matched) wanted = normalize(matched.label);
+    }
     const found = optionNodes(popup).filter(node => normalize(optionLabel(node)) === wanted && node.getAttribute("aria-disabled") !== "true");
     if (found.length !== 1) { await close(element); throw new Error("No unique exact menu option matches the answer. Choose this answer manually."); }
     found[0].scrollIntoView({block: "nearest"});

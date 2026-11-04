@@ -73,28 +73,6 @@ EDUCATION_FIELDS = ("school", "degree", "date")
 CERTIFICATION_FIELDS = ("cert", "issuer", "date")
 EMPLOYER_COLUMN = "company"
 KB_IMPORT_LOCK = threading.Lock()
-# These classes require a reviewed answer and must never reach the draft process.
-BLOCKED_DRAFT_PATTERNS = (
-    # Authorization and immigration answers must come from separate confirmed facts.
-    r"\b(?:work|employment)\s+(?:authori[sz]ation|eligibility)|\b(?:authori[sz]\w*|eligib\w*|right|permit\w*|permission|allow\w*|legally)\b.{0,60}\b(?:work|employment)\b",
-    r"\b(?:visa|sponsor\w*|immigration|citizen\w*|nationality|work permit|opt|cpt|h[ -]?1b)\b",
-    # Legal history is never inferred from a resume.
-    r"\b(?:criminal|crime|legal|convict\w*|felon\w*|misdemeanor|arrest\w*|charged|indict\w*|litigation|lawsuit|investigation|offen[cs]e|prosecut\w*|debar\w*|sanction\w*)\b",
-    # Medical, military, and voluntary self-identification remain personal choices.
-    r"\b(?:disab\w*|accommodation\w*|veteran\w*|military|armed forces|national guard|reservist\w*|reserves|active duty|service member|uniformed services)\b",
-    r"\b(?:gender|sex|male|female|non[ -]?binary|transgender|race|racial|ethnic\w*|hispanic|latino|black|white|asian|indigenous|native american|pacific islander|sexual orientation|lgbtq\w*|pronouns?|self[ -]?(?:id\w*|identification|disclosure)|demographic\w*|religio\w*|marital status|national origin|eeo|decline to (?:identify|answer|disclose))\b",
-    # Compensation and relationships require a user-provided response.
-    r"\b(?:salary|compensation|remuneration|pay expectations?|expected pay|desired pay|pay requirements?|wage\w*)\b",
-    r"\b(?:(?:expected|desired|anticipated|minimum|target)\s+(?:annual\s+|hourly\s+)?(?:base|rate|pay)|(?:base|hourly|annual)\s+(?:pay|rate)|pay rate)\b",
-    r"\b(?:relative\w*|related to|family|spouse|conflict\w*|outside (?:business|employment|activit\w*)|non[ -]?compet\w*|non[ -]?solicit\w*)\b",
-    # Regulatory registrations and declarations must never be invented.
-    r"\b(?:securities|finra|financial services licen[sc]e|series\s+\d+|broker[ -]?dealer|registered representative)\b",
-    # Agreements may not be drafted; signatures and attestations are also refused below.
-    r"\b(?:agree\w*|attest\w*|sign(?:atures?|ed|ing)?|initials|certify|consent|acknowledge|declaration|accept|terms and conditions|I (?:confirm|affirm|declare)|truthful|accurate and complete|true and (?:correct|accurate))\b",
-)
-BLOCKED_DRAFT = tuple(re.compile(pattern, re.I) for pattern in BLOCKED_DRAFT_PATTERNS)
-# Signatures and attestations are never fillable, even from previously stored data.
-NEVER_FILL = re.compile(r"\b(?:signature|sign|signed|initials|attest\w*|certify|declaration|I (?:confirm|affirm|declare)|truthful|accurate and complete|true and (?:correct|accurate))\b", re.I)
 DRAFT_RULES = (
     "Write a draft application answer in at most 3 sentences, plain prose. "
     "Use no em-dashes or double hyphens. Never invent facts. "
@@ -371,11 +349,10 @@ class AssistService:
         label = body[QUESTION_COLUMN]
         with file_lock(self.data / LOG_FILENAME), (self.data / LOG_FILENAME).open("a", encoding="utf-8") as handle:
             handle.write(json.dumps({QUESTION_COLUMN: label}, ensure_ascii=True) + "\n")
-        context = label + " " + " ".join(body.get(OPTIONS_COLUMN, []))
-        blocked = any(pattern.search(context) for pattern in BLOCKED_DRAFT) or question_alias.blocked(body) or dropdown_mappings.blocked(body)
+        blocked = question_alias.blocked(body) or dropdown_mappings.blocked(body)
         # Eligibility and self-ID answers Yazad already gave are reused as stored (never drafted by a model).
         intent = intent_layer.classify(label)
-        if (intent in STORED_ONLY_INTENTS and not NEVER_FILL.search(label) and not answer_memory.is_protected(body)):
+        if (intent in STORED_ONLY_INTENTS and not answer_memory.is_protected(body)):
             value = intent_layer.lookup(answer_memory.load_memory(self.data), label)
             if value:
                 return {"status": "stored", "source": "intent", "answer": value, "candidates": intent_layer.expand(value)}
@@ -398,7 +375,7 @@ class AssistService:
             essay = essay_tracks.answer(self.data, body)
             if essay:
                 return essay
-        if not NEVER_FILL.search(label) and not question_alias.blocked(body) and not dropdown_mappings.blocked(body):
+        if not question_alias.blocked(body) and not dropdown_mappings.blocked(body):
             value = self.company_answer(body)
             source = "company_kb"
             if not value:
@@ -438,16 +415,13 @@ class AssistService:
 
     def correction(self, body):
         self.validate(body)
-        context = body[QUESTION_COLUMN] + " " + " ".join(body.get(OPTIONS_COLUMN, []))
-        if any(pattern.search(context) for pattern in BLOCKED_DRAFT):
-            return {"status": "skipped"}
         return {"status": "recorded" if corrections.record(self.data, body) else "skipped"}
 
     def accept(self, body):
         self.validate(body)
         label, answer = body[QUESTION_COLUMN], body.get(ANSWER_COLUMN)
         if (not isinstance(answer, str) or not answer.strip() or len(answer) > answer_memory.MAX_ANSWER
-                or NEVER_FILL.search(label) or question_alias.blocked(body) or corrections.blocked(body) or dropdown_mappings.blocked(body)):
+                or question_alias.blocked(body) or corrections.blocked(body) or dropdown_mappings.blocked(body)):
             raise ValueError("Answer is empty, too long, or protected.")
         scoped = bool(body.get(HOST_COLUMN))
         directory = self.company_scope(body)[0] if scoped else self.data
@@ -515,9 +489,7 @@ class AssistService:
                 if index in repeated:
                     results.append({QUESTION_COLUMN: label, "status": "skipped", "stored": False})
                     continue
-                context = label + " " + " ".join(pair.get(OPTIONS_COLUMN, []))
-                if (not answer or NEVER_FILL.search(label) or question_alias.blocked(pair) or corrections.blocked(pair) or dropdown_mappings.blocked(pair)
-                        or any(pattern.search(context) for pattern in BLOCKED_DRAFT)):
+                if (not answer or question_alias.blocked(pair) or corrections.blocked(pair) or dropdown_mappings.blocked(pair)):
                     results.append({QUESTION_COLUMN: label, "status": "skipped", "stored": False})
                     continue
                 mapping = dropdown_mappings.review(self, body, pair, dry_run)

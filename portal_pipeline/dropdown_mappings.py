@@ -28,7 +28,6 @@ VENDOR_DOMAINS = {
     "ultipro": ("ultipro.com",), "adp": ("adp.com",),
 }
 HOST_PATTERN = re.compile(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}")
-SELF_ID_CONTEXT = re.compile(r"\b(?:reserves|active duty|service member|uniformed services|religio\w*|marital status)\b", re.I)
 
 
 def vendor_from_host(host):
@@ -47,7 +46,7 @@ def vendor_from_host(host):
 def blocked(body):
     values = [body.get(LABEL, ""), *body.get("options", [])]
     return answer_memory.is_protected(body) or any(
-        miss_log.BLOCKED.search(value) or SELF_ID_CONTEXT.search(value)
+        miss_log.BLOCKED.search(value)
         for value in map(miss_log.normalized, values))
 
 

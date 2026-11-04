@@ -15,6 +15,7 @@ from browser_test_support import HERE, SYNTHETIC_URL, SyntheticBrowserTest
 PAIRING_TOKEN = "synthetic-test-token"
 SESSION_ID = "a" * 32
 SENTINEL = "SENTINEL-VALUE-5521"
+PASSWORD_SENTINEL = "SENTINEL-PASSWORD-5521"  # only credentials stay out of exports
 RESUME_SHA = "b" * 64
 FIXED_NOW = "2026-10-04T12:00:00+00:00"
 PORTAL_VALUES = {
@@ -26,13 +27,13 @@ MARKUP = f"""
 <label>Email address<input id="mail" name="email" type="email"></label>
 <label>Cover note<textarea id="note" maxlength="40"></textarea></label>
 <label>Favorite synthetic color<input id="color"></label>
-<label>Password<input id="pw" type="password" value="{SENTINEL}"></label>
+<label>Password<input id="pw" type="password" value="{PASSWORD_SENTINEL}"></label>
 <label>Gender<select id="gender"><option value="">Choose</option><option value="x">{SENTINEL}</option></select></label>
 <label>Are you a protected veteran?<input id="vet" value="{SENTINEL}"></label>
 <label>I agree to the privacy policy<input id="agree" type="checkbox"></label>
 """
-PROTECTED_LABELS = ["Password", "Gender", "protected veteran", "privacy policy", "Boundary signature", "I certify this boundary"]
-EXPECTED_LABELS = ["First name", "Email address", "Cover note", "Favorite synthetic color", "Untouched field"]
+PROTECTED_LABELS = ["Password"]
+EXPECTED_LABELS = ["First name", "Email address", "Cover note", "Favorite synthetic color", "Gender", "Are you a protected veteran?", "I agree to the privacy policy", "Untouched field", "Boundary signature", "I certify this boundary"]
 
 sys.path.insert(0, str(HERE))
 import answer_sheet
@@ -145,7 +146,7 @@ class SheetPlainTests(unittest.TestCase):
                         "url": "https://safety-fixture.myworkdayjobs.com/a/../../escape", "heading": "../../evil"}
                 status, result = post(body)
                 self.assertEqual(status, 200, result)
-                self.assertEqual([row["label"] for row in result["sheet"]["rows"]], ["First name"])
+                self.assertEqual([row["label"] for row in result["sheet"]["rows"]], ["First name", "Gender"])
                 self.assertIn("<html", result["html"])
                 written = sorted(p for p in Path(temp).rglob("*") if p.is_file())
                 self.assertEqual(len(written), 2)
@@ -184,13 +185,14 @@ class PanelWiringTests(SyntheticBrowserTest):
         labels = [item["label"] for item in corpus["body"]["questions"]]
         self.assertIn("Favorite synthetic color", labels)
         self.assertNotIn("First name", labels)
-        self.assertFalse({"Password", "Gender", "I agree to the privacy policy"} & set(labels))
+        self.assertNotIn("Password", labels)
+        self.assertIn("Gender", labels)
         with self.page.expect_download() as download:
             host.get_by_role("button", name="Export answer sheet", exact=True).click()
         self.assertEqual(Path(download.value.path()).read_text(encoding="utf-8"), "<p>sheet</p>")
         request = next(call for call in self.page.evaluate("calls") if call["path"].endswith("/answer-sheet"))
         raw = json.dumps(request["body"])
-        for protected in ("Password", "Gender", "veteran", SENTINEL):
+        for protected in ("Password", PASSWORD_SENTINEL):
             self.assertNotIn(protected, raw)
         host.get_by_role("textbox", name="Answer First name", exact=True).fill("Edited name")
         host.get_by_role("button", name="Save edit to profile for First name", exact=True).click()

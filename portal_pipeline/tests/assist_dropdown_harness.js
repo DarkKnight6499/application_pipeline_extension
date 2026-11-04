@@ -10,6 +10,9 @@ const HOST = 'example.myworkdayjobs.com';
 const LABEL = 'Country?';
 const ANSWER = 'USA';
 const OPTION = 'United States of America';
+const STATE_OPTIONS = ['New Jersey', 'New York'];
+const STATE_ANSWERS = ['NJ', 'New Jersey'];
+let storedAnswer = ANSWER;
 
 class Element {
   constructor(tag = 'input') {
@@ -57,7 +60,7 @@ const runtime = {sendMessage(message, callback) {
   if (message.type === 'portal-assist-learn') callback({ok: true, value: {scope: 'Example Corp',
     results: message.body.pairs.map(pair => ({label: pair.label, answer: pair.answer, status: 'dropdown',
       mapping_answer: ANSWER, vendor: 'workday', previous_option: null, stored: !message.body.dry_run}))}});
-  else callback({ok: true, value: {status: 'stored', answer: ANSWER, candidates: [ANSWER], mapped_options: [OPTION]}});
+  else callback({ok: true, value: {status: 'stored', answer: storedAnswer, candidates: [storedAnswer], mapped_options: storedAnswer === ANSWER ? [OPTION] : []}});
 }};
 const context = vm.createContext({document, location: new URL(`https://${HOST}/apply`),
   setTimeout, clearTimeout, chrome: {runtime}, Event, Node: {ELEMENT_NODE: 1},
@@ -69,8 +72,11 @@ assert.equal(source.split(marker).length, 2);
 vm.runInContext(source.replace(marker,
   '  globalThis.testAssist = {match, fill, scan, controls, learnRows};\n})();'), context);
 const api = context.testAssist;
+vm.runInContext(fs.readFileSync(path.join(EXTENSION, 'classifier.js'), 'utf8'), context);
 
 async function checks() {
+  const manifest = JSON.parse(fs.readFileSync(path.join(EXTENSION, 'manifest.json'), 'utf8'));
+  assert.deepEqual(manifest.content_scripts[0].js, ['classifier.js', 'assist-content.js']);
   const options = [{text: ANSWER}, {text: OPTION}];
   assert.equal(api.match(options, [ANSWER], [OPTION]).text, OPTION);
   assert.equal(api.match(options, [ANSWER], ['Absent']).text, ANSWER);
@@ -132,7 +138,80 @@ async function checks() {
   assert.equal(filled.value, 'opaque-option');
   assert.equal(await api.controls.get(filled).run(false), 'has value');
   assert.equal(requests.length, before + 1);
-  process.stdout.write('Assist dropdown checks passed\n');
+  const menu = new Element('button');
+  menu.type = 'button'; menu.value = ''; menu.labels = [{innerText: 'State'}];
+  menu.attributes = {'aria-haspopup': 'listbox', 'aria-controls': 'states'};
+  const stateOptions = STATE_OPTIONS.map(label => {
+    const option = new Element('li'); option.innerText = label;
+    option.click = () => { menu.innerText = label; };
+    return option;
+  });
+  nodes.states = new Element('ul'); nodes.states.attributes.role = 'listbox';
+  nodes.states.querySelectorAll = () => stateOptions;
+  for (const answer of STATE_ANSWERS) {
+    storedAnswer = answer; menu.innerText = 'Select One Required';
+    fields.splice(0, fields.length, menu); api.scan();
+    assert.equal(await api.controls.get(menu).run(false), 'stored');
+    assert.equal(menu.innerText, 'New Jersey');
+    assert.equal(await api.controls.get(menu).run(false), 'has value');
+  }
+  menu.innerText = 'New York';
+  const preservedRequests = requests.length;
+  assert.equal(await api.controls.get(menu).run(false), 'has value');
+  assert.equal(menu.innerText, 'New York');
+  assert.equal(requests.length, preservedRequests);
+  storedAnswer = 'CA'; menu.innerText = 'Select One Required';
+  assert.equal(await api.controls.get(menu).run(false), 'no match');
+  assert.equal(api.controls.get(menu).badge.textContent, 'no match');
+  assert.deepEqual(Array.from(requests.at(-1).body.options), STATE_OPTIONS);
+  assert.equal(requests.at(-1).type, 'portal-assist-miss');
+  assert.equal(menu.innerText, 'Select One Required');
+  const classifier = context.PortalClassifier;
+  assert.equal(classifier.classify('State', '', 'contact'), 'state');
+  assert.equal(classifier.placeDependent('State'), false);
+  assert.equal(classifier.classify('State', '', 'employment'), null);
+  assert.equal(classifier.classify('Which state will you work in?', '', 'contact'), null);
+  assert.equal(classifier.placeDependent('Which state will you work in?'), true);
+  const optionRows = labels => labels.map(label => ({label, value: label}));
+  assert.equal(classifier.matchOption(optionRows(['New Jersey extra']), 'NJ'), null);
+  assert.equal(classifier.matchOption(optionRows(['New Jersey', 'New Jersey']), 'NJ'), null);
+  assert.equal(classifier.matchOption([{label: 'New Jersey', disabled: true}], 'NJ'), null);
+  assert.equal(classifier.matchOption(optionRows(['C#']), 'C++'), null);
+
+  const adapterContext = vm.createContext({setTimeout, performance, CSS: {escape: value => value},
+    getComputedStyle: () => ({visibility: 'visible'}),
+    document: {querySelectorAll: () => adapterMenu.attributes['aria-controls'] ? [adapterList] : []}});
+  const adapterMenu = new Element('button');
+  adapterMenu.id = 'state'; adapterMenu.textContent = 'Select One Required';
+  adapterMenu.attributes = {'aria-haspopup': 'listbox', 'aria-expanded': 'false'};
+  let questionLabel = 'State';
+  adapterMenu.group = {querySelector: () => ({textContent: questionLabel})};
+  const adapterList = new Element('ul'); adapterList.attributes.role = 'listbox';
+  const adapterOptions = STATE_OPTIONS.map(label => {
+    const node = new Element('li'); node.textContent = label;
+    node.closest = selector => selector === '[role="listbox"]' ? adapterList : null;
+    node.scrollIntoView = () => {};
+    node.click = () => { adapterMenu.textContent = label; adapterMenu.attributes['aria-expanded'] = 'false'; delete adapterMenu.attributes['aria-controls']; };
+    return node;
+  });
+  adapterList.querySelectorAll = () => adapterOptions;
+  adapterMenu.click = () => {
+    const opened = adapterMenu.attributes['aria-expanded'] === 'true';
+    adapterMenu.attributes['aria-expanded'] = String(!opened);
+    if (opened) delete adapterMenu.attributes['aria-controls'];
+    else adapterMenu.attributes['aria-controls'] = 'lazy-external-list';
+  };
+  for (const script of ['classifier.js', 'workday-menu.js']) vm.runInContext(fs.readFileSync(path.join(EXTENSION, script), 'utf8'), adapterContext);
+  for (const answer of STATE_ANSWERS) {
+    adapterMenu.textContent = 'Select One Required';
+    assert.equal(await adapterContext.PortalWorkdayMenu.choose(adapterMenu, answer), 'New Jersey');
+  }
+  adapterMenu.textContent = 'Select One Required';
+  await assert.rejects(adapterContext.PortalWorkdayMenu.choose(adapterMenu, 'CA'), /No unique exact/);
+  assert.equal(adapterMenu.textContent, 'Select One Required');
+  questionLabel = 'Other dropdown';
+  await assert.rejects(adapterContext.PortalWorkdayMenu.choose(adapterMenu, 'NJ'), /No unique exact/);
+  process.stdout.write('Assist dropdown and State adapter checks passed\n');
 }
 
 checks().catch(error => { process.stderr.write(error.stack + '\n'); process.exitCode = 1; });

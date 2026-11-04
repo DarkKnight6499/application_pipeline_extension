@@ -315,14 +315,18 @@ class BackgroundQuestionsTests(unittest.TestCase):
     def test_confirm_sensitive_and_invalid_source_rows_never_append(self):
         body = {**self.body(label="Gender"), "dry_run": False}
         body["pairs"][0]["previous_answer"] = None
-        self.assertFalse(self.service.learn(body)["results"][0]["stored"])
-        self.assertFalse((self.data / page_questions.FILENAME).exists())
+        self.assertTrue(self.service.learn(body)["results"][0]["stored"])
+        self.assertEqual([row["label"] for row in page_questions.read(self.data)], ["Gender"])
+        protected = {**self.body(label="Password"), "dry_run": False}
+        protected["pairs"][0]["previous_answer"] = None
+        self.assertFalse(self.service.learn(protected)["results"][0]["stored"])
+        before = {str(path): path.read_bytes() for path in self.data.rglob("*") if path.is_file()}
         for source in ("invalid", [], None):
             body = {**self.body(source=source), "dry_run": False}
             body["pairs"][0]["previous_answer"] = None
             with self.assertRaises(ValueError):
                 self.service.learn(body)
-        self.assertFalse(list(self.data.rglob("answer_memory.json")))
+        self.assertEqual({str(path): path.read_bytes() for path in self.data.rglob("*") if path.is_file()}, before)
 
     def test_confirm_appends_selected_successful_rows_with_source_and_parallel_companies(self):
         def confirm(company):

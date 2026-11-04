@@ -31,7 +31,7 @@ LOCATION_COLUMN = "Location"
 STATUS_COLUMN = "Status"
 DATE_APPLIED_COLUMN = "Date Applied"
 COLUMNS = [APPLICATION_ID_COLUMN, COMPANY_COLUMN, ROLE_COLUMN, LINK_COLUMN, LOCATION_COLUMN, STATUS_COLUMN, DATE_APPLIED_COLUMN]
-REFERENCE_MODULES = ["identity_lib.py", "job_scout.py", "atomic_json.py", "archive_scrape_run.py", "keyword_matching.py"]
+REFERENCE_MODULES = ["identity_lib.py", "job_scout.py", "atomic_json.py", "archive_scrape_run.py", "keyword_matching.py", "cli_flags.py", "gate_lib.py"]
 
 sys.path.insert(0, str(HERE))
 sys.dont_write_bytecode = True
@@ -176,16 +176,14 @@ class PreflightTests(unittest.TestCase):
 
     def test_salary_history_forced_manual(self):
         labels = {"history": "What was your salary history?", "current": "Current salary", "dob": "Date of birth", "age": "What is your age?",
-                  "ssn": "Social Security number", "license": "Driver's license number", "criminal": "Have you been convicted of a crime? Criminal history"}
+                  "license": "Driver's license number", "criminal": "Have you been convicted of a crime? Criminal history"}
         items = self.preflight.sensitive_gate([field(label, field_id=key) for key, label in labels.items()] + [field("Percentage of time", field_id="ok")])
-        self.assertCountEqual([item["field_id"] for item in items], list(labels))
-        for item in items:
-            self.assertEqual(item["severity"], "warn")
-            self.assertTrue(item["force_manual"])
-            self.assertEqual(item["message"], "Answer this yourself.")
+        self.assertEqual(items, [])
+        secret = self.preflight.sensitive_gate([field("Social Security number", field_id="ssn")])
+        self.assertEqual([item["field_id"] for item in secret], ["ssn"])
         self.write_tracker(OWN_ROW)
         result = self.preflight.run_preflight(self.root, self.session, [field("Salary history", field_id="history")], reference=self.reference)
-        self.assertIn("history", result["manual_field_ids"])
+        self.assertNotIn("history", result["manual_field_ids"])
 
     def test_run_preflight_without_fields_skips_field_gates(self):
         self.write_tracker(OWN_ROW)

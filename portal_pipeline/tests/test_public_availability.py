@@ -84,7 +84,7 @@ class PublicInspectionTests(SyntheticBrowserTest):
         self.assertEqual(set(report["coverage"]["reason_codes"]), {"iframe_uninspected", "open_shadow_uninspected", "spinbutton_unsupported"})
         for sentinel in ("VALUE_SENTINEL", "FRAME_SENTINEL", "SHADOW_SENTINEL", "PASSWORD_SENTINEL", "SECRET_SPIN_LABEL"):
             self.assertNotIn(sentinel, str(report))
-        self.assertEqual(report["protected_fields_omitted"], 3)
+        self.assertEqual(report["protected_fields_omitted"], 1)
 
     def test_inspection_panel_shows_coverage_and_unopened_choices(self):
         self.open_markup('''<iframe></iframe><div role="combobox" aria-label="Are you willing to relocate?"

@@ -1,16 +1,15 @@
 /* Author: Yazad Madan. User-selected per-field assist in the extension's isolated world. */
 (() => {
   // Config
-  const FIELD_SELECTOR = 'input:not([type]),input[type="text"],input[type="email"],input[type="tel"],input[type="url"],input[type="search"],textarea,select,input[type="radio"],input[type="checkbox"],[role="combobox"],button[aria-haspopup="listbox"]';
-  const CAPTURE_SELECTOR = 'input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),textarea,select,[role="combobox"],[role="radiogroup"]';
+  const FIELD_SELECTOR = 'input:not([type]),input[type="text"],input[type="email"],input[type="tel"],input[type="url"],input[type="search"],textarea,select,input[type="radio"],input[type="checkbox"],[role="checkbox"],[role="combobox"],button[aria-haspopup="listbox"]';
+  const CAPTURE_SELECTOR = 'input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),textarea,select,[role="checkbox"],[role="combobox"],[role="radiogroup"],button[aria-haspopup="listbox"]';
   // Oracle-style pills: a radiogroup of buttons with role=radio and aria-checked, no native inputs.
   // Workday-style custom dropdown: a button that opens a listbox; its chosen option shows as the button text.
   const menuButton = element => element?.tagName === 'BUTTON' && element.getAttribute('aria-haspopup') === 'listbox';
   const PILL_OPTION = '[role="radio"]:not(input)';
   const pillGroup = element => element?.getAttribute?.('role') === 'radiogroup' && !!element.querySelector(PILL_OPTION);
   const GROUP_SELECTOR = 'fieldset,[role="radiogroup"],[role="group"],[data-automation-id="formField"],.form-field,.field';
-  const FORBIDDEN = /\b(password|passcode|captcha|verification code|ssn|social security|signature|sign|signed|initials|attest\w*|certify|declaration|I (confirm|affirm|declare)|truthful|accurate and complete|true and (correct|accurate))\b/i;
-  const LEARN_BLOCKED = /\b(?:(?:work|employment)\s+(?:authori[sz]ation|eligibility)|(?:authori[sz]\w*|eligib\w*|right|permit\w*|permission|allow\w*|legally)\b.{0,60}\b(?:work|employment)|visa|sponsor\w*|immigration|citizen\w*|nationality|work permit|opt|cpt|h[ -]?1b|disab\w*|accommodation\w*|veteran\w*|military|armed forces|national guard|reservist\w*|reserves|active duty|service member|uniformed services|gender|sex|male|female|non[ -]?binary|transgender|race|racial|ethnic\w*|hispanic|latino|black|white|asian|indigenous|native american|pacific islander|sexual orientation|lgbtq\w*|pronouns?|self[ -]?(?:id\w*|identification|disclosure)|demographic\w*|religio\w*|marital status|national origin|eeo|decline to (?:identify|answer|disclose))\b/i;
+  const FORBIDDEN = /\b(password|passcode|captcha|verification code|one.?time|otp|ssn|social security|credit card|bank account|routing number)\b/i;
   const MAX_LEARN_PAIRS = 80;
   const MAX_PAGE_FIELDS = 200;
   const MAX_LEARN_LABEL = 300;
@@ -18,6 +17,7 @@
   const ACTION = /^(?:next|continue|submit|apply)(?:\b|$)/i;
   const DEBOUNCE_MS = 180;
   const SETTLE_MS = 180;
+  const CHECKBOX_FAILURE = 'checkbox not retained';
   const STATUS_HIDE_MS = 3000;
   const RELOADED = 'Extension was reloaded. Refresh this page.';
   const CORRECTION_DEBOUNCE_MS = 180;
@@ -30,6 +30,14 @@
   const JOB_HEADING_SELECTOR = '[data-automation-id="jobPostingHeader"],h1,[role="heading"][aria-level="1"]';
   const HEADING_VALUES = 'input,textarea,select,output,[contenteditable],[role="textbox"],[role="combobox"],[role="spinbutton"],[role="listbox"]';
   const PLACEHOLDER = /^(?:select(?:\s+(?:one|an? option))?|choose(?:\s+.*)?|please select(?:\s+.*)?|[-*\s]*)$/i;
+  const isPlaceholder = value => PLACEHOLDER.test(value) || /^makeaselection$/i.test(String(value).replace(/[\s*-]/g, ''));
+  const DATE_SEGMENT_LABEL = /^[\s*]*(?:month|day|year|mm|dd|yyyy)[\s*:]*$/i;
+  const PLAIN_CONTAINER = 'tr,.iCIMS_TableRow,.form-group,div';
+  const QUESTION_NODE = 'label,.question-label,.iCIMS_LabelText,.iCIMS_QuestionText,[data-automation-id="formLabel"]';
+  const LABEL_EXCLUSIONS = 'option,input,textarea,select,button,[role="combobox"],[role="listbox"],.help,.help-text,.help-block,.hint,[role="tooltip"],[aria-hidden="true"],[hidden]';
+  const LABEL_DEPTH = 5;
+  const LABEL_TEXT_LIMIT = 2000;
+  const TYPED_SIGNATURE = /\b(?:by\s+)?typing\s+your\s+(?:full|legal)\s+name\b|^[*\s]*(?:typed |electronic |e-?)?signature\b/i;
   const TEXT_TYPES = ['text', 'tel', 'number'];
   const SEGMENT = /\b(?:month|day|year|mm|dd|yyyy)\b/i;
   const STYLE = ':host{all:initial!important;position:absolute!important;z-index:2147483647!important;font:12px Arial,sans-serif!important}button{font:inherit;border:1px solid #777;border-radius:4px;background:#fff;color:#222;padding:2px 6px;cursor:pointer}button:disabled{opacity:.6;cursor:wait}[hidden]{display:none!important}span{font:inherit;color:#333;margin-left:4px}a{font:inherit;color:#165bb4;cursor:pointer;margin-left:4px;text-decoration:underline}';
@@ -43,11 +51,52 @@
   let focused = null;
   let dock = null;
   const text = element => element?.innerText?.replace(/\s+/g, ' ').trim() || '';
+  const menuAnswer = element => {
+    const shown = text(element);
+    return isPlaceholder(shown) || /^select one required$/i.test(shown) ? '' : shown;
+  };
   const normalize = value => String(value ?? '').replace(/\s+/g, ' ').trim().toLocaleLowerCase();
   const visible = element => !!element?.isConnected && !element.closest('[hidden],[inert],[aria-hidden="true"]')
     && element.getClientRects().length > 0 && getComputedStyle(element).visibility !== 'hidden';
   const automation = () => globalThis.PortalAutomationFilling === true;
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const checkbox = element => element.type === 'checkbox' || element.getAttribute?.('role') === 'checkbox';
+  const checked = element => element.type === 'checkbox' ? element.checked : element.getAttribute('aria-checked') === 'true';
+
+  function checkboxTarget(element) {
+    if (visible(element)) return element;
+    const role = element.closest('[role="checkbox"]');
+    const parent = element.parentElement;
+    const candidates = [...(element.labels || []), role,
+      ...(parent?.querySelectorAll?.('input').length === 1 ? [parent] : [])];
+    return candidates.find(node => node?.getClientRects && visible(node)) || element;
+  }
+
+  const fieldVisible = element => visible(element) || (checkbox(element) && visible(checkboxTarget(element)));
+  const duplicateCheckbox = element => element.type !== 'checkbox' && checkbox(element)
+    && !!element.querySelector?.('input[type="checkbox"]');
+  const checkboxRetained = (element, wanted) => element.isConnected && checked(element) === wanted && !element.indeterminate
+    && [element, checkboxTarget(element)].every(node => {
+      const aria = node.getAttribute('aria-checked');
+      return aria === null || aria === String(wanted);
+    });
+
+  async function fillCheckbox(element, wanted, mayWrite) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      if (element.type === 'checkbox' && element.indeterminate) element.indeterminate = false;
+      if (checkboxRetained(element, wanted)) return;
+      // Never toggle an accepted value to repair ARIA or framework state.
+      if (checked(element) === wanted || !mayWrite()) break;
+      const target = checkboxTarget(element);
+      if (element.disabled || element.getAttribute('aria-disabled') === 'true' || target.getAttribute('aria-disabled') === 'true') break;
+      target.focus?.();
+      if (!mayWrite() || checked(element) === wanted) break;
+      safeClick(target, element.type !== 'checkbox' || target !== element);
+      await wait(SETTLE_MS);
+    }
+    if (element.type === 'checkbox' && element.indeterminate) element.indeterminate = false;
+    if (!checkboxRetained(element, wanted)) throw new Error(CHECKBOX_FAILURE);
+  }
 
   function ariaLabel(element) {
     const ids = (element.getAttribute('aria-labelledby') || '').trim().split(/\s+/);
@@ -78,11 +127,47 @@
   function labelFor(element) {
     if (element.type === 'radio') return groupLabel(element);
     const own = ownLabel(element);
-    const group = element.type === 'checkbox' ? groupLabel(element) : '';
+    const group = checkbox(element) ? groupLabel(element) : '';
     if (own && group && normalize(own) !== normalize(group)) return `${group}: ${own}`;
-    if (own && !SEGMENT.test(own)) return own;
+    if (own && !DATE_SEGMENT_LABEL.test(own)) return own;
     const container = element.closest('[data-automation-id="formField"],[data-automation-id^="formField-"],.form-field,.field');
-    return text(container?.querySelector('label,[data-automation-id="formLabel"]')) || groupLabel(element);
+    return text(container?.querySelector('label,[data-automation-id="formLabel"]')) || groupLabel(element) || plainLabel(element);
+  }
+
+  function plainLabel(element) {
+    const described = (element.getAttribute('aria-describedby') || '').split(/\s+/);
+    const labelText = node => {
+      if (!node) return '';
+      if (node.nodeType === Node.TEXT_NODE) {
+        const value = node.textContent.replace(/\s+/g, ' ').trim();
+        return value.length <= LABEL_TEXT_LIMIT ? value : '';
+      }
+      if (!visible(node) || node.matches(LABEL_EXCLUSIONS) || described.includes(node.id)
+        || node.querySelector(CAPTURE_SELECTOR) || (node.control && node.control !== element)) return '';
+      const copy = node.cloneNode(true);
+      for (const child of copy.querySelectorAll(LABEL_EXCLUSIONS)) child.remove();
+      for (const child of copy.querySelectorAll('[id]')) if (described.includes(child.id)) child.remove();
+      const value = (copy.textContent || '').replace(/\s+/g, ' ').trim();
+      return value.length <= LABEL_TEXT_LIMIT ? value : '';
+    };
+    let branch = element;
+    for (let depth = 0; branch.parentElement && depth < LABEL_DEPTH; depth += 1) {
+      const container = branch.parentElement;
+      if (container.matches('body,html,form,main')) break;
+      const fields = [...container.querySelectorAll(CAPTURE_SELECTOR)];
+      if (fields.length !== 1 || fields[0] !== element) return '';
+      if (container.matches(PLAIN_CONTAINER)) {
+        const questions = [...container.querySelectorAll(QUESTION_NODE)].map(labelText).filter(Boolean);
+        if (questions.length > 1) return '';
+        if (questions.length === 1) return questions[0];
+        for (let sibling = branch.previousSibling, count = 0; sibling && count < LABEL_DEPTH; sibling = sibling.previousSibling, count += 1) {
+          const value = labelText(sibling);
+          if (value) return value;
+        }
+      }
+      branch = container;
+    }
+    return '';
   }
 
   function members(element) {
@@ -128,14 +213,14 @@
 
   function choices(element) {
     if (element.tagName === 'SELECT') return [...element.options].filter(option => !option.disabled && !option.hidden
-      && !option.parentElement.disabled && option.value !== '' && !PLACEHOLDER.test(option.text)).map(option => ({node: option, text: option.text}));
+      && !option.parentElement.disabled && option.value !== '' && !isPlaceholder(option.text)).map(option => ({node: option, text: option.text}));
     if (element.type === 'radio') return members(element).filter(node => visible(node) && !node.disabled)
       .map(node => ({node, text: ownLabel(node)})).filter(option => option.text);
     if (pillGroup(element)) return [...element.querySelectorAll(PILL_OPTION)].filter(node => visible(node))
       .map(node => ({node, text: text(node)})).filter(option => option.text);
-    if (element.type === 'checkbox') return [{node: element, text: 'Yes', checked: true}, {node: element, text: 'No', checked: false}];
+    if (checkbox(element)) return [{node: element, text: 'Yes', checked: true}, {node: element, text: 'No', checked: false}];
     if (element.getAttribute('role') === 'combobox' || menuButton(element)) return [...(popup(element)?.querySelectorAll('[role="option"]') || [])]
-      .filter(node => visible(node) && node.getAttribute('aria-disabled') !== 'true').map(node => ({node, text: text(node)}));
+      .filter(node => visible(node) && node.getAttribute('aria-disabled') !== 'true' && !isPlaceholder(text(node))).map(node => ({node, text: text(node)}));
     return [];
   }
 
@@ -170,13 +255,14 @@
   }
 
   function nonempty(element) {
+    if (menuButton(element)) return !!menuAnswer(element);
     if (pills(element).length) return true;
     if (element.type === 'radio') return members(element).some(node => node.checked);
-    if (element.type === 'checkbox') return element.checked || element.indeterminate;
-    if (element.tagName === 'SELECT') return [...element.selectedOptions].some(option => option.value !== '' && !PLACEHOLDER.test(option.text));
+    if (checkbox(element)) return checked(element) && checkboxRetained(element, true);
+    if (element.tagName === 'SELECT') return [...element.selectedOptions].some(option => option.value !== '' && !isPlaceholder(option.text));
     if (element.getAttribute('role') === 'combobox') {
       const value = 'value' in element ? element.value : text(element);
-      return !!value.trim() && !PLACEHOLDER.test(value.trim());
+      return !!value.trim() && !isPlaceholder(value.trim());
     }
     return !!element.value?.trim();
   }
@@ -188,22 +274,22 @@
       const checked = members(element).find(node => node.checked);
       return checked ? ownLabel(checked) : '';
     }
-    if (element.type === 'checkbox') return element.indeterminate ? '' : element.checked ? 'Yes' : 'No';
+    if (checkbox(element)) return element.indeterminate || element.getAttribute('aria-checked') === 'mixed' ? '' : checked(element) ? 'Yes' : 'No';
     if (element.tagName === 'SELECT') return [...element.selectedOptions].filter(option =>
-      option.value !== '' && !PLACEHOLDER.test(option.text)).map(option => option.text).join('; ');
-    if (element.tagName === 'BUTTON') { const shown = text(element); return PLACEHOLDER.test(shown) ? '' : shown; }  // Workday custom dropdown shows its choice as button text
+      option.value !== '' && !isPlaceholder(option.text)).map(option => option.text).join('; ');
+    if (menuButton(element)) return menuAnswer(element);
     const chosen = pills(element);
     if (chosen.length) return chosen.join('; ');
     const parts = groupOf(element, capture);
     if (parts.length > 1) return parts.every(node => node.value.trim()) ? parts.map(node => node.value.trim()).join('/') : '';
     const value = String('value' in element ? element.value : text(element)).trim();
-    return element.getAttribute('role') === 'combobox' && PLACEHOLDER.test(value) ? '' : value;
+    return element.getAttribute('role') === 'combobox' && isPlaceholder(value) ? '' : value;
   }
 
   function captureElements() {
     const seen = new Set();
     return [...document.querySelectorAll(CAPTURE_SELECTOR)].filter(element => {
-      if (!visible(element) || element.closest('[data-portal-panel]') || element.parentElement?.closest('[role="combobox"]')) return false;
+      if (!fieldVisible(element) || duplicateCheckbox(element) || element.closest('[data-portal-panel]') || element.parentElement?.closest('[role="combobox"]')) return false;
       if (element.getAttribute('role') === 'radiogroup' && !pillGroup(element)) return false;
       const parts = element.type === 'radio' ? members(element) : groupOf(element, true);
       if (parts.some(node => seen.has(node))) return false;
@@ -235,7 +321,6 @@
       const options = choices(element).map(option => option.text);
       if (!visible(element) || !label || !answer) continue;
       if (!capture && (element.disabled || element.readOnly || FORBIDDEN.test(label)
-        || LEARN_BLOCKED.test([label, ...options].join(' '))
         || /\d+\s*:/.test(label)  // indexed rows of a repeating section (Work Experience 2: ...) are not reusable answers
         || label.length > MAX_LEARN_LABEL || answer.length > MAX_LEARN_ANSWER)) continue;
       // Values already on the page count too: Simplify and the last application are trusted, and the review step still gates saving.
@@ -276,7 +361,7 @@
         || location.href !== context.url || companyHint() !== context.company_hint) return;
       const options = [...new Set([...context.options, ...choices(element).map(option => option.text)])];
       if (!answer || answer.length > MAX_LEARN_ANSWER || context.label.length > MAX_LEARN_LABEL
-        || FORBIDDEN.test(context.label) || LEARN_BLOCKED.test([context.label, ...options].join(' '))) return;
+        || FORBIDDEN.test(context.label)) return;
       state.correctionPending = false;
       state.reportedUser = answer;
       void request('portal-assist-correction', {...context, options, user_value: answer}).catch(() => {});
@@ -292,20 +377,29 @@
     for (const type of ['input', 'change', 'blur']) element.dispatchEvent(new Event(type, {bubbles: true}));
   }
 
-  function safeClick(element) {
+  function safeClick(element, pointer = false) {
     const button = element.closest('button');
     if (!visible(element) || element.closest('a[href],button[type="submit"],input[type="submit"],input[type="image"]')
       || (button?.form && button.type !== 'button')
       || (element.tagName === 'BUTTON' && element.form && element.type !== 'button')
       || ACTION.test(text(element))) throw new Error('Manual field');
+    if (pointer) {
+      for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup']) {
+        const Constructor = type.startsWith('pointer') && typeof PointerEvent !== 'undefined' ? PointerEvent : MouseEvent;
+        element.dispatchEvent(new Constructor(type, {bubbles: true, cancelable: true, composed: true, button: 0}));
+      }
+    }
     element.click();
   }
+
+  // Workday tenant slugs that differ from the company name.
+  const TENANT_NAMES = { ghr: 'Bank of America' };
 
   function companyHint() {
     const employer = document.querySelector('[data-automation-id="companyName"],[itemprop="hiringOrganization"] [itemprop="name"]');
     if (text(employer)) return text(employer).slice(0, 150);
     const host = location.hostname;
-    if (/\.(?:myworkdayjobs|myworkdaysite)\.com$/i.test(host)) return host.split('.')[0];
+    if (/\.(?:myworkdayjobs|myworkdaysite)\.com$/i.test(host)) return TENANT_NAMES[host.split('.')[0].toLowerCase()] || host.split('.')[0];
     if (/\.fa\.[a-z0-9-]+\.oraclecloud\.com$/i.test(host)) return host.split('.')[0];
     // SuccessFactors hosts are shared (careerN.successfactors.com); the tenant is the company query parameter.
     if (/\.successfactors\.(?:com|eu)$/i.test(host)) return (new URLSearchParams(location.search).get('company') || '').slice(0, 150);
@@ -328,7 +422,7 @@
 
   function reportMiss(element, label) {
     try {
-      const dropdown = element.tagName === 'SELECT' || element.getAttribute('role') === 'combobox';
+      const dropdown = element.tagName === 'SELECT' || element.getAttribute('role') === 'combobox' || menuButton(element);
       void request('portal-assist-miss', {label: label.replace(/\s+/g, ' ').trim().slice(0, MISS_LABEL_LIMIT),
         type: element.getAttribute('role') === 'combobox' || menuButton(element) ? 'combobox' : element.type || element.tagName.toLowerCase(),
         host: location.hostname, company_hint: companyHint(),
@@ -387,26 +481,43 @@
 
   async function fill(element, result, mayWrite) {
     if (!mayWrite()) return null;
+    if (checkbox(element)) {
+      const option = match(choices(element), result.candidates, result.mapped_options);
+      if (!option) return null;
+      await fillCheckbox(element, option.checked, mayWrite);
+      return {kind: 'checkbox', node: element, value: option.checked};
+    }
     if ((element.getAttribute('role') === 'combobox' || menuButton(element)) && element.tagName !== 'SELECT') {
+      const matchChoices = () => {
+        const options = choices(element);
+        if (!menuButton(element) || globalThis.PortalClassifier?.classify(labelFor(element), '', 'contact') !== 'state') {
+          return match(options, result.candidates, result.mapped_options);
+        }
+        for (const answer of [...(result.mapped_options || []), ...result.candidates]) {
+          const found = PortalClassifier.matchOption(options.map(option => ({...option, label: option.text, value: option.text})), answer);
+          if (found) return found;
+        }
+        return null;
+      };
       if (!popup(element)) safeClick(element);
       const deadline = Date.now() + POPUP_TIMEOUT_MS;
-      while (!match(choices(element), result.candidates, result.mapped_options) && Date.now() < deadline) {
+      while (!matchChoices() && Date.now() < deadline) {
         await wait(60);
         if (!mayWrite()) return null;
       }
-      const option = match(choices(element), result.candidates, result.mapped_options);
+      const option = matchChoices();
       if (!option || !mayWrite()) return null;
       safeClick(option.node);
       for (const type of ['input', 'change', 'blur']) element.dispatchEvent(new Event(type, {bubbles: true}));
       return {kind: 'combobox', value: option.text};
     }
-    if (element.tagName === 'SELECT' || ['radio', 'checkbox'].includes(element.type)) {
+    if (element.tagName === 'SELECT' || element.type === 'radio') {
       const option = match(choices(element), result.candidates, result.mapped_options);
       if (!option) return null;
       if (element.tagName === 'SELECT') nativeSet(element, 'value', option.node.value);
-      else nativeSet(option.node, 'checked', element.type === 'radio' || option.checked);
-      return {kind: element.type === 'radio' ? 'radio' : element.type === 'checkbox' ? 'checkbox' : 'select',
-        node: option.node, value: element.tagName === 'SELECT' ? option.node.value : element.type === 'radio' || option.checked};
+      else nativeSet(option.node, 'checked', true);
+      return {kind: element.type === 'radio' ? 'radio' : 'select',
+        node: option.node, value: element.tagName === 'SELECT' ? option.node.value : true};
     }
     const parts = groupOf(element);
     if (parts.length > 1) return fillGroup(parts, result);
@@ -418,7 +529,8 @@
   function unchanged(element, written) {
     if (!element.isConnected || !written) return false;
     if (written.kind === 'group') return written.parts.every((node, index) => node.value === written.values[index]);
-    if (written.kind === 'radio' || written.kind === 'checkbox') return written.node.checked === written.value;
+    if (written.kind === 'checkbox') return checkboxRetained(written.node, written.value);
+    if (written.kind === 'radio') return written.node.checked === written.value;
     if (written.kind === 'combobox') return normalize('value' in element && !menuButton(element) ? element.value : text(element)) === normalize(written.value);
     return element.value === written.value;
   }
@@ -467,14 +579,15 @@
       if (!overwrite && parts.some(nonempty)) return 'has value';
       if (!label || FORBIDDEN.test(label) || element.disabled || element.readOnly) return 'manual';
       const url = location.href;
-      const mayWrite = () => !automation() && element.isConnected && visible(element) && !element.disabled && !element.readOnly
+      const mayWrite = () => !automation() && element.isConnected && fieldVisible(element) && !element.disabled && !element.readOnly
         && labelFor(element) === label && location.href === url && (overwrite || !parts.some(nonempty));
       pending = true;
       button.disabled = true;
       badge.textContent = 'looking up';
       save.hidden = true;
       try {
-        const result = await request('portal-assist-answer', {label, options: choices(element).map(option => option.text),
+        const signature = element.tagName === 'INPUT' && element.type === 'text' && TYPED_SIGNATURE.test(label);
+        const result = await request(signature ? 'portal-assist-full-name' : 'portal-assist-answer', {label, options: choices(element).map(option => option.text),
           type: element.getAttribute('role') === 'combobox' || menuButton(element) ? 'combobox' : element.type || element.tagName.toLowerCase(),
           host: location.hostname, url, company_hint: companyHint(), ...essayContext(), ...rowContext(element)});
         if (!mayWrite()) return 'field changed';
@@ -489,7 +602,10 @@
           return 'no match';
         }
         await wait(SETTLE_MS);
-        if (!unchanged(element, written)) return 'not retained';
+        if (!unchanged(element, written)) {
+          if (written.kind === 'checkbox') { reportMiss(element, label); return CHECKBOX_FAILURE; }
+          return 'not retained';
+        }
         const state = fieldStates.get(element);
         if (state) {
           clearTimeout(state.correctionTimer);
@@ -505,7 +621,11 @@
         draft = result.status === 'draft' ? {label, answer: result.answer} : null;
         save.hidden = !draft;
         return result.status;
-      } catch (error) { badge.title = error.message; return 'unavailable'; }
+      } catch (error) {
+        badge.title = error.message;
+        if (error.message === CHECKBOX_FAILURE) { reportMiss(element, label); return CHECKBOX_FAILURE; }
+        return 'unavailable';
+      }
       finally { pending = false; button.disabled = false; }
     };
     entry.run = async overwrite => {
@@ -701,7 +821,7 @@
       // Sites re-render fields after an earlier answer (country, device type), so the next field is looked up fresh each time.
       for (let guard = 0; guard < MAX_PAGE_FIELDS; guard += 1) {
         scan();
-        const next = [...controls].filter(([element]) => element.isConnected && visible(element) && !attempted.has(keyOf(element))).sort(order)[0];
+        const next = [...controls].filter(([element]) => element.isConnected && fieldVisible(element) && !attempted.has(keyOf(element))).sort(order)[0];
         if (!next) break;
         const key = keyOf(next[0]);
         attempted.add(key);
@@ -720,7 +840,10 @@
         else misses.push(`${label.slice(0, 60)}: ${status}`);
       }
       button.disabled = false;
-      summary.textContent = [`filled ${filled}, left alone ${left} (already filled)${blank ? `, left blank ${blank} (optional)` : ""}`,
+      const shown = captureElements();
+      const unlabelled = shown.filter(element => !labelFor(element)).length;
+      summary.textContent = [`filled ${filled}, left alone ${left}${blank ? `, left blank ${blank} (optional)` : ""}`,
+        `${shown.length} visible controls, ${unlabelled} without labels`,
         ...(misses.length ? ['not filled:', ...misses.map(line => `- ${line}`)] : [])].join('\n');
       summary.hidden = false;
     });
@@ -753,7 +876,7 @@
     const radioSeen = new Set();
     for (const element of document.querySelectorAll(FIELD_SELECTOR)) {
       if (!fieldStates.has(element)) fieldStates.set(element, {initial: currentAnswer(element)});
-      if (!visible(element) || element.disabled || element.readOnly || element.closest('[data-portal-panel]')) continue;
+      if (!fieldVisible(element) || duplicateCheckbox(element) || element.disabled || element.readOnly || element.closest('[data-portal-panel]')) continue;
       if (element.parentElement?.closest('[role="combobox"]')) continue;
       const parts = groupOf(element);
       if (parts[0] !== element) continue;
