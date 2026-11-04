@@ -154,7 +154,9 @@
     for (let depth = 0; branch.parentElement && depth < LABEL_DEPTH; depth += 1) {
       const container = branch.parentElement;
       if (container.matches('body,html,form,main')) break;
-      const fields = [...container.querySelectorAll(CAPTURE_SELECTOR)];
+      // Hidden backing controls and inner inputs of a combobox are not separate questions.
+      const fields = [...container.querySelectorAll(CAPTURE_SELECTOR)].filter(node => fieldVisible(node) && !duplicateCheckbox(node)
+        && !node.parentElement?.closest('[role="combobox"]'));
       if (fields.length !== 1 || fields[0] !== element) return '';
       if (container.matches(PLAIN_CONTAINER)) {
         const questions = [...container.querySelectorAll(QUESTION_NODE)].map(labelText).filter(Boolean);
@@ -302,9 +304,10 @@
   function saveDiagnosis(rows) {
     const all = [...document.querySelectorAll(CAPTURE_SELECTOR)];
     const shown = all.filter(visible);
-    const named = rows.filter(row => row.label).length;
+    const named = shown.filter(element => labelFor(element) || ownLabel(element)).length;
+    const answered = rows.length;
     const bare = shown.filter(element => !labelFor(element) && !ownLabel(element))[0];
-    return `[${window === window.top ? 'top page' : 'iframe'}: ${all.length} controls, ${shown.length} visible, ${named} labelled${bare ? `, unlabelled e.g. ${bare.tagName.toLowerCase()}#${bare.id || bare.name || '?'}` : ''}]
+    return `[${window === window.top ? 'top page' : 'iframe'}: ${all.length} controls, ${shown.length} visible, ${named} labelled, ${answered} answered${bare ? `, unlabelled e.g. ${bare.tagName.toLowerCase()}#${bare.id || bare.name || '?'}` : ''}]
 `;
   }
 
